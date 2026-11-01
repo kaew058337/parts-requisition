@@ -255,6 +255,14 @@ function ensureTextCols_(sh, name, force) {
   const cols = TEXT_COLS_[name];
   if (!cols || !sh || (!force && TXT_DONE_[name])) return;
   TXT_DONE_[name] = true;
+  // เหลือแถวว่างไม่พอ → เพิ่มแถวและตั้งเป็นข้อความล่วงหน้า (แถวที่ Sheets เพิ่มเองตอนเขียนเกินขอบ จะเป็นรูปแบบทั่วไป ทำให้เลข 0 นำหน้าหาย)
+  try {
+    const mx = sh.getMaxRows();
+    if (mx - sh.getLastRow() < 300) {
+      sh.insertRowsAfter(mx, 1000);
+      cols.forEach(c => sh.getRange(mx + 1, c, 1000, 1).setNumberFormat('@'));
+    }
+  } catch (e) { /* ไม่ให้ล้ม */ }
   let props = null;
   try { props = PropertiesService.getDocumentProperties(); } catch (e) { props = null; }
   const key = 'txtcols1:' + name;
