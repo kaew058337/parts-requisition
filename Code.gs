@@ -280,6 +280,88 @@ function ensureTextCols_(sh, name, force) {
   } catch (e) { /* ไม่ให้การตั้งรูปแบบทำให้ระบบหลักล้ม */ }
 }
 
+/**
+ * นำค่า Part number / Serial ที่แก้ไว้ในชีท "คลังพัสดุ" ไปแก้ที่ชีทต้นทางให้ (รับ, จ่าย, ยืมพัสดุ, ใบเบิก, ชุดพัสดุ, เคลม)
+ * ใช้: แก้ช่อง Part / serial ในคลังพัสดุ แล้วกดเมนูนี้ทันที (ก่อนมีการเคลื่อนไหวอื่นที่ทำให้ชีทถูกสร้างใหม่)
+ */
+function applyStockEdits() {
+  return withLock_(() => {
+    const stk = getSheet_(SHEET_STK), last = stk.getLastRow();
+    const out = { applied: [], skipped: [] };
+    if (last >= 2) {
+      const sRows = stk.getRange(2, 1, last - 1, HEADERS[SHEET_STK].length).getValues();
+      const rcv = getSheet_(SHEET_RCV), iss = getSheet_(SHEET_ISS), loan = getSheet_(SHEET_LOAN);
+      const rc = readRcv_();
+      const rcBySeq = {};
+      rc.forEach((r, i) => { rcBySeq[str_(r[RC.SEQ])] = i; });
+      const snUsed = {};
+      rc.forEach(r => { const k = snKey_(r[RC.SN]); if (k) snUsed[k] = (snUsed[k] || 0) + 1; });
+      const setTxt = (sh, row, col, v) => sh.getRange(row, col).setNumberFormat('@').setValue(v);
+      const issRows = readIss_(), loanRows = readLoans_();
+      sRows.forEach((sr, i) => {
+        const seq = str_(sr[0]);
+        if (!seq || rcBySeq[seq] === undefined) return;
+        const idx = rcBySeq[seq], r = rc[idx];
+        const oldPart = str_(r[RC.PART]), oldSn = str_(r[RC.SN]);
+        const newPart = sr[2] instanceof Date ? null : str_(sr[2]);
+        const newSn = sr[4] instanceof Date ? null : str_(sr[4]);
+        if (newPart === null || newSn === null) { out.skipped.push('แถว ' + (i + 2) + ' ยังเป็นวันที่ — พิมพ์ค่าที่ถูกต้องทับก่อน'); return; }
+        const partCh = newPart !== oldPart, snCh = newSn !== oldSn;
+        if (!partCh && !snCh) return;
+        if (!newPart) { out.skipped.push('แถว ' + (i + 2) + ' Part ว่างไม่ได้'); return; }
+        if (snCh && newSn && snKey_(newSn) !== snKey_(oldSn) && snUsed[snKey_(newSn)]) {
+          out.skipped.push('แถว ' + (i + 2) + ' S/N ' + newSn + ' ซ้ำกับรายการอื่น'); return;
+        }
+        if (snCh && !newSn && oldSn) { out.skipped.push('แถว ' + (i + 2) + ' ลบ S/N ไม่ได้ (ต้องมีค่า)'); return; }
+        const rrow = idx + 2, doc = str_(r[RC.DOC]);
+        if (partCh) setTxt(rcv, rrow, RC.PART + 1, newPart);
+        if (snCh) { setTxt(rcv, rrow, RC.SN + 1, newSn); snUsed[snKey_(oldSn)] = 0; if (newSn) snUsed[snKey_(newSn)] = 1; }
+        // จ่าย
+        issRows.forEach((ir, j) => {
+          if (str_(ir[IS.RSEQ]) !== seq) return;
+          if (partCh) setTxt(iss, j + 2, IS.PART + 1, newPart);
+          if (snCh) setTxt(iss, j + 2, IS.SN + 1, newSn);
+        });
+        // ยืมพัสดุ (ลำดับล็อต col 18)
+        loanRows.forEach((lr, j) => {
+          if (str_(lr[17]) !== seq) return;
+          if (partCh) setTxt(loan, j + 2, 3, newPart);
+          if (snCh) setTxt(loan, j + 2, 5, newSn);
+        });
+        // ใบเบิก (ให้ยังจับคู่ รับ↔เบิก ได้)
+        if (partCh && doc && (str_(r[RC.SRC]) || SRC_REQ) === SRC_REQ) {
+          const req = getSheet_(SHEET_REQ), rl = req.getLastRow();
+          if (rl >= 2) {
+            const rv = req.getRange(2, 1, rl - 1, 3).getValues();
+            const hit = rv.map((x, k) => ({ x, k })).filter(o => pad_(o.x[1], 9) === pad_(doc, 9));
+            const pick = hit.length === 1 ? hit : hit.filter(o => str_(o.x[2]) === oldPart);
+            pick.forEach(o => setTxt(req, o.k + 2, 3, newPart));
+          }
+        }
+        // ชุดพัสดุ / เคลม ที่อ้าง S/N เดิม
+        if (snCh && oldSn) {
+          readKit_().forEach(k => { if (snKey_(k.serial) === snKey_(oldSn)) { setTxt(getSheet_(SHEET_KIT), k.row, 5, newSn); if (partCh) setTxt(getSheet_(SHEET_KIT), k.row, 2, newPart); } });
+          readClaims_().forEach(c => {
+            const sh = getSheet_(SHEET_CLAIM);
+            if (snKey_(c.sn) === snKey_(oldSn)) { setTxt(sh, c.row, 2, newSn); if (partCh) setTxt(sh, c.row, 3, newPart); }
+            if (snKey_(c.newSn) === snKey_(oldSn)) setTxt(sh, c.row, 11, newSn);
+          });
+        }
+        out.applied.push('ลำดับรับ ' + seq + ': ' + (partCh ? 'Part ' + oldPart + ' → ' + newPart + ' ' : '') + (snCh ? 'S/N ' + (oldSn || '(ว่าง)') + ' → ' + (newSn || '(ว่าง)') : ''));
+        log_('แก้ Part/S/N จากคลังพัสดุ', doc, out.applied[out.applied.length - 1], 'เมนูชีท');
+      });
+    }
+    rebuildStock_();
+    try {
+      const ui = SpreadsheetApp.getUi();
+      ui.alert(out.applied.length ? 'นำค่าที่แก้ไปใช้แล้ว ' + out.applied.length + ' รายการ' : 'ไม่พบค่าที่แก้ต่างจากต้นทาง',
+        out.applied.slice(0, 20).join('\n') + (out.skipped.length ? '\n\nข้าม ' + out.skipped.length + ' รายการ:\n' + out.skipped.slice(0, 15).join('\n') : '') +
+        (out.applied.length || out.skipped.length ? '' : '\nแก้ช่อง Part number หรือ serial number ในชีทคลังพัสดุ แล้วกดเมนูนี้อีกครั้ง'), ui.ButtonSet.OK);
+    } catch (e) { /* ไม่มี UI */ }
+    return out;
+  });
+}
+
 /** หา Part number / Serial ที่ถูก Google Sheets แปลงเป็นวันที่ไปแล้ว : ระบายสีเหลืองและรายงาน (ต้องพิมพ์ค่าที่ถูกต้องใหม่เอง) */
 function findDateParts() {
   const ss = SpreadsheetApp.getActiveSpreadsheet(), found = [];
@@ -2517,6 +2599,7 @@ function onOpen() {
       .addItem('เพิ่มรายการชุดเข้าคลัง (ยอดยกมา)', 'importKitToStock')
       .addSeparator()
       .addItem('ตรวจ Part/Serial ที่กลายเป็นวันที่', 'findDateParts')
+      .addItem('นำค่าที่แก้ในคลังพัสดุไปแก้ต้นทาง', 'applyStockEdits')
       .addToUi();
   } catch (e) { /* ไม่มี UI */ }
 }
