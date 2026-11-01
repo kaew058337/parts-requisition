@@ -764,6 +764,7 @@
       <div id="d-list"></div>
     </div>
     <button class="btn ghost" id="d-print">พิมพ์ใบเบิก (A5)</button>
+    <button class="btn ghost" id="d-printall" style="display:none">พิมพ์ทั้งหมด</button>
     <button class="btn" id="d-close" style="margin-top:10px">ตกลง</button>
   </div>
 </div>
@@ -1140,6 +1141,8 @@
         return '<div class="dl-row"><div><b>'+esc(x.docNo)+'</b><div class="meta" style="margin:0">'+esc(x.part||'')+' '+esc(x.name)+' × '+esc(String(x.qty))+'</div></div><button class="btn ghost sm" data-pr="'+i+'">พิมพ์</button></div>';
       }).join('') : '';
       $('d-print').style.display = many ? 'none' : '';
+      $('d-printall').style.display = many ? '' : 'none';
+      $('d-printall').textContent = 'พิมพ์ทั้งหมด '+docs.length+' ใบ (A5)';
       $('d-bg').classList.add('on');
       $('r-machine').value=''; $('r-issue').value=''; $('r-urg').value='เบิกธรรมดา';
       $('r-items').innerHTML=''; addItem();
@@ -1188,7 +1191,7 @@
     return Number(m[1])+' '+TH_MON[mo-1]+' '+m[3];
   }
 
-  function printForm(d){
+  function formHtml(d){
     var psk = pfDetect(), base = psk?16:12.5, mn = base*0.55;
     var by = ((d.rank?d.rank+' ':'')+d.fullName+(d.position?'  '+d.position:'')).trim();
     var qtyTxt = (d.qty===0||d.qty)?(d.qty+' '+(d.unit||'EA')):'';
@@ -1213,13 +1216,21 @@
     '<tr><td>วันเดือนปี :</td></tr>'+
     '<tr><td class="nb" colspan="3"></td><td>ผู้ตรวจสอบ</td></tr>'+
     '</table></div>';
-    $('print-area').innerHTML = html;
+    return html;
+  }
+
+  function printForms(list){
+    if(!list || !list.length) return;
+    $('print-area').innerHTML = list.map(function(d,i){
+      return '<div style="'+(i? 'break-before:page;page-break-before:always' : '')+'">'+formHtml(d)+'</div>';
+    }).join('');
     setPage('A5 landscape','6mm');
     document.body.classList.add('printing');
     var done = function(){ document.body.classList.remove('printing'); window.removeEventListener('afterprint', done); };
     window.addEventListener('afterprint', done);
-    setTimeout(function(){ try{ window.print(); }catch(err){ done(); toast('เครื่องนี้พิมพ์จากหน้าเว็บไม่ได้ ลองเปิดจากเบราว์เซอร์อื่น', true); } }, 150);
+    setTimeout(function(){ try{ window.print(); }catch(err){ done(); toast('เครื่องนี้พิมพ์จากหน้าเว็บไม่ได้ ลองเปิดจากเบราว์เซอร์', true); } }, 250);
   }
+  function printForm(d){ printForms([d]); }
 
   /* ---------- พิมพ์ใบส่งคืนพัสดุ A4 แนวตั้ง (แบบ ทอ.๗๗) ---------- */
   function thShort(d,m,be){ return d+' '+TH_MON[m-1]+' '+String(be).slice(-2); }
@@ -1292,6 +1303,7 @@
   $('rd-print').addEventListener('click', function(){ if(state.lastRet) printReturn(state.lastRet); });
   $('rd-close').addEventListener('click', function(){ $('rd-bg').classList.remove('on'); });
   $('d-print').addEventListener('click', function(){ if(state.lastReq) printForm(state.lastReq); });
+  $('d-printall').addEventListener('click', function(){ printForms(state.lastReqs); });
   $('d-list').addEventListener('click', function(e){ var b=e.target.closest('button[data-pr]'); if(b && state.lastReqs) printForm(state.lastReqs[Number(b.dataset.pr)]); });
 
   $('d-close').addEventListener('click', function(){ $('d-bg').classList.remove('on'); });
