@@ -997,7 +997,7 @@
   $('back-btn').addEventListener('click', function(){ show(state.lastMain || 'req'); });
   $('refresh').addEventListener('click', function(){
     var on = state.view || 'req';
-    if(on==='rcv') loadRcv(); else if(on==='iss') loadIssue(); else if(on==='stk') { if(state.stkMode==='loan') loadLoans(); else loadStock(); } else if(on==='ret' && state.retMode==='stock') loadReturnable(); else if(on==='his') loadHistory(); else boot(true);
+    if(on==='rcv') loadRcv(); else if(on==='iss') loadIssue(); else if(on==='stk') { if(state.stkMode==='loan') loadLoans(); else loadStock(true); } else if(on==='ret' && state.retMode==='stock') loadReturnable(); else if(on==='his') loadHistory(); else boot(true);
   });
 
   /* ---------- boot ---------- */
@@ -1501,10 +1501,10 @@
     run('repairStockLink', [{ seq:b.dataset.rp, by:state.by }]).then(function(res){ toast('ซ่อมแล้ว · '+res.how); loadStock(); boot(); })
       .catch(function(err){ toast(err.message,true); }).then(function(){ busy(b,false); });
   });
-  function loadStock(){
-    $('k-list').innerHTML='<div class="empty"><span class="spin"></span></div>';
-    loadRecon();
-    run('getStock').then(function(rows){ state.stk=rows; renderStock(); })
+  function loadStock(sync){
+    /* แสดงข้อมูลเดิมทันที (ถ้ามี) แล้วโหลดใหม่เบื้องหลัง; ไม่เรียก getReconcile ทุกครั้ง (ช้า เพราะล็อกและเขียนชีทใหม่) */
+    if(state.stk && state.stk.length){ renderStock(); } else { $('k-list').innerHTML='<div class="empty"><span class="spin"></span></div>'; }
+    run('getStock').then(function(rows){ state.stk=rows; renderStock(); if(sync===true) loadRecon(); })
       .catch(function(e){ $('k-list').innerHTML='<div class="empty">'+esc(e.message)+'</div>'; });
   }
   function renderStock(){
