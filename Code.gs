@@ -16,6 +16,14 @@ const SHEET_LOG = 'บันทึกการใช้งาน';
 const SHEET_LOAN = 'ยืมพัสดุ';
 const SHEET_CNT = 'ตรวจนับ';
 const SHEET_KIT = 'ชุดพัสดุ';
+const SHEET_CLAIM = 'เคลม';
+const WARRANTY_DAYS = 365;        // ประกัน 1 ปี นับจากวันที่รับ (LRU / LRU(TCI)) ; ของที่เคลมกลับมานับใหม่จากวันที่ได้รับกลับ
+const WARRANTY_SOON_DAYS = 60;    // เตือน "ใกล้หมดประกัน" เมื่อเหลือไม่เกินกี่วัน
+const CLAIM_SENT = 'ส่งเคลมแล้ว';
+const CLAIM_REPAIRED = 'ได้ซ่อมกลับ';
+const CLAIM_NEW = 'ได้ของใหม่';
+const CLAIM_DENIED = 'ถูกปฏิเสธ';
+const CLAIM_STATUS = [CLAIM_SENT, CLAIM_REPAIRED, CLAIM_NEW, CLAIM_DENIED];
 const LOAN_OPEN = 'ยืมอยู่';
 const LOAN_CLOSED = 'ปิดแล้ว';
 const LOAN_RETURNED = 'คืนเข้าคลัง';
@@ -39,6 +47,7 @@ const HEADERS = {
   [SHEET_RCV]: ['ลำดับรับ', 'เลขเอกสารการเบิก', 'Part number', 'ชื่อพัสดุ', 'serial number', 'ประเภทพัสดุ', 'จำนวน', 'หน่วยนับ', 'ราคา/หน่วย', 'ราคารวม', 'COND', 'วันที่แจ้ง', 'ความเร่งด่วน', 'วันกำหนดส่งพัสดุ', 'วันที่รับ', 'วันที่เกิน', 'TAIL No.', 'card ID', 'TCI', 'หมดอายุ', 'LOCATION', 'ผู้รับ', 'หมายเหตุ', 'แหล่งที่มา', 'อ้างอิง'],
   [SHEET_ISS]: ['ลำดับจ่าย', 'วันที่จ่าย', 'เลขเอกสารการเบิก', 'ลำดับรับ (อ้างอิง)', 'Part number', 'ชื่อพัสดุ', 'serial number', 'จำนวน', 'หน่วยนับ', 'TAIL No.', 'จ่ายให้ช่าง', 'หมายเหตุ', 'ผู้บันทึก'],
   [SHEET_CNT]: ['เลขที่ตรวจนับ', 'วันที่ตรวจนับ', 'LOCATION', 'ลำดับรับ', 'Part number', 'ชื่อพัสดุ', 'serial number', 'ประเภทพัสดุ', 'หน่วยนับ', 'ยอดในระบบ', 'นับได้จริง', 'ผลต่าง', 'ผลการปรับ', 'เหตุผล / หมายเหตุ', 'ผู้ตรวจนับ', 'ผู้ตรวจสอบ / กรรมการ', 'เวลาบันทึก'],
+  [SHEET_CLAIM]: ['เลขที่เคลม', 'serial number', 'Part number', 'ชื่อพัสดุ', 'ประเภทพัสดุ', 'วันที่ส่งเคลม', 'ที่หนังสือ', 'ผู้รับเคลม/หน่วยงาน', 'สถานะ', 'วันที่ได้รับกลับ', 'serial number ใหม่', 'หมายเหตุ', 'ผู้บันทึก'],
   [SHEET_KIT]: ['ชุด', 'Part number', 'ชื่อพัสดุ', 'ประเภทพัสดุ', 'serial number', 'จำนวนมาตรฐาน', 'LOCATION', 'หมายเหตุ'],
   [SHEET_USR]: ['ยศ', 'ชื่อ-สกุล', 'ตำแหน่ง'],
   [SHEET_TECH]: ['ยศ-ชื่อ นามสกุล'],
@@ -77,6 +86,11 @@ const API_FUNCS_ = {
   getCountList: getCountList,
   getCountLocations: getCountLocations,
   getHistory: getHistory,
+  getSerialHistory: getSerialHistory,
+  getClaims: getClaims,
+  getWarrantyList: getWarrantyList,
+  submitClaim: submitClaim,
+  updateClaim: updateClaim,
   getKits: getKits,
   getLoans: getLoans,
   getLoansForPart: getLoansForPart,
@@ -1021,6 +1035,7 @@ function issueCore_(p) {
 function getStock() {
   const info = reqInfoMap_();
   const kitRows_ = readKit_();
+  const warr_ = warrantyMap_();
   const groups = {};
   computeLots_().filter(l => l.remain > 0).forEach(l => {
     const key = l.part || l.name;
@@ -1031,7 +1046,8 @@ function getStock() {
       location: l.loc, expire: fmtThai_(l.expire), received: fmtThai_(l.recvDate), note: l.note,
       issRow: l.free ? 0 : l.seq, issSeq: l.free ? 0 : l.seq, linkNote: '',
       machine: l.free ? '' : ((info[l.doc + '|' + l.part] || {}).machine || ''),
-      kit: kitOfLot_(l, kitRows_).kit
+      kit: kitOfLot_(l, kitRows_).kit,
+      warr: l.serial && isLRU_(l.type) ? (warr_[snKey_(l.serial)] || null) : null
     });
   });
   return Object.keys(groups).sort().map(k => groups[k]);
@@ -1966,6 +1982,219 @@ function submitReturn(p) {
       alerts.length ? '⚠ เตือนส่งคืนซ้ำ ' + alerts.length + ' Serial' : ''].filter(Boolean).join(' | '), p.by);
     return { ok: true, count: rows.length, docNo: docNo, alert: alerts[0] || null, alerts: alerts };
   });
+}
+
+/* ---------- ประวัติรายตัว (Serial) · ประกัน 1 ปี · เคลม ---------- */
+
+const D_ = d => d instanceof Date ? new Date(d.getFullYear(), d.getMonth(), d.getDate()) : null;
+const dayDiff_ = (a, b) => Math.round((D_(b) - D_(a)) / 86400000);
+const ymd_ = d => d instanceof Date ? Utilities.formatDate(d, TZ, 'yyyy-MM-dd') : '';
+
+function readClaims_() {
+  const sh = getSheet_(SHEET_CLAIM), last = sh.getLastRow();
+  if (last < 2) return [];
+  return sh.getRange(2, 1, last - 1, 13).getValues().map((r, i) => ({
+    row: i + 2, id: Number(r[0]) || 0, sn: str_(r[1]), part: str_(r[2]), name: str_(r[3]), type: str_(r[4]),
+    sent: r[5] instanceof Date ? r[5] : null, docRef: str_(r[6]), vendor: str_(r[7]), status: str_(r[8]),
+    back: r[9] instanceof Date ? r[9] : null, newSn: str_(r[10]), note: str_(r[11]), by: str_(r[12])
+  })).filter(c => c.id && c.sn);
+}
+
+/** วันเริ่มประกันของแต่ละ Serial (เฉพาะ LRU / LRU(TCI)):
+ *  = วันที่ได้รับกลับจากเคลมล่าสุด (นับใหม่) ถ้ามี ; ไม่เช่นนั้น = วันที่รับครั้งแรกตามใบเบิก ; ของยอดยกมาที่ไม่มีวันรับ = ไม่ทราบ (ไม่ติดตามประกัน) */
+function warrantyMap_() {
+  const start = {}, today = parseDate_(todayStr_());
+  readRcv_().forEach(r => {
+    const k = snKey_(r[RC.SN]);
+    if (!k || !isLRU_(r[RC.TYPE])) return;
+    if ((str_(r[RC.SRC]) || SRC_REQ) !== SRC_REQ || !(r[RC.RDATE] instanceof Date)) return;
+    if (!start[k] || r[RC.RDATE] < start[k]) start[k] = r[RC.RDATE];
+  });
+  readClaims_().forEach(c => {
+    if (!c.back) return;
+    const k = c.status === CLAIM_REPAIRED ? snKey_(c.sn) : c.status === CLAIM_NEW ? snKey_(c.newSn) : '';
+    if (k && isLRU_(c.type || 'LRU') ) start[k] = c.back;
+  });
+  const out = {};
+  Object.keys(start).forEach(k => {
+    const st = D_(start[k]), end = new Date(st.getFullYear(), st.getMonth(), st.getDate() + WARRANTY_DAYS);
+    const left = dayDiff_(today, end);
+    out[k] = { start: fmtThai_(st), end: fmtThai_(end), left: left,
+      status: left < 0 ? 'expired' : left <= WARRANTY_SOON_DAYS ? 'soon' : 'ok' };
+  });
+  return out;
+}
+
+/** ประวัติของ Serial หนึ่งตัว (รวมสายเคลมที่ได้ของใหม่) เรียงตามเวลา */
+function getSerialHistory(serial) {
+  const key = snKey_(serial);
+  if (!key) throw new Error('กรุณากรอก Serial');
+  const claims = readClaims_(), chain = {};
+  chain[key] = 1;
+  for (let grew = true; grew;) {
+    grew = false;
+    claims.forEach(c => {
+      const a = snKey_(c.sn), b = snKey_(c.newSn);
+      if (b && (chain[a] || chain[b]) && !(chain[a] && chain[b])) { chain[a] = chain[b] = 1; grew = true; }
+    });
+  }
+  const ev = [];
+  let part = '', name = '', type = '';
+  readRcv_().forEach(r => {
+    const k = snKey_(r[RC.SN]);
+    if (!chain[k]) return;
+    part = str_(r[RC.PART]); name = str_(r[RC.NAME]); type = str_(r[RC.TYPE]) || type;
+    const src = str_(r[RC.SRC]) || SRC_REQ;
+    ev.push({ k: k, sn: str_(r[RC.SN]), t: 'rcv', d: r[RC.RDATE] instanceof Date ? r[RC.RDATE] : null, o: 1,
+      text: src === SRC_REQ ? 'รับตามใบเบิก ' + docStr_(r[RC.DOC]) : src === SRC_OPEN ? 'ยอดยกมา (ไม่มีวันที่รับ)' : src, loc: str_(r[RC.LOC]) });
+  });
+  readIss_().forEach(r => {
+    const k = snKey_(r[IS.SN]);
+    if (!chain[k]) return;
+    const tech = isTechIssue_(r);
+    ev.push({ k: k, sn: str_(r[IS.SN]), t: tech ? 'install' : 'out', d: r[IS.DATE] instanceof Date ? r[IS.DATE] : null, o: 2,
+      text: tech ? 'จ่ายให้ช่าง/ติดตั้ง' : 'จ่ายออก', machine: str_(r[IS.TAIL]), tech: str_(r[IS.TECH]), doc: docStr_(r[IS.DOC]) });
+  });
+  const ret = getSheet_(SHEET_RET), rl = ret.getLastRow();
+  if (rl >= 2) ret.getRange(2, 1, rl - 1, 14).getValues().forEach(r => {
+    const k = snKey_(r[4]);
+    if (!chain[k]) return;
+    ev.push({ k: k, sn: str_(r[4]), t: 'remove', d: r[11] instanceof Date ? r[11] : null, o: 3, text: 'ส่งคืน/ถอดออก',
+      machine: str_(r[8]), issue: str_(r[9]), docRef: str_(r[12]), cond: str_(r[13]) });
+  });
+  claims.forEach(c => {
+    if (!chain[snKey_(c.sn)] && !chain[snKey_(c.newSn)]) return;
+    ev.push({ k: snKey_(c.sn), sn: c.sn, t: 'claim', d: c.sent, o: 4, text: 'ส่งเคลม #' + c.id + (c.vendor ? ' → ' + c.vendor : ''), docRef: c.docRef, claimId: c.id });
+    if (c.status && c.status !== CLAIM_SENT) {
+      ev.push({ k: snKey_(c.sn), sn: c.sn, t: 'claimback', d: c.back || c.sent, o: 5,
+        text: c.status + (c.status === CLAIM_NEW && c.newSn ? ' (S/N ใหม่ ' + c.newSn + ')' : '') + (c.status === CLAIM_REPAIRED || c.status === CLAIM_NEW ? ' · ประกันนับใหม่' : ''), claimId: c.id });
+    }
+  });
+  if (!ev.length) throw new Error('ไม่พบ Serial ' + str_(serial) + ' ในระบบ');
+  ev.sort((a, b) => ((a.d ? a.d.getTime() : -1) - (b.d ? b.d.getTime() : -1)) || (a.o - b.o));
+
+  // ช่วงที่อยู่บนเครื่อง: จับคู่ "ติดตั้ง" กับ "ถอด" ถัดไปของ Serial เดียวกัน
+  const stints = [], open = {}, today = parseDate_(todayStr_());
+  ev.forEach(e => {
+    if (e.t === 'install') { if (open[e.k]) stints.push(open[e.k]); open[e.k] = { sn: e.sn, machine: e.machine, from: e.d, to: null }; }
+    else if (e.t === 'remove' && open[e.k]) { open[e.k].to = e.d; stints.push(open[e.k]); delete open[e.k]; }
+  });
+  Object.keys(open).forEach(k => stints.push(open[k]));
+  const stintOut = stints.map(x => ({ sn: x.sn, machine: x.machine, from: fmtThai_(x.from), to: x.to ? fmtThai_(x.to) : '',
+    days: x.from ? dayDiff_(x.from, x.to || today) : null, ongoing: !x.to }));
+
+  const warr = warrantyMap_()[key] || null;
+  const last = ev.filter(e => e.k === key).slice(-1)[0];
+  let state = '';
+  if (last) state = last.t === 'install' ? 'ติดตั้งอยู่ที่ ' + (last.machine || '-') : last.t === 'remove' ? 'ส่งคืน/ถอดออกแล้ว'
+    : last.t === 'claim' ? 'ส่งเคลมอยู่' : last.t === 'claimback' ? 'ได้รับกลับจากเคลม' : 'อยู่ในคลัง';
+  const lot = computeLots_().filter(l => snKey_(l.serial) === key && l.remain > 0)[0];
+  if (lot && (!last || last.t === 'rcv')) state = 'อยู่ในคลัง' + (lot.loc ? ' (' + lot.loc + ')' : '');
+  const first = ev.filter(e => e.k === key && e.d)[0];
+  const onAir = stintOut.reduce((t, x) => t + (x.days || 0), 0);
+  const openClaim = claims.filter(c => snKey_(c.sn) === key && c.status === CLAIM_SENT)[0] || null;
+  return {
+    serial: str_(serial), part: part, name: name, type: type, state: state, warranty: warr, isLRU: isLRU_(type),
+    ageDays: first ? dayDiff_(first.d, today) : null, installs: stintOut.length, onAirDays: onAir,
+    avgStint: stintOut.length ? Math.round(onAir / stintOut.length) : null, openClaim: openClaim ? openClaim.id : 0,
+    events: ev.map(e => ({ t: e.t, date: e.d ? fmtThai_(e.d) : '', sn: e.sn, main: e.k === key, text: e.text, machine: e.machine || '', tech: e.tech || '',
+      issue: e.issue || '', docRef: e.docRef || '', loc: e.loc || '' })),
+    stints: stintOut
+  };
+}
+
+function getClaims() {
+  return readClaims_().sort((a, b) => ((a.status === CLAIM_SENT ? 0 : 1) - (b.status === CLAIM_SENT ? 0 : 1)) || (b.id - a.id)).map(c => ({
+    id: c.id, sn: c.sn, part: c.part, name: c.name, type: c.type, sent: fmtThai_(c.sent), docRef: c.docRef, vendor: c.vendor,
+    status: c.status, back: fmtThai_(c.back), newSn: c.newSn, note: c.note,
+    days: c.sent ? dayDiff_(c.sent, c.back || parseDate_(todayStr_())) : null, open: c.status === CLAIM_SENT
+  }));
+}
+
+/** บันทึกการส่งเคลม p = {serial, sentDate, docRef, vendor, note, by} */
+function submitClaim(p) {
+  return withLock_(() => {
+    const sn = str_(p.serial);
+    if (!sn) throw new Error('กรุณากรอก Serial');
+    const h = getSerialHistory(sn);
+    if (!h.isLRU) throw new Error('ประกัน/เคลมใช้กับ LRU และ LRU(TCI) เท่านั้น');
+    if (readClaims_().some(c => snKey_(c.sn) === snKey_(sn) && c.status === CLAIM_SENT)) throw new Error('Serial นี้มีรายการส่งเคลมค้างอยู่แล้ว');
+    const sh = getSheet_(SHEET_CLAIM);
+    const id = nextSeq_(sh);
+    const row = [id, sn, h.part, h.name, h.type, parseDate_(p.sentDate || todayStr_()), str_(p.docRef), str_(p.vendor), CLAIM_SENT, '', '', str_(p.note), str_(p.by)];
+    const at = sh.getLastRow() + 1;
+    sh.getRange(at, 2, 1, 1).setNumberFormat('@');
+    sh.getRange(at, 1, 1, row.length).setValues([row]);
+    sh.getRange(at, 6, 1, 1).setNumberFormat('dd/mm/yyyy');
+    sh.getRange(at, 10, 1, 1).setNumberFormat('dd/mm/yyyy');
+    log_('ส่งเคลม', '', [sn, h.part, h.name, str_(p.docRef), str_(p.vendor)].filter(Boolean).join(' | '), p.by);
+    return { ok: true, id: id, warranty: h.warranty };
+  });
+}
+
+/** อัปเดตสถานะเคลม p = {id, status, backDate, newSerial, note, by} */
+function updateClaim(p) {
+  return withLock_(() => {
+    const c = readClaims_().filter(x => x.id === Number(p.id))[0];
+    if (!c) throw new Error('ไม่พบรายการเคลม');
+    const status = str_(p.status);
+    if (CLAIM_STATUS.indexOf(status) < 0) throw new Error('สถานะไม่ถูกต้อง');
+    let back = '', newSn = '';
+    if (status === CLAIM_REPAIRED || status === CLAIM_NEW) {
+      if (!p.backDate) throw new Error('กรุณาระบุวันที่ได้รับกลับ');
+      back = parseDate_(p.backDate);
+      if (c.sent && back < D_(c.sent)) throw new Error('วันที่ได้รับกลับต้องไม่ก่อนวันที่ส่งเคลม');
+    }
+    if (status === CLAIM_NEW) {
+      newSn = str_(p.newSerial);
+      if (!newSn) throw new Error('กรุณาระบุ Serial ใหม่');
+      if (snKey_(newSn) === snKey_(c.sn)) throw new Error('Serial ใหม่ต้องไม่ซ้ำกับ Serial เดิม');
+    }
+    if (status === CLAIM_DENIED && !str_(p.note) && !c.note) throw new Error('กรุณาระบุเหตุผลที่ถูกปฏิเสธ (หมายเหตุ)');
+    const sh = getSheet_(SHEET_CLAIM);
+    sh.getRange(c.row, 9).setValue(status);
+    sh.getRange(c.row, 10).setValue(back || '');
+    if (back) sh.getRange(c.row, 10).setNumberFormat('dd/mm/yyyy');
+    sh.getRange(c.row, 11).setNumberFormat('@').setValue(newSn);
+    if (str_(p.note)) sh.getRange(c.row, 12).setValue(str_(p.note));
+    log_('อัปเดตเคลม', '', ['#' + c.id, c.sn, status, newSn ? 'S/N ใหม่ ' + newSn : ''].filter(Boolean).join(' | '), p.by);
+    return { ok: true, status: status };
+  });
+}
+
+/** LRU ที่ยังอยู่ในประกัน และเหลือไม่เกิน N วัน (อยู่ในคลัง หรือติดตั้งอยู่บนเครื่อง) เรียงจากใกล้หมดก่อน */
+function getWarrantyList(days) {
+  const win = Number(days) || WARRANTY_SOON_DAYS, warr = warrantyMap_(), today = parseDate_(todayStr_());
+  const info = {};
+  readRcv_().forEach(r => {
+    const k = snKey_(r[RC.SN]);
+    if (k && warr[k]) info[k] = { serial: str_(r[RC.SN]), part: str_(r[RC.PART]), name: str_(r[RC.NAME]), type: str_(r[RC.TYPE]) };
+  });
+  const inst = {}, rem = {};
+  readIss_().forEach(r => {
+    const k = snKey_(r[IS.SN]);
+    if (!k || !isTechIssue_(r) || !(r[IS.DATE] instanceof Date)) return;
+    if (!inst[k] || r[IS.DATE] >= inst[k].d) inst[k] = { d: r[IS.DATE], machine: str_(r[IS.TAIL]) };
+  });
+  const ret = getSheet_(SHEET_RET), rl = ret.getLastRow();
+  if (rl >= 2) ret.getRange(2, 5, rl - 1, 8).getValues().forEach(r => {      // คอลัมน์ 5..12
+    const k = snKey_(r[0]); const d = r[7];
+    if (k && d instanceof Date && (!rem[k] || d > rem[k])) rem[k] = d;
+  });
+  const stock = {};
+  computeLots_().forEach(l => { if (l.remain > 0 && l.serial) stock[snKey_(l.serial)] = l; });
+  const claimOpen = {};
+  readClaims_().forEach(c => { if (c.status === CLAIM_SENT) claimOpen[snKey_(c.sn)] = 1; });
+  const out = [];
+  Object.keys(warr).forEach(k => {
+    const w = warr[k], i = info[k];
+    if (!i || w.left < 0 || w.left > win || claimOpen[k]) return;
+    const onAir = inst[k] && (!rem[k] || rem[k] < inst[k].d);
+    const where = stock[k] ? 'อยู่ในคลัง' + (stock[k].loc ? ' (' + stock[k].loc + ')' : '') : onAir ? 'ติดตั้งอยู่ที่ ' + (inst[k].machine || '-') : '';
+    if (!where) return;
+    out.push({ serial: i.serial, part: i.part, name: i.name, type: i.type, start: w.start, end: w.end, left: w.left, where: where });
+  });
+  return out.sort((a, b) => a.left - b.left);
 }
 
 /* ---------- API: ประวัติ ---------- */

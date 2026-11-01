@@ -222,7 +222,8 @@
   .tgl:active .tgl-in:checked + .tgl-tr .tgl-plane{transform:translateX(22px) rotate(-9deg) scale(.94)}
   .tgl-tx{flex:1}
   /* ---- ตรวจนับพัสดุ ---- */
-  #ct-bg,#ex-bg{z-index:55}
+  #ct-bg,#ex-bg,#sn-bg{z-index:55}
+  #cm-bg,#cu-bg{z-index:66}
   #kt-bg{z-index:55}
   .kn-row,.kb-row{display:flex;gap:10px;align-items:center;padding:10px 12px;border:1px solid #e6edf7;border-radius:16px;background:#fff;margin:0 0 8px}
   .kq{width:68px;flex:none;margin:0;padding:8px 10px;font-size:15px}
@@ -251,8 +252,8 @@
   .ktab button{border:0;background:none;font:inherit;font-size:14px;padding:10px 4px;border-radius:14px;color:var(--muted);cursor:pointer;transition:background .3s var(--ease),color .3s,box-shadow .3s}
   .ktab button.on{background:#fff;color:var(--navy-royal);font-weight:600;box-shadow:0 4px 12px rgba(7,27,53,.12),0 0 0 1px rgba(76,141,206,.25)}
   .ktab .chip{margin-left:4px;font-size:11px;padding:2px 8px}
-  #ct-bg .sheet{top:0;max-height:none;border-radius:0;max-width:760px;padding-top:calc(16px + env(safe-area-inset-top))}
-  #ct-bg .sheet .hd{position:sticky;top:calc(-16px - env(safe-area-inset-top));z-index:2;background:var(--bg);margin:-4px -4px 8px;padding:8px 4px}
+  #ct-bg .sheet,#sn-bg .sheet{top:0;max-height:none;border-radius:0;max-width:760px;padding-top:calc(16px + env(safe-area-inset-top))}
+  #ct-bg .sheet .hd,#sn-bg .sheet .hd{position:sticky;top:calc(-16px - env(safe-area-inset-top));z-index:2;background:var(--bg);margin:-4px -4px 8px;padding:8px 4px}
   .ci{background:var(--card);border:1px solid #e6edf7;border-left:5px solid #cbd9ee;border-radius:18px;padding:12px 14px;margin:0 0 10px;box-shadow:var(--shadow);transition:border-color .25s var(--ease),background .25s var(--ease)}
   .ci.ok{border-left-color:var(--ok)}
   .ci.bad{border-left-color:var(--bad);background:#fffaf9}
@@ -278,6 +279,14 @@
     body.printing > *:not(#print-area){display:none !important}
     body.printing #print-area{display:block}
   }
+  a.snl{color:var(--navy-royal);text-decoration:underline;text-underline-offset:2px;cursor:pointer;font-weight:600}
+  .tl{position:relative;margin:6px 0 0 8px;padding-left:18px;border-left:2px solid #cfdcee}
+  .tl .ev{position:relative;padding:0 0 14px}
+  .tl .ev::before{content:"";position:absolute;left:-25px;top:3px;width:12px;height:12px;border-radius:50%;background:var(--blue);border:2px solid #fff;box-shadow:0 0 0 1px #cfdcee}
+  .tl .ev.install::before{background:#1e9e66}.tl .ev.remove::before{background:#d9822b}.tl .ev.claim::before{background:#7a4fd1}.tl .ev.claimback::before{background:#1e9e66}.tl .ev.out::before{background:#8a97ad}
+  .tl .ev b{display:block;font-size:15px}.tl .ev .d{font-size:12.5px;color:var(--muted)}
+  .sn-sum{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
+  .sn-sum div{background:#eef4fc;border-radius:14px;padding:10px 8px;text-align:center}.sn-sum b{display:block;font-size:20px;color:var(--navy-royal)}.sn-sum span{font-size:11.5px;color:var(--muted)}
   .rp{font-family:'TH Sarabun PSK','THSarabunPSK','TH SarabunPSK','Sarabun',sans-serif;color:#000;font-size:13pt;line-height:1.15;width:277mm}
   .rp h1{font-size:20pt;margin:0 0 1mm;text-align:center}
   .rp .sb{text-align:center;margin-bottom:3mm}
@@ -380,10 +389,11 @@
   <button class="dr-it dr-in" id="cnt-btn" style="--i:3"><svg viewBox="0 0 24 24"><path d="M9 11l2 2 4-4"/><rect x="4" y="4" width="16" height="16" rx="3"/></svg>ตรวจนับพัสดุ<span class="ex"><svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8M10 6H5a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1v-5"/></svg></span></button>
   <div class="dr-sec dr-in" style="--i:4">ข้อมูล</div>
   <button class="dr-it dr-in" id="his-btn" style="--i:5"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>ประวัติ<span class="ex"><svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8M10 6H5a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1v-5"/></svg></span></button>
-  <button class="dr-it dr-in" id="ex-btn" style="--i:6"><svg viewBox="0 0 24 24"><path d="M12 4v11"/><path d="M7 11l5 5 5-5"/><path d="M4 20h16"/></svg>ส่งออกรายงาน<span class="ex"><svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8M10 6H5a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1v-5"/></svg></span></button>
-  <div class="dr-sec dr-in" style="--i:7">ระบบ</div>
-  <button class="dr-it dr-in" id="who-btn" style="--i:8"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg><span id="who-lb">ตั้งชื่อผู้ใช้</span></button>
-  <button class="dr-it dr-in" id="refresh" style="--i:9"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 10-2.3 5.7"/><path d="M20 4v7h-7"/></svg>รีเฟรช</button>
+  <button class="dr-it dr-in" id="sn-btn" style="--i:6"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.2-4.2"/></svg>ประวัติ S/N · ประกัน · เคลม<span class="ex"><svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8M10 6H5a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1v-5"/></svg></span></button>
+  <button class="dr-it dr-in" id="ex-btn" style="--i:7"><svg viewBox="0 0 24 24"><path d="M12 4v11"/><path d="M7 11l5 5 5-5"/><path d="M4 20h16"/></svg>ส่งออกรายงาน<span class="ex"><svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8M10 6H5a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1v-5"/></svg></span></button>
+  <div class="dr-sec dr-in" style="--i:8">ระบบ</div>
+  <button class="dr-it dr-in" id="who-btn" style="--i:9"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg><span id="who-lb">ตั้งชื่อผู้ใช้</span></button>
+  <button class="dr-it dr-in" id="refresh" style="--i:10"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 10-2.3 5.7"/><path d="M20 4v7h-7"/></svg>รีเฟรช</button>
 </aside>
 
 <main>
@@ -812,6 +822,8 @@
       <option value="iss">ประวัติจ่ายพัสดุ</option>
       <option value="req">ประวัติใบเบิก</option>
       <option value="loan">รายการยืมออกที่ยังไม่คืน</option>
+      <option value="claims">รายการเคลม</option>
+      <option value="warranty">LRU ใกล้หมดประกัน (≤ 60 วัน)</option>
     </select>
     <div class="row2" id="ex-range">
       <div><label>ตั้งแต่วันที่</label><input type="date" id="ex-from"></div>
@@ -820,6 +832,60 @@
     <div class="meta" id="ex-info" style="margin-top:10px"></div>
     <button class="btn" id="ex-xlsx">ดาวน์โหลด Excel (.xlsx)</button>
     <button class="btn ghost" id="ex-pdf" style="margin-top:10px">PDF (พิมพ์ A4 แล้วเลือกบันทึกเป็น PDF)</button>
+  </div>
+</div>
+
+<!-- ===== sheet: ประวัติ S/N · ประกัน · เคลม ===== -->
+<div class="sheet-bg" id="sn-bg">
+  <div class="sheet">
+    <div class="hd"><b>ประวัติ S/N · ประกัน · เคลม</b><button class="x" id="sn-x" aria-label="ปิด">×</button></div>
+    <div class="seg" id="sn-seg" style="grid-template-columns:repeat(3,1fr)">
+      <button data-m="h" class="on">ประวัติ S/N</button>
+      <button data-m="c">เคลม</button>
+      <button data-m="w">ใกล้หมดประกัน</button>
+    </div>
+    <div id="sn-h">
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <input class="search" id="sn-q" type="search" placeholder="พิมพ์ Serial number" autocapitalize="characters" autocomplete="off" style="margin:0;flex:1">
+        <button class="btn sm" id="sn-go" style="margin:0">ค้นหา</button>
+      </div>
+      <div id="sn-res"><div class="info" style="margin-top:12px">ค้นหา S/N เพื่อดูว่า รับเมื่อไร · ติดตั้งบนเครื่องไหน · ใช้งานกี่วัน · ประกันเหลือเท่าไร · เคยส่งเคลมหรือไม่ (ประกัน 1 ปีนับจากวันที่รับ ใช้กับ LRU และ LRU(TCI))</div></div>
+    </div>
+    <div id="sn-c" style="display:none"><div id="sn-clist" style="margin-top:12px"></div></div>
+    <div id="sn-w" style="display:none">
+      <div class="info" style="margin-top:12px">LRU ที่ยังอยู่ในประกันและเหลือไม่เกิน <b>60 วัน</b> (ทั้งที่อยู่ในคลังและติดตั้งอยู่บนเครื่อง) ไม่รวมที่ส่งเคลมอยู่แล้ว ของยอดยกมาที่ไม่มีวันรับจะไม่ถูกนับ</div>
+      <div id="sn-wlist"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== sheet: ส่งเคลม ===== -->
+<div class="sheet-bg" id="cm-bg">
+  <div class="sheet">
+    <div class="hd"><b>ส่งเคลม</b><button class="x" id="cm-x" aria-label="ปิด">×</button></div>
+    <div class="info" id="cm-info"></div>
+    <div class="row2">
+      <div><label>วันที่ส่งเคลม</label><input type="date" id="cm-date"></div>
+      <div><label>ที่หนังสือ</label><input id="cm-doc" placeholder="เช่น 70-001"></div>
+    </div>
+    <label>ผู้รับเคลม / หน่วยงาน</label><input id="cm-vendor">
+    <label>หมายเหตุ</label><textarea id="cm-note" rows="2"></textarea>
+    <button class="btn" id="cm-submit">บันทึกส่งเคลม</button>
+  </div>
+</div>
+
+<!-- ===== sheet: อัปเดตสถานะเคลม ===== -->
+<div class="sheet-bg" id="cu-bg">
+  <div class="sheet">
+    <div class="hd"><b>อัปเดตสถานะเคลม</b><button class="x" id="cu-x" aria-label="ปิด">×</button></div>
+    <div class="info" id="cu-info"></div>
+    <label>สถานะ</label>
+    <select id="cu-status"><option>ส่งเคลมแล้ว</option><option>ได้ซ่อมกลับ</option><option>ได้ของใหม่</option><option>ถูกปฏิเสธ</option></select>
+    <div id="cu-back"><label>วันที่ได้รับกลับ</label><input type="date" id="cu-date"></div>
+    <div id="cu-new"><label>Serial ใหม่</label><input id="cu-newsn" autocapitalize="characters" autocomplete="off"></div>
+    <label>หมายเหตุ <span id="cu-need" class="meta"></span></label><textarea id="cu-note" rows="2"></textarea>
+    <div class="meta" id="cu-hint" style="margin-top:6px"></div>
+    <button class="btn" id="cu-submit">บันทึก</button>
   </div>
 </div>
 
@@ -1605,7 +1671,8 @@
     $('k-list').innerHTML = rows.map(function(g){
       var lots = g.lots.map(function(l){
         var bits=[];
-        if(l.serial) bits.push('S/N '+esc(l.serial));
+        if(l.serial) bits.push('S/N <a class="snl" data-sn="'+esc(l.serial)+'">'+esc(l.serial)+'</a>');
+        if(l.warr){ bits.push('<span class="chip '+(l.warr.status==='ok'?'ok':l.warr.status==='soon'?'warn':'bad')+'">'+(l.warr.status==='expired'?'หมดประกัน':'ประกันเหลือ '+l.warr.left+' วัน')+'</span>'); }
         if(l.kit) bits.push('<b>'+esc(l.kit.replace('FLY AWAY KIT','ชุด KIT'))+'</b>');
         bits.push('จำนวน '+fmtNum(l.qty));
         if(l.type) bits.push(esc(l.type));
@@ -1893,7 +1960,8 @@
       'ผ่านมา <b>'+a.days+' วัน</b> นับจากวันที่รับ (เหลืออีก '+(a.limit-a.days)+' วันในรอบ)<br>'+
       'เลขเบิก '+esc(a.docNo)+' · รับ '+esc(a.receiveDate)+' · จ่าย '+esc(a.issueDate)+
       (a.tail?'<br>ติดตั้งที่ '+esc(a.tail):'')+(a.tech?' · ช่าง '+esc(a.tech):'')+
-      (a.priorReturns>0?'<br>เคยส่งคืน Serial นี้มาแล้ว '+a.priorReturns+' ครั้ง':'');
+      (a.priorReturns>0?'<br>เคยส่งคืน Serial นี้มาแล้ว '+a.priorReturns+' ครั้ง':'')+
+      '<br><a class="snl" data-sn="'+esc(a.serial)+'">ดูประวัติ / ส่งเคลม</a>';
   }
   state.warned = '';
   function showSerialAlert(a, inlineEl){ showSerialAlerts([a], inlineEl); }
@@ -2172,11 +2240,147 @@
   show('stk');
 
 
+
+  /* ---------- ประวัติ S/N · ประกัน · เคลม ---------- */
+  var sn = { mode:'h', cur:null, claims:[] };
+  var EV_LABEL = { rcv:'รับเข้า', install:'ติดตั้ง', remove:'ถอด/ส่งคืน', claim:'ส่งเคลม', claimback:'รับกลับจากเคลม', out:'จ่ายออก' };
+  function snSeg(m){
+    sn.mode = m;
+    Array.prototype.forEach.call($('sn-seg').querySelectorAll('button'), function(b){ b.classList.toggle('on', b.dataset.m===m); });
+    $('sn-h').style.display = m==='h' ? '' : 'none';
+    $('sn-c').style.display = m==='c' ? '' : 'none';
+    $('sn-w').style.display = m==='w' ? '' : 'none';
+    if(m==='c') snLoadClaims();
+    if(m==='w') snLoadWarr();
+    $('sn-bg').firstElementChild.scrollTop = 0;
+  }
+  function snOpen(serial){
+    $('w-bg').classList.remove('on');
+    $('sn-bg').classList.add('on');
+    snSeg('h');
+    if(serial){ $('sn-q').value = serial; snSearch(); }
+    else setTimeout(function(){ $('sn-q').focus(); }, 80);
+  }
+  function warrChip(w, isLRU){
+    if(!isLRU) return '<span class="chip">ไม่มีประกัน (ไม่ใช่ LRU)</span>';
+    if(!w) return '<span class="chip">ไม่ทราบวันรับ · ไม่ติดตามประกัน</span>';
+    var cls = w.status==='ok' ? 'ok' : w.status==='soon' ? 'warn' : 'bad';
+    return '<span class="chip '+cls+'">'+(w.status==='expired' ? 'หมดประกัน '+(-w.left)+' วันแล้ว' : 'ในประกัน เหลือ '+w.left+' วัน')+'</span>';
+  }
+  function snSearch(){
+    var q = $('sn-q').value.trim(); if(!q) return;
+    $('sn-res').innerHTML = '<div class="empty"><span class="spin"></span></div>';
+    run('getSerialHistory', [q]).then(function(h){
+      sn.cur = h;
+      var w = h.warranty;
+      var html = '<div class="card" style="margin-top:12px"><div class="t" style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b style="font-size:18px">S/N '+esc(h.serial)+'</b>'+(h.type?'<span class="chip blue">'+esc(h.type)+'</span>':'')+'</div>'+
+        '<div class="nm" style="margin-top:4px">'+esc(h.name)+'</div><div class="meta">'+esc(h.part)+' · '+esc(h.state||'-')+'</div>'+
+        '<div style="margin-top:8px">'+warrChip(w, h.isLRU)+'</div>'+
+        (w && h.isLRU ? '<div class="meta" style="margin-top:6px">ประกัน '+esc(w.start)+' → '+esc(w.end)+'</div>' : '')+
+        '<div class="sn-sum"><div><b>'+(h.ageDays==null?'-':h.ageDays)+'</b><span>อายุ (วัน)</span></div><div><b>'+h.installs+'</b><span>ครั้งที่ติดตั้ง</span></div><div><b>'+h.onAirDays+'</b><span>วันบนเครื่อง'+(h.avgStint!=null&&h.installs>1?' · เฉลี่ย '+h.avgStint:'')+'</span></div></div>'+
+        (h.isLRU ? (h.openClaim ? '<div class="warnbox" style="margin:0 0 8px">ส่งเคลมอยู่ (#'+h.openClaim+')</div>' : '<button class="btn ghost" id="sn-claim" style="margin-top:0">ส่งเคลม</button>') : '')+
+        '</div>';
+      if(h.stints.length){
+        html += '<div class="sec">ช่วงที่อยู่บนเครื่อง</div><div class="card" style="margin-top:8px">'+h.stints.map(function(x){
+          return '<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid #eef2f8"><span><b>'+esc(x.machine||'-')+'</b>'+(x.sn!==h.serial?' <span class="meta">('+esc(x.sn)+')</span>':'')+'<br><span class="meta">'+esc(x.from)+' → '+(x.ongoing?'ปัจจุบัน':esc(x.to))+'</span></span><b>'+(x.days==null?'-':x.days+' วัน')+'</b></div>';
+        }).join('')+'</div>';
+      }
+      html += '<div class="sec">เส้นเวลา</div><div class="card" style="margin-top:8px"><div class="tl">'+h.events.map(function(e){
+        var extra = [e.machine?'เครื่อง '+e.machine:'', e.tech?'ช่าง '+e.tech:'', e.loc?'ที่เก็บ '+e.loc:'', e.issue?'อาการ: '+e.issue:'', e.docRef?'หนังสือ '+e.docRef:'', (!e.main?'S/N '+e.sn:'')].filter(Boolean).join(' · ');
+        return '<div class="ev '+esc(e.t)+'"><b>'+esc(EV_LABEL[e.t]||e.t)+' <span class="d">'+(esc(e.date)||'ไม่ทราบวันที่')+'</span></b><div>'+esc(e.text)+'</div>'+(extra?'<div class="d">'+esc(extra)+'</div>':'')+'</div>';
+      }).join('')+'</div></div>';
+      $('sn-res').innerHTML = html;
+      var cb = $('sn-claim'); if(cb) cb.addEventListener('click', cmOpen);
+    }).catch(function(e){ $('sn-res').innerHTML = '<div class="empty">'+esc(e.message)+'</div>'; });
+  }
+  $('sn-btn').addEventListener('click', function(){ snOpen(''); });
+  $('sn-x').addEventListener('click', function(){ $('sn-bg').classList.remove('on'); });
+  $('sn-seg').addEventListener('click', function(e){ var b=e.target.closest('button[data-m]'); if(b) snSeg(b.dataset.m); });
+  $('sn-go').addEventListener('click', snSearch);
+  $('sn-q').addEventListener('keydown', function(e){ if(e.key==='Enter') snSearch(); });
+  document.addEventListener('click', function(e){ var a=e.target.closest && e.target.closest('a.snl'); if(a){ e.preventDefault(); snOpen(a.dataset.sn); } });
+
+  /* รายการเคลม */
+  function claimChip(c){ return '<span class="chip '+(c.status==='ส่งเคลมแล้ว'?'warn':c.status==='ถูกปฏิเสธ'?'bad':'ok')+'">'+esc(c.status)+'</span>'; }
+  function snLoadClaims(){
+    $('sn-clist').innerHTML = '<div class="empty"><span class="spin"></span></div>';
+    run('getClaims').then(function(list){
+      sn.claims = list;
+      $('sn-clist').innerHTML = list.length ? list.map(function(c,i){
+        return '<div class="pcard" data-c="'+i+'"><div class="t"><span class="doc">#'+c.id+' · S/N '+esc(c.sn)+'</span>'+claimChip(c)+'</div>'+
+          '<div class="nm">'+esc(c.name)+'</div><div class="meta">'+esc(c.part)+(c.type?' · '+esc(c.type):'')+'</div>'+
+          '<div class="meta">ส่ง '+esc(c.sent)+(c.back?' · กลับ '+esc(c.back):'')+(c.days!=null?' · '+c.days+' วัน':'')+(c.vendor?' · '+esc(c.vendor):'')+(c.docRef?' · หนังสือ '+esc(c.docRef):'')+'</div>'+
+          (c.newSn?'<div class="meta">Serial ใหม่: <a class="snl" data-sn="'+esc(c.newSn)+'">'+esc(c.newSn)+'</a></div>':'')+
+          (c.note?'<div class="meta">'+esc(c.note)+'</div>':'')+'</div>';
+      }).join('') : '<div class="empty">ยังไม่มีรายการเคลม<br><span class="meta">เริ่มจากค้นหา S/N แล้วกด "ส่งเคลม"</span></div>';
+    }).catch(function(e){ $('sn-clist').innerHTML='<div class="empty">'+esc(e.message)+'</div>'; });
+  }
+  $('sn-clist').addEventListener('click', function(e){
+    if(e.target.closest('a.snl')) return;
+    var c=e.target.closest('.pcard'); if(c) cuOpen(sn.claims[Number(c.dataset.c)]);
+  });
+  function snLoadWarr(){
+    $('sn-wlist').innerHTML = '<div class="empty"><span class="spin"></span></div>';
+    run('getWarrantyList',[60]).then(function(list){
+      $('sn-wlist').innerHTML = list.length ? list.map(function(x){
+        return '<div class="pcard"><div class="t"><span class="doc">S/N <a class="snl" data-sn="'+esc(x.serial)+'">'+esc(x.serial)+'</a></span><span class="chip warn">เหลือ '+x.left+' วัน</span></div>'+
+          '<div class="nm">'+esc(x.name)+'</div><div class="meta">'+esc(x.part)+' · '+esc(x.type)+' · '+esc(x.where)+'</div><div class="meta">หมดประกัน '+esc(x.end)+'</div></div>';
+      }).join('') : '<div class="empty">ไม่มี LRU ที่ใกล้หมดประกัน</div>';
+    }).catch(function(e){ $('sn-wlist').innerHTML='<div class="empty">'+esc(e.message)+'</div>'; });
+  }
+
+  /* ส่งเคลม */
+  function cmOpen(){
+    var h = sn.cur; if(!h) return;
+    $('cm-info').innerHTML = '<b>'+esc(h.name)+'</b><br><span class="meta">'+esc(h.part)+' · S/N '+esc(h.serial)+' · '+esc(h.type)+'</span><br>'+warrChip(h.warranty, h.isLRU);
+    $('cm-date').value = state.today || ''; $('cm-doc').value=''; $('cm-vendor').value=''; $('cm-note').value='';
+    $('cm-bg').classList.add('on');
+  }
+  $('cm-x').addEventListener('click', function(){ $('cm-bg').classList.remove('on'); });
+  $('cm-bg').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('on'); });
+  $('cm-submit').addEventListener('click', function(){
+    if(!state.by){ askBy(function(){ $('cm-submit').click(); }); return; }
+    var h = sn.cur; if(!h) return;
+    var w = h.warranty;
+    if(w && w.status==='expired' && !confirm('หมดประกันแล้ว '+(-w.left)+' วัน ยืนยันส่งเคลมหรือไม่?')) return;
+    if(!w && !confirm('ไม่ทราบวันรับ จึงตรวจประกันไม่ได้ ยืนยันส่งเคลมหรือไม่?')) return;
+    var b=this; busy(b,true);
+    run('submitClaim', [{ serial:h.serial, sentDate:$('cm-date').value, docRef:$('cm-doc').value, vendor:$('cm-vendor').value, note:$('cm-note').value, by:state.by }]).then(function(r){
+      $('cm-bg').classList.remove('on'); toast('บันทึกส่งเคลมแล้ว (#'+r.id+')'); snSearch();
+    }).catch(function(e){ toast(e.message,true); }).then(function(){ busy(b,false); });
+  });
+
+  /* อัปเดตสถานะเคลม */
+  function cuToggle(){
+    var st = $('cu-status').value;
+    $('cu-back').style.display = (st==='ได้ซ่อมกลับ'||st==='ได้ของใหม่') ? '' : 'none';
+    $('cu-new').style.display = st==='ได้ของใหม่' ? '' : 'none';
+    $('cu-need').textContent = st==='ถูกปฏิเสธ' ? '(จำเป็น: เหตุผลที่ถูกปฏิเสธ)' : '';
+    $('cu-hint').textContent = (st==='ได้ซ่อมกลับ'||st==='ได้ของใหม่') ? 'ประกันจะนับใหม่ 1 ปี จากวันที่ได้รับกลับ' + (st==='ได้ของใหม่' ? ' · ของใหม่ต้องเพิ่มเข้าคลังด้วย (ผ่านการรับตามใบเบิก หรือ + ยอดยกมา)' : ' · ถ้าของกลับเข้าคลังจริง ให้เพิ่มเข้าคลังด้วย (+ ยอดยกมา)') : '';
+  }
+  function cuOpen(c){
+    if(!c) return; sn.cu = c;
+    $('cu-info').innerHTML = '<b>#'+c.id+' · S/N '+esc(c.sn)+'</b><br><span class="meta">'+esc(c.name)+' · '+esc(c.part)+'<br>ส่งเคลม '+esc(c.sent)+(c.vendor?' · '+esc(c.vendor):'')+'</span>';
+    $('cu-status').value = c.status; $('cu-date').value = state.today||''; $('cu-newsn').value = c.newSn||''; $('cu-note').value = '';
+    cuToggle(); $('cu-bg').classList.add('on');
+  }
+  $('cu-status').addEventListener('change', cuToggle);
+  $('cu-x').addEventListener('click', function(){ $('cu-bg').classList.remove('on'); });
+  $('cu-bg').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('on'); });
+  $('cu-submit').addEventListener('click', function(){
+    if(!state.by){ askBy(function(){ $('cu-submit').click(); }); return; }
+    var c = sn.cu; if(!c) return;
+    var b=this; busy(b,true);
+    run('updateClaim', [{ id:c.id, status:$('cu-status').value, backDate:$('cu-date').value, newSerial:$('cu-newsn').value, note:$('cu-note').value, by:state.by }]).then(function(r){
+      $('cu-bg').classList.remove('on'); toast('อัปเดตแล้ว · '+r.status); snLoadClaims(); loadStock();
+    }).catch(function(e){ toast(e.message,true); }).then(function(){ busy(b,false); });
+  });
+
   /* ---------- ส่งออกรายงาน (Excel / PDF) ---------- */
   function exThai(iso){ var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(iso||''); return m? m[3]+'/'+m[2]+'/'+(Number(m[1])+543) : ''; }
   function exKey(thai){ var m=/(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(thai||''); return m? (Number(m[3])-543)*10000+Number(m[2])*100+Number(m[1]) : 0; }
   function exIso(v){ return v? Number(v.replace(/-/g,'')) : 0; }
-  var EX_NAMES = { stock:'คลังพัสดุคงเหลือ', rcv:'ประวัติรับพัสดุ', iss:'ประวัติจ่ายพัสดุ', req:'ประวัติใบเบิก', loan:'รายการยืมออกที่ยังไม่คืน' };
+  var EX_NAMES = { stock:'คลังพัสดุคงเหลือ', rcv:'ประวัติรับพัสดุ', iss:'ประวัติจ่ายพัสดุ', req:'ประวัติใบเบิก', loan:'รายการยืมออกที่ยังไม่คืน', claims:'รายการเคลม', warranty:'LRU ใกล้หมดประกัน (เหลือไม่เกิน 60 วัน)' };
   function exToggle(){ var k=$('ex-kind').value; $('ex-range').style.display = (k==='rcv'||k==='iss'||k==='req') ? '' : 'none'; $('ex-info').textContent=''; }
   function exOpen(){
     var t=state.today||new Date().toISOString().slice(0,10);
@@ -2199,6 +2403,20 @@
         return { title:title, sub:'ณ วันที่ '+exThai(state.today)+' · '+rows.length+' Part number · '+lots+' ล็อต · รวม '+tot+' หน่วย',
           headers:['Part number','ชื่อพัสดุ','Serial number','ประเภท','จำนวน','หน่วยนับ','LOCATION','เลขใบเบิก/แหล่งที่มา','สภาพ','วันหมดอายุ','วันที่รับ','หมายเหตุ'],
           rows:out, numCols:[4] };
+      });
+    }
+    if(k==='claims'){
+      return run('getClaims').then(function(list){
+        return { title:title, sub:'ณ วันที่ '+exThai(state.today)+' · '+list.length+' รายการ',
+          headers:['เลขที่เคลม','Serial number','Part number','ชื่อพัสดุ','ประเภท','วันที่ส่งเคลม','ที่หนังสือ','ผู้รับเคลม/หน่วยงาน','สถานะ','วันที่ได้รับกลับ','Serial ใหม่','หมายเหตุ'],
+          rows:list.map(function(c){ return [c.id,c.sn,c.part,c.name,c.type,c.sent,c.docRef,c.vendor,c.status,c.back,c.newSn,c.note]; }), numCols:[0] };
+      });
+    }
+    if(k==='warranty'){
+      return run('getWarrantyList',[60]).then(function(list){
+        return { title:title, sub:'ณ วันที่ '+exThai(state.today)+' · '+list.length+' รายการ',
+          headers:['Serial number','Part number','ชื่อพัสดุ','ประเภท','เริ่มประกัน','หมดประกัน','เหลือ (วัน)','สถานที่'],
+          rows:list.map(function(x){ return [x.serial,x.part,x.name,x.type,x.start,x.end,x.left,x.where]; }), numCols:[6] };
       });
     }
     if(k==='loan'){
