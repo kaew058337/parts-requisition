@@ -1526,7 +1526,7 @@
         '<div class="t"><span class="doc">'+esc(r.docNo)+'</span><span class="chip '+esc(r.urgency)+'">'+esc(urg(r.urgency))+'</span></div>'+
         '<div class="nm">'+esc(r.name)+'</div>'+
         '<div class="meta">'+esc(r.part)+(r.serial?' · S/N '+esc(r.serial):'')+' · จำนวน '+fmtNum(r.qty)+' '+esc(r.unit)+'</div>'+
-        '<div class="meta">'+(r.machine?'เครื่อง '+esc(r.machine):'')+(r.location?' · '+esc(r.location):'')+(r.due?' · กำหนดส่ง '+esc(r.due):'')+'</div>'+
+        '<div class="meta">'+(r.machine?'เครื่อง '+esc(r.machine):'')+(r.location?' · '+esc(r.location):'')+'</div>'+
       '</div>';
     }).join('');
   }
