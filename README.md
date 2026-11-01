@@ -10,13 +10,13 @@ Web app มือถือสำหรับเบิก / รับ / จ่า
 | `Index.html` | หน้าเว็บทั้งหมด |
 | `appsscript.json` | ตั้งค่า manifest |
 
-## ติดตั้ง
-1. เปิด Google Sheet ใหม่ → **ส่วนขยาย → Apps Script**
-2. วางโค้ด `Code.gs`, สร้างไฟล์ HTML ชื่อ `Index` วาง `Index.html`, เปิดแสดง manifest แล้ววาง `appsscript.json`
-3. รันฟังก์ชัน setup ครั้งแรก (สร้างชีทต่าง ๆ) แล้วอนุญาตสิทธิ์
-4. **ทำให้ใช้งานได้ → การทำให้ใช้งานได้รายการใหม่ → เว็บแอป** (Execute as: Me, Access: Anyone) แล้วคัดลอก URL `/exec`
+## ติดตั้ง / อัปเดต (ใช้ Google Sheet เดิมได้เลย ไม่ต้องสร้างใหม่)
+1. เปิด Google Sheet เดิมที่มีข้อมูลอยู่ → **ส่วนขยาย → Apps Script**
+2. วางโค้ด `Code.gs` และ `Index.html` ทับของเดิม (`appsscript.json` ใช้ตัวเดิมได้)
+3. บันทึก แล้วรีเฟรชชีท จะมีเมนูของระบบขึ้นมา ชีทที่ยังไม่มี (เช่น ชุดพัสดุ) สร้างได้จากเมนู
+4. **ทำให้ใช้งานได้ → จัดการการทำให้ใช้งานได้ → แก้ไข (ไอคอนดินสอ) → เวอร์ชัน: เวอร์ชันใหม่** URL `/exec` เดิมจะไม่เปลี่ยน
 
-หรือใช้ [clasp](https://github.com/google/clasp): `clasp login && clasp create --type sheets && clasp push && clasp deploy`
+> ถ้าตั้งระบบครั้งแรกกับชีทใหม่เท่านั้น ให้รันฟังก์ชัน `setup` หนึ่งครั้ง
 
 ## เชื่อม LINE LIFF
 1. LINE Developers → Channel (LINE Login) → แท็บ **LIFF** → Add
