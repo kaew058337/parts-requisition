@@ -1575,14 +1575,6 @@
         }).join('')+'<div class="meta" style="margin-top:8px">กรุณาตรวจและแก้ตัวเลขในชีทให้ตรงกัน</div>';
     }).catch(function(){});
   }
-  $('recon-bar').addEventListener('click', function(e){
-    var b=e.target.closest('button[data-rp]'); if(!b) return;
-    if(!state.by){ askBy(function(){ b.click(); }); return; }
-    if(!confirm('ตรวจแล้วว่าพัสดุนี้ยังอยู่ในคลังจริง? ระบบจะผูกกับล็อตเดิมที่ตรงกัน หรือสร้างล็อตใหม่ในคลังพัสดุตามจำนวนในชีท จ่าย-รับ')) return;
-    busy(b,true);
-    run('repairStockLink', [{ seq:b.dataset.rp, by:state.by }]).then(function(res){ toast('ซ่อมแล้ว · '+res.how); loadStock(); boot(); })
-      .catch(function(err){ toast(err.message,true); }).then(function(){ busy(b,false); });
-  });
   function loadStock(sync){
     /* แสดงข้อมูลเดิมทันที (ถ้ามี) แล้วโหลดใหม่เบื้องหลัง; ไม่เรียก getReconcile ทุกครั้ง (ช้า เพราะล็อกและเขียนชีทใหม่) */
     if(state.stk && state.stk.length){ renderStock(); } else { $('k-list').innerHTML='<div class="empty"><span class="spin"></span></div>'; }

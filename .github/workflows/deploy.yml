@@ -1,0 +1,61 @@
+name: Deploy to Google Apps Script
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Code.gs'
+      - 'Index.html'
+      - 'appsscript.json'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:      # กดรันเองได้จากแท็บ Actions
+
+concurrency:
+  group: deploy-apps-script
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # 1) ตรวจโค้ดก่อน ถ้าไม่ผ่านจะไม่ deploy (กันเว็บจริงพัง)
+      - name: ตรวจโค้ด
+        run: python3 scripts/check.py
+
+      # 2) ติดตั้ง clasp (ล็อกเวอร์ชันไว้ให้ทำงานคงที่)
+      - name: ติดตั้ง clasp
+        run: npm install -g @google/clasp@2.4.2
+
+      # 3) ใส่ข้อมูลล็อกอินและ Script ID จาก GitHub Secrets
+      - name: ตั้งค่า clasp
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+          SCRIPT_ID: ${{ secrets.SCRIPT_ID }}
+        run: |
+          test -n "$CLASPRC_JSON" || { echo "::error::ยังไม่ได้ตั้ง secret CLASPRC_JSON"; exit 1; }
+          test -n "$SCRIPT_ID"    || { echo "::error::ยังไม่ได้ตั้ง secret SCRIPT_ID"; exit 1; }
+          printf '%s' "$CLASPRC_JSON" > "$HOME/.clasprc.json"
+          printf '{"scriptId":"%s","rootDir":"."}' "$SCRIPT_ID" > .clasp.json
+
+      # 4) ส่งโค้ดขึ้น Apps Script (เฉพาะ Code.gs, Index.html, appsscript.json ตาม .claspignore)
+      - name: clasp push
+        run: clasp push --force
+
+      # 5) ปล่อยเป็นเวอร์ชันใหม่ทับ deployment เดิม (ลิงก์ /exec ไม่เปลี่ยน)
+      - name: clasp deploy
+        env:
+          DEPLOYMENT_ID: ${{ secrets.DEPLOYMENT_ID }}
+          SHA: ${{ github.sha }}
+        run: |
+          test -n "$DEPLOYMENT_ID" || { echo "::error::ยังไม่ได้ตั้ง secret DEPLOYMENT_ID"; exit 1; }
+          clasp deploy --deploymentId "$DEPLOYMENT_ID" --description "GitHub ${SHA:0:7}"
+
+      - name: ลบไฟล์ล็อกอิน
+        if: always()
+        run: rm -f "$HOME/.clasprc.json" .clasp.json
