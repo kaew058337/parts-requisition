@@ -1045,11 +1045,55 @@ function moveLocation(p) {
     const lot = computeLots_().filter(l => l.seq === Number(p.seq))[0];
     if (!lot || lot.remain <= 0) throw new Error('ไม่พบพัสดุในคลัง (อาจถูกจ่ายไปแล้ว) กรุณารีเฟรช');
     if (lot.loc === loc) return { ok: true, from: lot.loc, to: loc, same: true };
+    const fromKit = KIT_NAMES.indexOf(lot.loc) >= 0 ? lot.loc : '';
+    if (fromKit) kitLeaveCheck_(fromKit, lot);                                       // ชิ้นที่ถูกนำออกไปราชการอยู่ ห้ามย้ายออกจากชุด
     getSheet_(SHEET_RCV).getRange(lot.row, RC.LOC + 1).setValue(loc);
+    if (fromKit) kitLeave_(fromKit, lot);
     log_('ย้ายที่จัดเก็บ', lot.doc, [lot.part, lot.serial ? 'S/N ' + lot.serial : '', (lot.loc || '(ว่าง)') + ' → ' + loc].filter(Boolean).join(' | '), p.by);
+    // ย้ายเข้า FLY AWAY KIT: ลงรายการในชีท ชุดพัสดุ ด้วย (ถ้ายังไม่มี)
+    const kit = KIT_NAMES.indexOf(loc) >= 0 ? ensureKitRow_(loc, lot) : null;
     rebuildStock_();
-    return { ok: true, from: lot.loc, to: loc };
+    return { ok: true, from: lot.loc, to: loc, kit: kit ? loc : '', kitAdded: kit ? kit.added : '' };
   });
+}
+
+/** ตรวจก่อนย้ายพัสดุออกจากชุด: ถ้าชิ้นนั้นถูกนำออกไปราชการ/รอเบิกทดแทนอยู่ ให้ย้ายไม่ได้ */
+function kitLeaveCheck_(kit, lot) {
+  const st = kitState_(kit);
+  st.items.forEach(i => {
+    if (kitSamePart_(i, lot.part, lot.name) && (!i.serial || snKey_(i.serial) === snKey_(lot.serial)) && (i.out > 0 || i.waiting > 0))
+      throw new Error('พัสดุนี้ถูกนำออกไปราชการ/รอเบิกทดแทนอยู่ ย้ายออกจาก ' + kit + ' ไม่ได้ ให้ปิดรายการนำออกก่อน');
+  });
+}
+/** ย้ายพัสดุออกจากชุด: เอาออกจากรายการชุด (มี S/N = ลบแถว, ไม่มี S/N = ลดจำนวนมาตรฐาน) */
+function kitLeave_(kit, lot) {
+  const sh = getSheet_(SHEET_KIT), sn = snKey_(lot.serial);
+  const rows = readKit_().filter(r => r.kit === kit && kitSamePart_(r, lot.part, lot.name));
+  const r = sn ? rows.filter(x => snKey_(x.serial) === sn)[0] : rows.filter(x => !x.serial)[0];
+  if (!r) return;
+  const left = sn ? 0 : r.qty - lot.remain;
+  if (left > 0) sh.getRange(r.row, 6).setValue(left); else sh.deleteRow(r.row);
+}
+
+/** เพิ่มพัสดุเข้ารายการของชุด (ชีท ชุดพัสดุ) เมื่อย้ายล็อตเข้า FLY AWAY KIT; LOCATION ของรายการ = ชื่อชุด */
+function ensureKitRow_(kit, lot) {
+  const rows = readKit_().filter(r => r.kit === kit && kitSamePart_(r, lot.part, lot.name));
+  const sn = snKey_(lot.serial);
+  if (sn) {
+    if (rows.some(r => snKey_(r.serial) === sn)) return { added: 'exists' };       // มี S/N นี้ในชุดแล้ว
+  } else {
+    const r = rows.filter(x => !x.serial)[0];
+    if (r) {                                                                          // Part เดียวกัน ไม่มี S/N : เพิ่มจำนวนมาตรฐาน
+      const sh = getSheet_(SHEET_KIT);
+      sh.getRange(r.row, 6).setValue(r.qty + lot.remain);
+      if (!r.loc) sh.getRange(r.row, 7).setValue(kit);
+      return { added: 'qty' };
+    }
+  }
+  const sh = getSheet_(SHEET_KIT);
+  const row = [kit, lot.part, lot.name, lot.type, lot.serial, sn ? 1 : lot.remain, kit, 'เพิ่มจากหน้าย้ายที่จัดเก็บ'];
+  sh.getRange(sh.getLastRow() + 1, 1, 1, row.length).setValues([row]);
+  return { added: 'new' };
 }
 
 /** เมื่อแก้ LOCATION ในชีท คลังพัสดุ หรือ รับ ด้วยมือ -> แก้อีกชีทให้ตรงกันทันที (simple trigger ทำงานเอง ไม่ต้องตั้งค่า) */
