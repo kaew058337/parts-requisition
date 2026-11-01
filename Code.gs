@@ -1020,6 +1020,7 @@ function issueCore_(p) {
 
 function getStock() {
   const info = reqInfoMap_();
+  const kitRows_ = readKit_();
   const groups = {};
   computeLots_().filter(l => l.remain > 0).forEach(l => {
     const key = l.part || l.name;
@@ -1029,7 +1030,8 @@ function getStock() {
       seq: l.seq, free: l.free, serial: l.serial, qty: l.remain, docNo: l.label, type: l.type, cond: l.cond,
       location: l.loc, expire: fmtThai_(l.expire), received: fmtThai_(l.recvDate), note: l.note,
       issRow: l.free ? 0 : l.seq, issSeq: l.free ? 0 : l.seq, linkNote: '',
-      machine: l.free ? '' : ((info[l.doc + '|' + l.part] || {}).machine || '')
+      machine: l.free ? '' : ((info[l.doc + '|' + l.part] || {}).machine || ''),
+      kit: kitOfLot_(l, kitRows_).kit
     });
   });
   return Object.keys(groups).sort().map(k => groups[k]);
@@ -1044,17 +1046,38 @@ function moveLocation(p) {
     if (!loc) throw new Error('กรุณาระบุที่จัดเก็บใหม่');
     const lot = computeLots_().filter(l => l.seq === Number(p.seq))[0];
     if (!lot || lot.remain <= 0) throw new Error('ไม่พบพัสดุในคลัง (อาจถูกจ่ายไปแล้ว) กรุณารีเฟรช');
-    if (lot.loc === loc) return { ok: true, from: lot.loc, to: loc, same: true };
-    const fromKit = KIT_NAMES.indexOf(lot.loc) >= 0 ? lot.loc : '';
-    if (fromKit) kitLeaveCheck_(fromKit, lot);                                       // ชิ้นที่ถูกนำออกไปราชการอยู่ ห้ามย้ายออกจากชุด
-    getSheet_(SHEET_RCV).getRange(lot.row, RC.LOC + 1).setValue(loc);
-    if (fromKit) kitLeave_(fromKit, lot);
-    log_('ย้ายที่จัดเก็บ', lot.doc, [lot.part, lot.serial ? 'S/N ' + lot.serial : '', (lot.loc || '(ว่าง)') + ' → ' + loc].filter(Boolean).join(' | '), p.by);
-    // ย้ายเข้า FLY AWAY KIT: ลงรายการในชีท ชุดพัสดุ ด้วย (ถ้ายังไม่มี)
-    const kit = KIT_NAMES.indexOf(loc) >= 0 ? ensureKitRow_(loc, lot) : null;
+    const cur = kitOfLot_(lot);                                                       // ชุดที่ล็อตนี้อยู่ตอนนี้ ('' = ไม่อยู่ในชุด)
+    const want = p.kit === undefined || p.kit === null ? cur.kit : str_(p.kit);       // ไม่ส่งมา = คงสถานะชุดเดิม
+    if (want && kitNames_().indexOf(want) < 0) throw new Error('ไม่รู้จักชุด ' + want);
+    const sameLoc = lot.loc === loc;
+    if (sameLoc && want === cur.kit) return { ok: true, from: lot.loc, to: loc, same: true, kit: cur.kit };
+    if (cur.kit && want !== cur.kit) kitLeaveCheck_(cur.kit, lot);                    // ชิ้นที่ถูกนำออกไปราชการอยู่ ห้ามย้ายออกจากชุด
+    if (!sameLoc) getSheet_(SHEET_RCV).getRange(lot.row, RC.LOC + 1).setValue(loc);   // LOCATION = ที่จัดเก็บจริง ไม่เกี่ยวกับชุด
+    let kitNote = '';
+    if (cur.kit && want === cur.kit) {                                                // อยู่ชุดเดิม: ให้ LOCATION ของรายการชุดตามไปด้วย
+      if (!sameLoc) getSheet_(SHEET_KIT).getRange(cur.row, 7).setValue(loc);
+    } else {
+      if (cur.kit) kitLeave_(cur.kit, lot);
+      if (want) kitNote = ensureKitRow_(want, lot, loc).added;
+    }
+    log_('ย้ายที่จัดเก็บ', lot.doc, [lot.part, lot.serial ? 'S/N ' + lot.serial : '', (lot.loc || '(ว่าง)') + ' → ' + loc,
+      cur.kit !== want ? 'ชุด: ' + (cur.kit || '-') + ' → ' + (want || '-') : ''].filter(Boolean).join(' | '), p.by);
     rebuildStock_();
-    return { ok: true, from: lot.loc, to: loc, kit: kit ? loc : '', kitAdded: kit ? kit.added : '' };
+    return { ok: true, from: lot.loc, to: loc, kit: want, kitFrom: cur.kit, kitAdded: kitNote };
   });
+}
+
+function kitNames_() {
+  const n = KIT_NAMES.slice();
+  readKit_().forEach(r => { if (n.indexOf(r.kit) < 0) n.push(r.kit); });
+  return n;
+}
+/** ล็อตนี้อยู่ในชุดไหน: มี S/N = ตรงตาม Part+S/N ; ไม่มี S/N = Part เดียวกันและ LOCATION ตรงกับรายการชุด */
+function kitOfLot_(lot, kitRows) {
+  const sn = snKey_(lot.serial);
+  const r = (kitRows || readKit_()).filter(x => kitSamePart_(x, lot.part, lot.name) &&
+    (sn ? snKey_(x.serial) === sn : (!x.serial && x.loc === lot.loc)))[0];
+  return r ? { kit: r.kit, row: r.row, qty: r.qty } : { kit: '', row: 0, qty: 0 };
 }
 
 /** ตรวจก่อนย้ายพัสดุออกจากชุด: ถ้าชิ้นนั้นถูกนำออกไปราชการ/รอเบิกทดแทนอยู่ ให้ย้ายไม่ได้ */
@@ -1068,30 +1091,25 @@ function kitLeaveCheck_(kit, lot) {
 /** ย้ายพัสดุออกจากชุด: เอาออกจากรายการชุด (มี S/N = ลบแถว, ไม่มี S/N = ลดจำนวนมาตรฐาน) */
 function kitLeave_(kit, lot) {
   const sh = getSheet_(SHEET_KIT), sn = snKey_(lot.serial);
-  const rows = readKit_().filter(r => r.kit === kit && kitSamePart_(r, lot.part, lot.name));
-  const r = sn ? rows.filter(x => snKey_(x.serial) === sn)[0] : rows.filter(x => !x.serial)[0];
+  const r = readKit_().filter(x => x.kit === kit && kitSamePart_(x, lot.part, lot.name) &&
+    (sn ? snKey_(x.serial) === sn : (!x.serial && x.loc === lot.loc)))[0];
   if (!r) return;
   const left = sn ? 0 : r.qty - lot.remain;
   if (left > 0) sh.getRange(r.row, 6).setValue(left); else sh.deleteRow(r.row);
 }
 
-/** เพิ่มพัสดุเข้ารายการของชุด (ชีท ชุดพัสดุ) เมื่อย้ายล็อตเข้า FLY AWAY KIT; LOCATION ของรายการ = ชื่อชุด */
-function ensureKitRow_(kit, lot) {
+/** เพิ่มพัสดุเข้ารายการของชุด (ชีท ชุดพัสดุ) โดยเก็บ LOCATION = ที่จัดเก็บจริงของล็อต */
+function ensureKitRow_(kit, lot, loc) {
+  const sn = snKey_(lot.serial), sh = getSheet_(SHEET_KIT);
   const rows = readKit_().filter(r => r.kit === kit && kitSamePart_(r, lot.part, lot.name));
-  const sn = snKey_(lot.serial);
   if (sn) {
-    if (rows.some(r => snKey_(r.serial) === sn)) return { added: 'exists' };       // มี S/N นี้ในชุดแล้ว
+    const same = rows.filter(r => snKey_(r.serial) === sn)[0];
+    if (same) { sh.getRange(same.row, 7).setValue(loc); return { added: 'exists' }; }
   } else {
-    const r = rows.filter(x => !x.serial)[0];
-    if (r) {                                                                          // Part เดียวกัน ไม่มี S/N : เพิ่มจำนวนมาตรฐาน
-      const sh = getSheet_(SHEET_KIT);
-      sh.getRange(r.row, 6).setValue(r.qty + lot.remain);
-      if (!r.loc) sh.getRange(r.row, 7).setValue(kit);
-      return { added: 'qty' };
-    }
+    const r = rows.filter(x => !x.serial && x.loc === loc)[0];
+    if (r) { sh.getRange(r.row, 6).setValue(r.qty + lot.remain); return { added: 'qty' }; }
   }
-  const sh = getSheet_(SHEET_KIT);
-  const row = [kit, lot.part, lot.name, lot.type, lot.serial, sn ? 1 : lot.remain, kit, 'เพิ่มจากหน้าย้ายที่จัดเก็บ'];
+  const row = [kit, lot.part, lot.name, lot.type, lot.serial, sn ? 1 : lot.remain, loc, 'เพิ่มจากหน้าย้ายที่จัดเก็บ'];
   sh.getRange(sh.getLastRow() + 1, 1, 1, row.length).setValues([row]);
   return { added: 'new' };
 }

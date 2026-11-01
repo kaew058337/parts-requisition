@@ -698,11 +698,13 @@
     <div class="info" id="mv-info"></div>
     <label>LOCATION ใหม่</label><input id="mv-loc" list="mv-locs" autocomplete="off">
     <datalist id="mv-locs"></datalist>
-    <div id="mv-kits" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
-      <button class="btn ghost sm" type="button" data-kit="FLY AWAY KIT 1">→ FLY AWAY KIT 1</button>
-      <button class="btn ghost sm" type="button" data-kit="FLY AWAY KIT 2">→ FLY AWAY KIT 2</button>
+    <label>ชุดพัสดุ</label>
+    <div class="seg" id="mv-kits" style="grid-template-columns:repeat(3,1fr)">
+      <button type="button" data-kit="" class="on">ไม่อยู่ในชุด</button>
+      <button type="button" data-kit="FLY AWAY KIT 1">KIT 1</button>
+      <button type="button" data-kit="FLY AWAY KIT 2">KIT 2</button>
     </div>
-    <div class="meta" id="mv-kit-hint" style="display:none;margin-top:8px;color:var(--navy-royal)">จะเพิ่มพัสดุนี้เข้ารายการของชุด และนับรวมในชุดทันที</div>
+    <div class="meta" id="mv-kit-hint" style="display:none;margin-top:8px;color:var(--navy-royal)"></div>
     <div class="meta" style="margin:6px 0">ระบบจะแก้ LOCATION ในชีท รับ และ คลังพัสดุ ให้ตรงกันทันที</div>
     <button class="btn" id="mv-submit">ย้ายที่จัดเก็บ</button>
   </div>
@@ -1595,7 +1597,7 @@
     });
     state.lotMap = {};
     (state.stk||[]).forEach(function(g){ g.lots.forEach(function(l){
-      state.lotMap[l.seq] = { seq:l.seq, part:g.part, name:g.name, unit:g.unit, serial:l.serial, qty:l.qty, type:l.type, location:l.location, source:l.docNo, issRow:l.issRow, issSeq:l.issSeq, machine:l.machine };
+      state.lotMap[l.seq] = { seq:l.seq, part:g.part, name:g.name, unit:g.unit, serial:l.serial, qty:l.qty, type:l.type, location:l.location, source:l.docNo, issRow:l.issRow, issSeq:l.issSeq, machine:l.machine, kit:l.kit||'' };
     }); });
     var total=0, lots=0; rows.forEach(function(g){ total+=g.qty; lots+=g.lots.length; });
     $('k-sum').textContent = rows.length ? rows.length+' Part number · '+lots+' ล็อต · รวม '+fmtNum(total)+' หน่วย' : '';
@@ -1604,6 +1606,7 @@
       var lots = g.lots.map(function(l){
         var bits=[];
         if(l.serial) bits.push('S/N '+esc(l.serial));
+        if(l.kit) bits.push('<b>'+esc(l.kit.replace('FLY AWAY KIT','ชุด KIT'))+'</b>');
         bits.push('จำนวน '+fmtNum(l.qty));
         if(l.type) bits.push(esc(l.type));
         if(l.cond) bits.push('COND '+esc(l.cond));
@@ -1627,13 +1630,18 @@
     var seen={}, opts='';
     (state.stk||[]).forEach(function(g){ g.lots.forEach(function(x){ if(x.location && !seen[x.location]){ seen[x.location]=1; opts+='<option value="'+esc(x.location)+'">'; } }); });
     $('mv-locs').innerHTML=opts;
-    $('mv-loc').value=l.location||''; mvHint();
+    $('mv-loc').value=l.location||''; mvSetKit(l.kit||'');
     $('mv-bg').classList.add('on');
     setTimeout(function(){ $('mv-loc').focus(); $('mv-loc').select(); },50);
   });
-  function mvHint(){ var v=$('mv-loc').value.trim(); $('mv-kit-hint').style.display = /^FLY AWAY KIT [12]$/.test(v) ? '' : 'none'; }
-  $('mv-loc').addEventListener('input', mvHint);
-  $('mv-kits').addEventListener('click', function(e){ var b=e.target.closest('button[data-kit]'); if(!b) return; $('mv-loc').value=b.dataset.kit; mvHint(); });
+  function mvSetKit(k){
+    state.mvKit = k;
+    Array.prototype.forEach.call($('mv-kits').querySelectorAll('button'), function(b){ b.classList.toggle('on', b.dataset.kit===k); });
+    var cur = (state.mv && state.mv.kit) || '', h = $('mv-kit-hint');
+    if(k===cur){ h.style.display = k ? '' : 'none'; h.textContent = k ? 'พัสดุนี้อยู่ใน '+k+' (ย้ายที่เก็บแล้วยังอยู่ในชุดเหมือนเดิม)' : ''; }
+    else { h.style.display=''; h.textContent = k ? 'จะเพิ่มพัสดุนี้เข้ารายการของ '+k+' และนับรวมในชุด (ที่จัดเก็บยังเป็น LOCATION ด้านบน)' : 'จะเอาพัสดุนี้ออกจากรายการของ '+cur; }
+  }
+  $('mv-kits').addEventListener('click', function(e){ var b=e.target.closest('button[data-kit]'); if(b) mvSetKit(b.dataset.kit); });
   $('mv-x').addEventListener('click', function(){ $('mv-bg').classList.remove('on'); });
   $('mv-bg').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('on'); });
   $('mv-submit').addEventListener('click', function(){
@@ -1642,10 +1650,11 @@
     var loc=$('mv-loc').value.trim();
     if(!loc){ toast('กรุณาระบุที่จัดเก็บใหม่',true); return; }
     var b=this; busy(b,true);
-    run('moveLocation', [{ seq:l.seq, location:loc, by:state.by }]).then(function(res){
+    run('moveLocation', [{ seq:l.seq, location:loc, kit:state.mvKit||'', by:state.by }]).then(function(res){
       $('mv-bg').classList.remove('on');
-      toast(res.same?'ที่จัดเก็บเหมือนเดิม': res.kit ? 'ย้ายเข้า '+res.kit+' แล้ว'+(res.kitAdded==='exists'?' (มีในรายการชุดอยู่แล้ว)':' · เพิ่มในรายการชุดแล้ว') : 'ย้ายแล้ว → '+res.to);
-      if(res.kit && typeof kt!=='undefined' && kt) kt.data=null;
+      var kitMsg = (res.kit||'') !== (res.kitFrom||'') ? (res.kit ? ' · เพิ่มเข้า '+res.kit+' แล้ว' : ' · เอาออกจาก '+res.kitFrom+' แล้ว') : '';
+      toast(res.same ? 'ไม่มีการเปลี่ยนแปลง' : 'ย้ายแล้ว → '+res.to+kitMsg);
+      if(kitMsg && typeof kt!=='undefined' && kt) kt.data=null;
       loadStock();
     }).catch(function(err){ toast(err.message,true); }).then(function(){ busy(b,false); });
   });
