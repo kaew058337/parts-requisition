@@ -232,7 +232,70 @@ function getSheet_(name) {
     }
     sh.autoResizeColumns(1, h.length);
   }
+  ensureTextCols_(sh, name);
   return sh;
+}
+
+/* ---------- กัน Google Sheets แปลง Part number / Serial เป็นวันที่ (เช่น 5-12, 3/4) ---------- */
+// คอลัมน์ Part number / Serial ของแต่ละชีท (เลขคอลัมน์ เริ่ม 1) ตั้งเป็นรูปแบบ "ข้อความ" ทั้งคอลัมน์
+const TEXT_COLS_ = {};
+TEXT_COLS_[SHEET_REQ] = [3];
+TEXT_COLS_[SHEET_RCV] = [3, 5];
+TEXT_COLS_[SHEET_ISS] = [5, 7];
+TEXT_COLS_[SHEET_STK] = [3, 5];
+TEXT_COLS_[SHEET_LOAN] = [3, 5];
+TEXT_COLS_[SHEET_RET] = [2, 5, 6];
+TEXT_COLS_[SHEET_KIT] = [2, 5];
+TEXT_COLS_[SHEET_CNT] = [5, 7];
+TEXT_COLS_[SHEET_CLAIM] = [2, 3, 11];
+const TXT_DONE_ = {};
+
+/** ตั้งรูปแบบข้อความให้คอลัมน์ Part/Serial (ทำครั้งเดียวต่อชีท) ; ช่องที่ถูกแปลงเป็นวันที่ไปแล้วจะไม่ถูกแตะ แต่ระบายสีเหลืองไว้ให้แก้ */
+function ensureTextCols_(sh, name, force) {
+  const cols = TEXT_COLS_[name];
+  if (!cols || !sh || (!force && TXT_DONE_[name])) return;
+  TXT_DONE_[name] = true;
+  let props = null;
+  try { props = PropertiesService.getDocumentProperties(); } catch (e) { props = null; }
+  const key = 'txtcols1:' + name;
+  if (!force && props && props.getProperty(key)) return;
+  try {
+    const max = Math.max(sh.getMaxRows(), 2), last = sh.getLastRow();
+    cols.forEach(c => {
+      const rng = sh.getRange(2, c, max - 1, 1);
+      const dateRows = [];
+      if (last >= 2) sh.getRange(2, c, last - 1, 1).getValues().forEach((r, i) => { if (r[0] instanceof Date) dateRows.push(i + 2); });
+      rng.setNumberFormat('@');
+      dateRows.forEach(r => sh.getRange(r, c).setNumberFormat('dd/mm/yyyy').setBackground('#fff2a8'));
+    });
+    if (props) props.setProperty(key, '1');
+  } catch (e) { /* ไม่ให้การตั้งรูปแบบทำให้ระบบหลักล้ม */ }
+}
+
+/** หา Part number / Serial ที่ถูก Google Sheets แปลงเป็นวันที่ไปแล้ว : ระบายสีเหลืองและรายงาน (ต้องพิมพ์ค่าที่ถูกต้องใหม่เอง) */
+function findDateParts() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet(), found = [];
+  Object.keys(TEXT_COLS_).forEach(name => {
+    const sh = ss.getSheetByName(name);
+    if (!sh) return;
+    ensureTextCols_(sh, name, true);
+    const last = sh.getLastRow();
+    if (last < 2) return;
+    TEXT_COLS_[name].forEach(c => {
+      sh.getRange(2, c, last - 1, 1).getValues().forEach((r, i) => {
+        if (r[0] instanceof Date) found.push({ sheet: name, row: i + 2, col: sh.getRange(1, c).getValue(), shown: Utilities.formatDate(r[0], TZ, 'dd/MM/yyyy') });
+      });
+    });
+  });
+  try {
+    const ui = SpreadsheetApp.getUi();
+    ui.alert(found.length ? 'พบ ' + found.length + ' ช่องที่ถูกแปลงเป็นวันที่' : 'ไม่พบ Part number / Serial ที่ถูกแปลงเป็นวันที่',
+      found.length ? found.slice(0, 25).map(f => f.sheet + ' แถว ' + f.row + ' (' + f.col + ') = ' + f.shown).join('\n') +
+        (found.length > 25 ? '\n... และอีก ' + (found.length - 25) + ' ช่อง' : '') +
+        '\n\nช่องเหล่านี้ถูกระบายสีเหลืองแล้ว ให้พิมพ์ Part/Serial ที่ถูกต้องทับ (แก้ที่ชีท รับ / จ่าย / เบิก ซึ่งเป็นต้นทาง) ชีท คลังพัสดุ จะอัปเดตตามเอง' : 'ทุกคอลัมน์ Part/Serial ถูกตั้งเป็นข้อความแล้ว',
+      ui.ButtonSet.OK);
+  } catch (e) { /* ไม่มี UI */ }
+  return found;
 }
 
 /* ---------- ย้ายข้อมูลจากชีท จ่าย-รับ เดิม (ทำครั้งเดียวอัตโนมัติ ไม่ลบข้อมูลเดิม) ---------- */
@@ -2444,6 +2507,8 @@ function onOpen() {
       .addSeparator()
       .addItem('สร้าง/เปิดชีท ชุดพัสดุ (FLY AWAY KIT)', 'createKitSheet')
       .addItem('เพิ่มรายการชุดเข้าคลัง (ยอดยกมา)', 'importKitToStock')
+      .addSeparator()
+      .addItem('ตรวจ Part/Serial ที่กลายเป็นวันที่', 'findDateParts')
       .addToUi();
   } catch (e) { /* ไม่มี UI */ }
 }
