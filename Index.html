@@ -140,6 +140,9 @@
   }
   .item{border:1.5px dashed #bcd0ea;border-radius:18px;padding:12px 14px;margin-bottom:12px;background:#f6f9fe;position:relative}
   .item .del{position:absolute;top:6px;right:8px;background:none;border:0;color:var(--bad);font-size:22px;line-height:1;cursor:pointer;padding:4px 8px}
+  .dl-row{display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;padding:10px 0;border-top:1px solid #e6edf7}
+  .dl-row:first-of-type{margin-top:12px}
+  #d-list{max-height:40vh;overflow:auto}
   .item .no{font-size:12px;color:var(--muted);font-weight:600}
   .chip{display:inline-block;font-size:12px;padding:3px 11px;border-radius:99px;background:#e4eefb;color:var(--navy-royal);font-weight:600}
   .dot{position:absolute;top:4px;left:calc(50% + 6px);min-width:16px;height:16px;border-radius:8px;background:var(--bad);color:#fff;font-size:10px;font-weight:700;line-height:16px;text-align:center;padding:0 4px;display:none;box-shadow:0 0 0 2px #0A2342}
@@ -385,8 +388,6 @@
       </div>
       <label>หมายเลข บ. (เครื่อง)</label>
       <select id="r-machine"></select>
-      <label>ประเภทพัสดุ</label>
-      <select id="r-type"><option value="">เลือกประเภทพัสดุ</option><option>LRU</option><option>SP</option><option>LRU(TCI)</option><option>SP(TCI)</option></select>
       <label>ข้อขัดข้อง</label><textarea id="r-issue" placeholder="อาการ / เหตุผลที่เบิก"></textarea>
     </div>
     <div class="card">
@@ -404,6 +405,7 @@
     <div class="card">
       <h2>รายการพัสดุ</h2>
       <div id="r-items"></div>
+      <button class="btn ghost" id="r-add" type="button" style="margin-top:4px">+ เพิ่มรายการ</button>
     </div>
     <button class="btn" id="r-submit">บันทึกใบเบิก</button>
   </section>
@@ -759,6 +761,7 @@
       <p class="meta" style="margin:12px 0 4px">หมายเลขการเบิก</p>
       <div class="big" id="d-no"></div>
       <p class="meta" id="d-cnt"></p>
+      <div id="d-list"></div>
     </div>
     <button class="btn ghost" id="d-print">พิมพ์ใบเบิก (A5)</button>
     <button class="btn" id="d-close" style="margin-top:10px">ตกลง</button>
@@ -1033,11 +1036,23 @@
 
   /* ---------- เบิก ---------- */
   var itemSeq = 0;
+  var TYPE_OPTS = '<option value="">เลือกประเภทพัสดุ</option><option>LRU</option><option>SP</option><option>LRU(TCI)</option><option>SP(TCI)</option>';
+  function renumberItems(){
+    var its = document.querySelectorAll('#r-items .item'), n = its.length;
+    Array.prototype.forEach.call(its, function(d,i){
+      d.querySelector('.no').textContent = n>1 ? 'รายการที่ '+(i+1) : '';
+      d.querySelector('.no').style.display = n>1 ? '' : 'none';
+      d.querySelector('.del').style.display = n>1 ? '' : 'none';
+    });
+    $('r-submit').textContent = n>1 ? 'บันทึกใบเบิก '+n+' ใบ' : 'บันทึกใบเบิก';
+  }
   function addItem(){
     itemSeq++;
     var d = document.createElement('div'); d.className='item';
     d.innerHTML =
-      '<label style="margin-top:0">Part number</label><input class="f-part" list="partlist" autocomplete="off" autocapitalize="characters">'+
+      '<div class="no"></div><button class="del" type="button" aria-label="ลบรายการ">×</button>'+
+      '<label style="margin-top:0">ประเภทพัสดุ</label><select class="f-type">'+TYPE_OPTS+'</select>'+
+      '<label>Part number</label><input class="f-part" list="partlist" autocomplete="off" autocapitalize="characters">'+
       '<label>ชื่อพัสดุ</label><input class="f-name">'+
       '<div class="row2"><div><label>จำนวน</label><input class="f-qty" type="number" inputmode="decimal" min="0" value="1"></div>'+
       '<div><label>หน่วยนับ</label><input class="f-unit" value="EA" placeholder="EA / ชิ้น / ชุด"></div></div>';
@@ -1045,7 +1060,15 @@
     var part=d.querySelector('.f-part'), name=d.querySelector('.f-name'), unit=d.querySelector('.f-unit');
     part.addEventListener('change', function(){ autofill(part,name,unit); });
     part.addEventListener('input', function(){ autofill(part,name,unit); });
+    d.querySelector('.del').addEventListener('click', function(){ d.remove(); renumberItems(); });
+    renumberItems();
+    return d;
   }
+  $('r-add').addEventListener('click', function(){
+    var d = addItem(), prev = d.previousElementSibling;
+    if(prev && prev.querySelector('.f-type')) d.querySelector('.f-type').value = prev.querySelector('.f-type').value;
+    d.scrollIntoView({block:'center', behavior:'smooth'}); d.querySelector('.f-part').focus({preventScroll:true});
+  });
 
   /* ---------- ผู้เบิก (จากชีท "ผู้เบิก") ---------- */
   function whoLabel(u){ return (u.rank?u.rank+' ':'')+u.fullName+(u.position?' — '+u.position:''); }
@@ -1085,26 +1108,40 @@
     if(!state.by){ askBy(function(){ $('r-submit').click(); }); return; }
     var items = Array.prototype.map.call(document.querySelectorAll('#r-items .item'), function(d){
       return { part:d.querySelector('.f-part').value, name:d.querySelector('.f-name').value,
-               qty:d.querySelector('.f-qty').value, unit:d.querySelector('.f-unit').value };
+               qty:d.querySelector('.f-qty').value, unit:d.querySelector('.f-unit').value, itemType:d.querySelector('.f-type').value };
     });
+    var entered = items.filter(function(i){ return i.part.trim() || i.name.trim(); });
+    if(!entered.length){ toast('กรุณากรอกรายการพัสดุ', true); return; }
+    for(var q=0;q<entered.length;q++){
+      var lab = entered.length>1 ? 'รายการที่ '+(q+1)+': ' : '';
+      if(!entered[q].itemType){ toast(lab+'กรุณาเลือกประเภทพัสดุ', true); return; }
+      if(!entered[q].name.trim()){ toast(lab+'กรุณากรอกชื่อพัสดุ', true); return; }
+      if(!(Number(entered[q].qty)>0)){ toast(lab+'จำนวนต้องมากกว่า 0', true); return; }
+    }
+    items = entered;
     var payload = {
       date:$('r-date').value, urgency:$('r-urg').value, machine:$('r-machine').value,
       issue:$('r-issue').value, items:items,
       rank:$('r-rank').value, fullName:$('r-fullname').value, position:$('r-position').value,
-      itemType:$('r-type').value, by:state.by
+      by:state.by
     };
     if(!payload.fullName){ toast('กรุณาเลือกผู้เบิก', true); return; }
     var btn=$('r-submit'); busy(btn,true);
     run('submitRequisition', [payload]).then(function(r){
       remember();
-      var it = items[0] || {};
-      state.lastReq = { docNo:r.docNo, machine:payload.machine, part:it.part, name:it.name, qty:it.qty, unit:it.unit,
-                        issue:payload.issue, rank:payload.rank, fullName:payload.fullName,
-                        urgency:payload.urgency, itemType:payload.itemType, position:payload.position };
-      $('d-no').textContent = r.docNo;
+      var docs = r.docs || [{ docNo:r.docNo, part:items[0].part, name:items[0].name, qty:items[0].qty, unit:items[0].unit, itemType:items[0].itemType }];
+      state.lastReqs = docs.map(function(x){ return { docNo:x.docNo, machine:payload.machine, part:x.part, name:x.name, qty:x.qty, unit:x.unit,
+          issue:payload.issue, rank:payload.rank, fullName:payload.fullName, urgency:payload.urgency, itemType:x.itemType, position:payload.position }; });
+      state.lastReq = state.lastReqs[0];
+      var many = docs.length>1;
+      $('d-no').textContent = many ? docs.length+' ใบ' : docs[0].docNo;
       $('d-cnt').textContent = '';
+      $('d-list').innerHTML = many ? state.lastReqs.map(function(x,i){
+        return '<div class="dl-row"><div><b>'+esc(x.docNo)+'</b><div class="meta" style="margin:0">'+esc(x.part||'')+' '+esc(x.name)+' × '+esc(String(x.qty))+'</div></div><button class="btn ghost sm" data-pr="'+i+'">พิมพ์</button></div>';
+      }).join('') : '';
+      $('d-print').style.display = many ? 'none' : '';
       $('d-bg').classList.add('on');
-      $('r-machine').value=''; $('r-type').value=''; $('r-issue').value=''; $('r-urg').value='เบิกธรรมดา';
+      $('r-machine').value=''; $('r-issue').value=''; $('r-urg').value='เบิกธรรมดา';
       $('r-items').innerHTML=''; addItem();
       boot();
     }).catch(function(e){ toast(e.message,true); }).then(function(){ busy(btn,false); });
@@ -1255,6 +1292,7 @@
   $('rd-print').addEventListener('click', function(){ if(state.lastRet) printReturn(state.lastRet); });
   $('rd-close').addEventListener('click', function(){ $('rd-bg').classList.remove('on'); });
   $('d-print').addEventListener('click', function(){ if(state.lastReq) printForm(state.lastReq); });
+  $('d-list').addEventListener('click', function(e){ var b=e.target.closest('button[data-pr]'); if(b && state.lastReqs) printForm(state.lastReqs[Number(b.dataset.pr)]); });
 
   $('d-close').addEventListener('click', function(){ $('d-bg').classList.remove('on'); });
 
@@ -1616,7 +1654,7 @@
     show('req');
     var it=document.querySelector('#r-items .item');
     if(it){ it.querySelector('.f-part').value=l.part; it.querySelector('.f-name').value=l.name; it.querySelector('.f-qty').value=l.serial?1:l.qty; it.querySelector('.f-unit').value=l.unit||'EA'; }
-    if(l.type) $('r-type').value=l.type;
+    if(l.type && it) it.querySelector('.f-type').value=l.type;
     toast('บันทึกใบเบิกแล้ว กลับไปที่แท็บ คลัง แล้วกด "จ่าย" ที่ล็อตนี้');
   });
   $('fi-submit').addEventListener('click', function(){
@@ -1789,7 +1827,7 @@
       it.querySelector('.f-part').value=x.part; it.querySelector('.f-name').value=x.name;
       it.querySelector('.f-qty').value=x.out; it.querySelector('.f-unit').value=x.unit||'EA';
     }
-    if(x.type) $('r-type').value=x.type;
+    if(x.type && it) it.querySelector('.f-type').value=x.type;
     $('r-issue').value='เบิกตามพัสดุที่ยืมไปใช้ (ยืมเลขที่ '+x.seq+' · '+x.borrower+')';
     toast('เลือกเครื่องและผู้เบิก แล้วบันทึกใบเบิก จากนั้นไปหน้า รับ เลือก "ของที่ยืมไปใช้"');
   }

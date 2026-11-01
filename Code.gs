@@ -91,7 +91,6 @@ const API_FUNCS_ = {
   kitBack: kitBack,
   kitCheckout: kitCheckout,
   moveLocation: moveLocation,
-  repairStockLink: repairStockLink,
   returnLoan: returnLoan,
   submitBorrow: submitBorrow,
   submitCount: submitCount,
@@ -627,37 +626,39 @@ function submitRequisitionCore_(p) {
   {
     const items = (p.items || []).filter(i => str_(i.part) || str_(i.name));
     if (!items.length) throw new Error('กรุณากรอกรายการพัสดุ');
-    if (items.length > 1) throw new Error('ใบเบิก 1 ใบ เบิกได้ 1 รายการ');
+    if (items.length > 50) throw new Error('เบิกได้ไม่เกิน 50 รายการต่อครั้ง');
     items.forEach((i, idx) => {
       if (!str_(i.name)) throw new Error('รายการที่ ' + (idx + 1) + ': กรุณากรอกชื่อพัสดุ');
       if (num_(i.qty) <= 0) throw new Error('รายการที่ ' + (idx + 1) + ': จำนวนต้องมากกว่า 0');
+      if (ITEM_TYPES.indexOf(str_(i.itemType) || str_(p.itemType)) < 0) throw new Error('รายการที่ ' + (idx + 1) + ': กรุณาเลือกประเภทพัสดุ');
     });
 
     if (!str_(p.machine)) throw new Error('กรุณาเลือกหมายเลขเครื่อง');
     if (!str_(p.fullName)) throw new Error('กรุณากรอกชื่อ-สกุลผู้เบิก');
-    if (ITEM_TYPES.indexOf(str_(p.itemType)) < 0) throw new Error('กรุณาเลือกประเภทพัสดุ');
     const sh = getSheet_(SHEET_REQ);
     const date = parseDate_(p.date || todayStr_());
     const dd = Utilities.formatDate(date, TZ, 'dd');
     const mm = Utilities.formatDate(date, TZ, 'MM');
     const yy = pad_((Number(Utilities.formatDate(date, TZ, 'yyyy')) + 543) % 100, 2);
-    const seq = nextReqSeq_(sh, mm, yy);
-    if (seq > 999) throw new Error('ลำดับการเบิกเดือนนี้เกิน 999 แล้ว');
-    const docNo = pad_(seq, 3) + dd + mm + yy;
+    const seq0 = nextReqSeq_(sh, mm, yy);
+    if (seq0 + items.length - 1 > 999) throw new Error('ลำดับการเบิกเดือนนี้เกิน 999 แล้ว');
+    const urg = str_(p.urgency) === 'AOG' ? 'AOG' : 'เบิกธรรมดา';
 
-    const rows = items.map(i => [
-      seq, docNo, str_(i.part), str_(i.name), num_(i.qty), str_(i.unit) || 'EA',
-      date, UNPAID, str_(p.machine), str_(p.urgency) === 'AOG' ? 'AOG' : 'เบิกธรรมดา', str_(p.issue),
-      str_(p.rank), str_(p.fullName), str_(p.position), str_(p.itemType)
-    ]);
+    /* 1 ใบเบิก = 1 รายการ : แต่ละรายการได้เลขใบเบิกของตัวเอง ต่อเลขกัน */
+    const docs = [];
+    const rows = items.map((i, k) => {
+      const seq = seq0 + k, docNo = pad_(seq, 3) + dd + mm + yy, type = str_(i.itemType) || str_(p.itemType);
+      docs.push({ docNo: docNo, part: str_(i.part), name: str_(i.name), qty: num_(i.qty), unit: str_(i.unit) || 'EA', itemType: type });
+      return [seq, docNo, str_(i.part), str_(i.name), num_(i.qty), str_(i.unit) || 'EA',
+        date, UNPAID, str_(p.machine), urg, str_(p.issue), str_(p.rank), str_(p.fullName), str_(p.position), type];
+    });
     const start = sh.getLastRow() + 1;
     sh.getRange(start, 2, rows.length, 1).setNumberFormat('@');
     sh.getRange(start, 7, rows.length, 2).setNumberFormat('dd/mm/yyyy');
     sh.getRange(start, 1, rows.length, rows[0].length).setValues(rows);
-    const it0 = items[0];
-    log_('เบิก', docNo, [str_(it0.part), str_(it0.name), 'x' + num_(it0.qty) + ' ' + (str_(it0.unit) || 'EA'), 'เครื่อง ' + str_(p.machine),
-      str_(p.itemType), str_(p.urgency) === 'AOG' ? 'AOG' : 'เบิกธรรมดา', 'ผู้เบิก ' + [str_(p.rank), str_(p.fullName)].filter(Boolean).join(' ')].join(' | '), p.by);
-    return { docNo: docNo, count: rows.length };
+    docs.forEach(d => log_('เบิก', d.docNo, [d.part, d.name, 'x' + d.qty + ' ' + d.unit, 'เครื่อง ' + str_(p.machine),
+      d.itemType, urg, 'ผู้เบิก ' + [str_(p.rank), str_(p.fullName)].filter(Boolean).join(' ')].join(' | '), p.by));
+    return { docNo: docs[0].docNo, docs: docs, count: rows.length };
   }
 }
 
