@@ -600,7 +600,7 @@
       <div><label>ความเร่งด่วน</label><select id="e-urg"><option value="เบิกธรรมดา">เบิกธรรมดา</option><option value="AOG">AOG</option></select></div>
     </div>
     <label>ประเภทพัสดุ</label>
-    <select id="e-type"><option>LRU</option><option>SP</option><option>LRU(TCI)</option><option>SP(TCI)</option></select>
+    <select id="e-type"><option>LRU</option><option>SP</option><option>LRU(TCI)</option><option>SP(TCI)</option><option>สารเคมี</option></select>
     <label>ข้อขัดข้อง</label><textarea id="e-issue"></textarea>
     <div class="row2">
       <div><label>ยศผู้เบิก</label><input id="e-rank"></div>
@@ -738,7 +738,7 @@
     <label>ชื่อพัสดุ</label><input id="o-name">
     <div class="row2">
       <div><label>ประเภทพัสดุ</label>
-        <select id="o-type"><option value=""></option><option>LRU</option><option>SP</option><option>LRU(TCI)</option><option>SP(TCI)</option></select></div>
+        <select id="o-type"><option value=""></option><option>LRU</option><option>SP</option><option>LRU(TCI)</option><option>SP(TCI)</option><option>สารเคมี</option></select></div>
       <div><label>COND</label>
         <select id="o-cond"><option value=""></option><option>NE</option><option>NS</option><option>OH</option><option>SV</option><option>RP</option><option>AR</option><option>US</option></select></div>
     </div>
@@ -1076,7 +1076,7 @@
 
   /* ---------- เบิก ---------- */
   var itemSeq = 0;
-  var TYPE_OPTS = '<option value="">เลือกประเภทพัสดุ</option><option>LRU</option><option>SP</option><option>LRU(TCI)</option><option>SP(TCI)</option>';
+  var TYPE_OPTS = '<option value="">เลือกประเภทพัสดุ</option><option>LRU</option><option>SP</option><option>LRU(TCI)</option><option>SP(TCI)</option><option>สารเคมี</option>';
   function renumberItems(){
     var its = document.querySelectorAll('#r-items .item'), n = its.length;
     Array.prototype.forEach.call(its, function(d,i){
@@ -2386,7 +2386,7 @@
     $('kb-items').innerHTML = kt.back.map(function(l,i){
       return '<div class="kb-row"><label class="kb-sw"><input type="checkbox" class="kb-u" data-i="'+i+'"><span>ใช้ติดตั้ง</span></label>'+
         '<div style="flex:1;min-width:0"><b>'+esc(l.part||'-')+'</b> '+esc(l.name)+'<div class="meta">'+(l.serial?'S/N '+esc(l.serial)+' · ':'')+'นำออก '+fmtNum(l.out)+' '+esc(l.unit||'')+'</div>'+
-        (!l.type?'<select class="kb-t" data-i="'+i+'" style="display:none;margin-top:6px"><option value="">เลือกประเภทพัสดุ</option><option>LRU</option><option>SP</option><option>LRU(TCI)</option><option>SP(TCI)</option></select>':'')+'</div>'+
+        (!l.type?'<select class="kb-t" data-i="'+i+'" style="display:none;margin-top:6px"><option value="">เลือกประเภทพัสดุ</option><option>LRU</option><option>SP</option><option>LRU(TCI)</option><option>SP(TCI)</option><option>สารเคมี</option></select>':'')+'</div>'+
         (!l.serial && l.out>1 ? '<input type="number" inputmode="decimal" class="kq" data-i="'+i+'" min="1" max="'+l.out+'" value="'+l.out+'" style="display:none" title="จำนวนที่ใช้">' : '')+'</div>';
     }).join('');
     $('kb-machine').innerHTML='<option value="">เลือกหมายเลขเครื่อง</option>'+(kt.data.machines||[]).map(function(m){ return '<option>'+esc(m)+'</option>'; }).join('');
@@ -2559,7 +2559,7 @@
         '<label>Part number</label><input data-j="'+j+'" data-f="part" list="partlist" autocomplete="off" autocapitalize="characters" value="'+esc(x.part)+'">'+
         '<label>ชื่อพัสดุ</label><input data-j="'+j+'" data-f="name" value="'+esc(x.name)+'">'+
         '<div class="row2"><div><label>ประเภท</label><select data-j="'+j+'" data-f="type"><option value=""></option>'+
-        ['LRU','SP','LRU(TCI)','SP(TCI)'].map(function(t){ return '<option'+(x.type===t?' selected':'')+'>'+t+'</option>'; }).join('')+'</select></div>'+
+        ['LRU','SP','LRU(TCI)','SP(TCI)','สารเคมี'].map(function(t){ return '<option'+(x.type===t?' selected':'')+'>'+t+'</option>'; }).join('')+'</select></div>'+
         '<div><label>จำนวน</label><input type="number" inputmode="decimal" min="0" data-j="'+j+'" data-f="qty" value="'+esc(x.qty)+'"></div></div>'+
         '<label>Serial number (ถ้ามี)</label><input data-j="'+j+'" data-f="serial" value="'+esc(x.serial)+'">'+
         '<label>หมายเหตุ</label><input data-j="'+j+'" data-f="note" value="'+esc(x.note)+'"></div>';

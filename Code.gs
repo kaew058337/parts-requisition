@@ -32,7 +32,7 @@ function isFreeLot_(d) { return str_(d) === OPENING || str_(d) === RETURNED; }
 function isSP_(t) { return String(t || '').indexOf('SP') === 0; }
 function isLRU_(t) { return String(t || '').indexOf('LRU') === 0; }
 
-const ITEM_TYPES = ['LRU', 'SP', 'LRU(TCI)', 'SP(TCI)'];
+const ITEM_TYPES = ['LRU', 'SP', 'LRU(TCI)', 'SP(TCI)', 'สารเคมี'];   // สารเคมี: ไม่บังคับ Serial เหมือน SP
 
 const HEADERS = {
   [SHEET_REQ]: ['ลำดับ', 'หมายเลขการเบิก', 'Part number', 'ชื่อ', 'จำนวน', 'หน่วยนับ', 'วันที่เบิก', 'วันที่จ่าย', 'เครื่อง', 'ความเร่งด่วน', 'ข้อขัดข้อง', 'ยศผู้เบิก', 'ชื่อ-สกุลผู้เบิก', 'ตำแหน่งผู้เบิก', 'ประเภทพัสดุ', 'เหตุผลยกเลิก'],
@@ -1452,7 +1452,7 @@ function kitUsedCore_(p) {
     const out = num_(v[8]), q = num_(p.qty);
     if (q <= 0 || q > out) throw new Error('จำนวนที่ใช้ต้องมากกว่า 0 และไม่เกินที่นำออก (' + out + ')');
     const type = str_(v[5]) || str_(p.itemType);
-    if (ITEM_TYPES.indexOf(type) < 0) throw new Error('ไม่ทราบประเภทพัสดุ กรุณาใส่ประเภท (LRU / SP / LRU(TCI) / SP(TCI)) ในชีท ชุดพัสดุ');
+    if (ITEM_TYPES.indexOf(type) < 0) throw new Error('ไม่ทราบประเภทพัสดุ กรุณาใส่ประเภท (LRU / SP / LRU(TCI) / SP(TCI) / สารเคมี) ในชีท ชุดพัสดุ');
     if (!str_(p.installedOn)) throw new Error('กรุณาเลือกเครื่องที่ติดตั้ง');
     if (!str_(p.fullName)) throw new Error('กรุณาเลือกผู้เบิก');
     const urgency = str_(p.urgency) === 'AOG' ? 'AOG' : 'เบิกธรรมดา';
@@ -2042,7 +2042,7 @@ function clearStockDataFromEditor() {
 function createImportTemplate() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sh = ss.getSheetByName(SHEET_IMPORT);
-  const H = ['Part number', 'ชื่อพัสดุ', 'ประเภทพัสดุ (LRU / SP / LRU(TCI) / SP(TCI))', 'serial number (ถ้ามี)', 'จำนวน', 'หน่วยนับ (ว่าง = EA)', 'COND', 'LOCATION', 'หมดอายุ (วว/ดด/ปปปป)', 'เลขใบเบิก (ถ้ามี)', 'วันที่รับ (ว่าง = วันนี้)', 'card ID', 'ผลตรวจ'];
+  const H = ['Part number', 'ชื่อพัสดุ', 'ประเภทพัสดุ (LRU / SP / LRU(TCI) / SP(TCI) / สารเคมี)', 'serial number (ถ้ามี)', 'จำนวน', 'หน่วยนับ (ว่าง = EA)', 'COND', 'LOCATION', 'หมดอายุ (วว/ดด/ปปปป)', 'เลขใบเบิก (ถ้ามี)', 'วันที่รับ (ว่าง = วันนี้)', 'card ID', 'ผลตรวจ'];
   if (!sh) {
     sh = ss.insertSheet(SHEET_IMPORT);
     HDR_STYLE_(sh.getRange(1, 1, 1, H.length).setValues([H]));
@@ -2116,7 +2116,7 @@ function importOpeningRows_(rows, by) {
       }
       if (!part && !name) return err('ต้องมี Part number หรือชื่อพัสดุ');
       if (!name) return err('ต้องมีชื่อพัสดุ');
-      if (type && ITEM_TYPES.indexOf(type) < 0) return err('ประเภทพัสดุไม่ถูกต้อง (ใช้ LRU / SP / LRU(TCI) / SP(TCI))');
+      if (type && ITEM_TYPES.indexOf(type) < 0) return err('ประเภทพัสดุไม่ถูกต้อง (ใช้ LRU / SP / LRU(TCI) / SP(TCI) / สารเคมี)');
       if (!(qty > 0)) return err('จำนวนต้องมากกว่า 0');
       if (sn && qty !== 1) return err('แถวที่มี Serial ต้องจำนวน 1 ต่อ 1 Serial');
       if (sn) {
@@ -2239,7 +2239,7 @@ function createRequisitionImportSheet() {
   sh.getRange(2, 2, 6, 1).setBackground('#fef9c3');
   sh.getRange('B5').setNumberFormat('dd/mm/yyyy');
   sh.getRange(9, 1).setValue('รายการพัสดุ (วางจาก Excel ได้ตั้งแต่แถวที่ ' + IMPREQ_FIRST_ROW + ' ลงไป)').setFontWeight('bold');
-  const H = ['Part number', 'ชื่อพัสดุ (ว่าง = ดึงจาก Part)', 'ประเภทพัสดุ (LRU / SP / LRU(TCI) / SP(TCI))', 'จำนวน', 'หน่วยนับ (ว่าง = EA)',
+  const H = ['Part number', 'ชื่อพัสดุ (ว่าง = ดึงจาก Part)', 'ประเภทพัสดุ (LRU / SP / LRU(TCI) / SP(TCI) / สารเคมี)', 'จำนวน', 'หน่วยนับ (ว่าง = EA)',
     'เครื่อง (เฉพาะแถว ถ้าต่างจากด้านบน)', 'ข้อขัดข้อง (เฉพาะแถว ถ้าต่างจากด้านบน)', 'ผลตรวจ'];
   HDR_STYLE_(sh.getRange(IMPREQ_FIRST_ROW - 1, 1, 1, H.length).setValues([H]));
   sh.setFrozenRows(IMPREQ_FIRST_ROW - 1);
@@ -2296,7 +2296,7 @@ function importRequisitionRows_(shared, rows, by) {
       if (!name) return err('ไม่พบชื่อพัสดุของ Part นี้ กรุณาใส่ชื่อพัสดุ');
       let type = str_(r[2]) || sharedType || lastType[part] || '';
       if (!type) return err('ไม่ได้ระบุประเภทพัสดุ (ใส่ในแถว หรือช่อง B8)');
-      if (ITEM_TYPES.indexOf(type) < 0) return err('ประเภทพัสดุไม่ถูกต้อง (ใช้ LRU / SP / LRU(TCI) / SP(TCI))');
+      if (ITEM_TYPES.indexOf(type) < 0) return err('ประเภทพัสดุไม่ถูกต้อง (ใช้ LRU / SP / LRU(TCI) / SP(TCI) / สารเคมี)');
       const qty = num_(r[3]);
       if (!(qty > 0)) return err('จำนวนต้องมากกว่า 0');
       const machine = str_(r[5]) || str_(shared.machine);
