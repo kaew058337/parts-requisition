@@ -58,6 +58,92 @@ function doGet() {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
+
+/* ---------- API สำหรับหน้าเว็บที่โฮสต์ภายนอก (GitHub Pages + LINE LIFF) ----------
+   หน้าเว็บส่ง POST (text/plain, JSON) { fn, args, idToken } มาที่ URL /exec
+   - ตรวจ LINE ID token กับ LINE ทุกครั้ง (cache ไว้ตามอายุ token)
+   - จำกัดผู้ใช้ได้ที่ Script property ALLOWED_LINE_IDS (คั่นด้วย ,) เว้นว่าง = LINE ทุกบัญชีที่เข้าได้
+   - Script property API_REQUIRE_LINE = 0 ปิดการตรวจ (ใช้ทดสอบเท่านั้น) */
+const LINE_CHANNEL_ID = '2012314415';
+const API_FUNCS_ = {
+  getBootstrap: getBootstrap,
+  addOpeningStock: addOpeningStock,
+  cancelRequisition: cancelRequisition,
+  checkSerialAlert: checkSerialAlert,
+  checkSerialAlerts: checkSerialAlerts,
+  closeLoanReplaced: closeLoanReplaced,
+  editRequisition: editRequisition,
+  getCountHistory: getCountHistory,
+  getCountList: getCountList,
+  getCountLocations: getCountLocations,
+  getHistory: getHistory,
+  getKits: getKits,
+  getLoans: getLoans,
+  getLoansForPart: getLoansForPart,
+  getNextReturnNo: getNextReturnNo,
+  getOpeningLots: getOpeningLots,
+  getPendingIssue: getPendingIssue,
+  getPendingReceive: getPendingReceive,
+  getReconcile: getReconcile,
+  getReturnable: getReturnable,
+  getStock: getStock,
+  issueFromLot: issueFromLot,
+  kitBack: kitBack,
+  kitCheckout: kitCheckout,
+  moveLocation: moveLocation,
+  repairStockLink: repairStockLink,
+  returnLoan: returnLoan,
+  submitBorrow: submitBorrow,
+  submitCount: submitCount,
+  submitIssue: submitIssue,
+  submitReceive: submitReceive,
+  submitRequisition: submitRequisition,
+  submitReturn: submitReturn,
+  submitReturnToStock: submitReturnToStock,
+};
+
+function authErr_(msg) { const e = new Error(msg); e.auth = true; return e; }
+
+function verifyLine_(tok) {
+  const props = PropertiesService.getScriptProperties();
+  if (props.getProperty('API_REQUIRE_LINE') === '0') return { sub: '(open)', name: '' };
+  if (!tok) throw authErr_('กรุณาเปิดผ่าน LINE (ไม่พบ token)');
+  const cache = CacheService.getScriptCache();
+  const key = 'lt_' + Utilities.base64EncodeWebSafe(
+    Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, tok)).slice(0, 40);
+  let prof = null;
+  const hit = cache.get(key);
+  if (hit) prof = JSON.parse(hit);
+  else {
+    const r = UrlFetchApp.fetch('https://api.line.me/oauth2/v2.1/verify', {
+      method: 'post', payload: { id_token: tok, client_id: LINE_CHANNEL_ID }, muteHttpExceptions: true
+    });
+    if (r.getResponseCode() !== 200) throw authErr_('LINE token ไม่ถูกต้องหรือหมดอายุ');
+    const j = JSON.parse(r.getContentText());
+    prof = { sub: j.sub, name: j.name || '' };
+    const ttl = Math.min(1800, Math.max(60, (Number(j.exp) || 0) - Math.floor(Date.now() / 1000) - 30));
+    cache.put(key, JSON.stringify(prof), ttl);
+  }
+  const allow = (props.getProperty('ALLOWED_LINE_IDS') || '').split(',').map(x => x.trim()).filter(Boolean);
+  if (allow.length && allow.indexOf(prof.sub) < 0) throw authErr_('บัญชี LINE นี้ยังไม่ได้รับอนุญาต (รหัส: ' + prof.sub + ')');
+  return prof;
+}
+
+function doPost(e) {
+  let out;
+  try {
+    const req = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    const fn = String(req.fn || '');
+    if (!Object.prototype.hasOwnProperty.call(API_FUNCS_, fn)) throw new Error('ไม่รู้จักคำสั่ง: ' + fn);
+    verifyLine_(req.idToken);
+    const data = API_FUNCS_[fn].apply(null, Array.isArray(req.args) ? req.args : []);
+    out = { ok: true, data: data === undefined ? null : data };
+  } catch (err) {
+    out = { ok: false, error: String((err && err.message) || err), auth: !!(err && err.auth) };
+  }
+  return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+}
+
 /* ---------- Setup ---------- */
 
 /** รันครั้งแรก 1 ครั้ง (เลือกฟังก์ชัน setup แล้วกด Run) เพื่อสร้าง 3 ชีท */

@@ -901,12 +901,31 @@
   function urg(u){ return !u || u==='ปกติ' ? 'เบิกธรรมดา' : u; }
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
   function toast(msg, err){ var t=$('toast'); t.textContent=msg; t.className='on'+(err?' err':''); clearTimeout(toast._t); toast._t=setTimeout(function(){t.className='';}, err?4200:2400); }
+  /* เรียกหลังบ้าน: ถ้าเปิดใน Apps Script ใช้ google.script.run, ถ้าเปิดจาก GitHub Pages/LIFF ใช้ fetch ไป API_URL */
+  var API_URL = '';   // ← URL /exec ของเว็บแอป Apps Script (ใช้เฉพาะเมื่อโฮสต์นอก Apps Script)
+  var liffDone = Promise.resolve();
+  function inGas(){ return !!(window.google && google.script && google.script.run); }
   function run(fn, args){
-    return new Promise(function(res, rej){
-      var r = google.script.run.withSuccessHandler(res).withFailureHandler(function(e){
-        rej(new Error(String((e && e.message) || e).replace(/^Error:\s*/, '')));
+    if(inGas()){
+      return new Promise(function(res, rej){
+        var r = google.script.run.withSuccessHandler(res).withFailureHandler(function(e){
+          rej(new Error(String((e && e.message) || e).replace(/^Error:\s*/, '')));
+        });
+        r[fn].apply(r, args||[]);
       });
-      r[fn].apply(r, args||[]);
+    }
+    if(!API_URL) return Promise.reject(new Error('ยังไม่ได้ตั้งค่า API_URL'));
+    return liffDone.then(function(){
+      var tok = (window.liff && liff.getIDToken && liff.getIDToken()) || '';
+      return fetch(API_URL, { method:'POST', redirect:'follow', headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body: JSON.stringify({ fn:fn, args:args||[], idToken:tok }) });
+    }).then(function(r){ return r.json(); }, function(){ throw new Error('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบอินเทอร์เน็ต'); })
+    .then(function(o){
+      if(!o.ok){
+        if(o.auth && window.liff && !run._relog && String(o.error).indexOf('หมดอายุ')>=0){ run._relog=1; try{ liff.logout(); liff.login(); }catch(e){} }
+        throw new Error(o.error || 'เกิดข้อผิดพลาด');
+      }
+      return o.data;
     });
   }
   function busy(btn, on, txt){ if(on){ btn.dataset.t=btn.textContent; btn.disabled=true; btn.textContent=txt||'กำลังบันทึก…'; } else { btn.disabled=false; btn.textContent=btn.dataset.t||btn.textContent; } }
@@ -931,26 +950,29 @@
   showBy();
 
   /* ---- LINE LIFF: ดึงชื่อ LINE มาเป็นชื่อผู้ใช้อัตโนมัติ (ใส่ LIFF ID ที่เดียวตรงนี้) ---- */
-  var LIFF_ID = '2012314415-fNQXwM5a';   // ← ใส่ LIFF ID เช่น '2001234567-AbCdEfGh' (เว้นว่าง = ไม่ใช้ LIFF)
+  var LIFF_ID = '';   // ← ใส่ LIFF ID เช่น '2001234567-AbCdEfGh' (เว้นว่าง = ไม่ใช้ LIFF)
   (function initLiff(){
     if(!LIFF_ID) return;
-    var sc = document.createElement('script');
-    sc.src = 'https://static.line-scdn.net/liff/edge/2/sdk.js';
-    sc.onload = function(){
-      if(!window.liff) return;
-      liff.init({ liffId: LIFF_ID }).then(function(){
-        if(!liff.isLoggedIn()){ if(liff.isInClient()) return; liff.login(); return; }
-        return liff.getProfile().then(function(pf){
-          state.line = { id: pf.userId, name: pf.displayName };
-          if(!state.by && pf.displayName){
-            state.by = pf.displayName;
-            try{ localStorage.setItem('op-name', state.by); }catch(e){}
-            showBy();
-          }
-        });
-      }).catch(function(e){ try{ console.warn('LIFF', e); }catch(_){} });
-    };
-    document.head.appendChild(sc);
+    liffDone = new Promise(function(resolve){
+      var sc = document.createElement('script');
+      sc.src = 'https://static.line-scdn.net/liff/edge/2/sdk.js';
+      sc.onerror = function(){ resolve(); };
+      sc.onload = function(){
+        if(!window.liff){ resolve(); return; }
+        liff.init({ liffId: LIFF_ID }).then(function(){
+          if(!liff.isLoggedIn()){ if(!liff.isInClient()){ liff.login(); return new Promise(function(){}); } return; }
+          return liff.getProfile().then(function(pf){
+            state.line = { id: pf.userId, name: pf.displayName };
+            if(!state.by && pf.displayName){
+              state.by = pf.displayName;
+              try{ localStorage.setItem('op-name', state.by); }catch(e){}
+              showBy();
+            }
+          });
+        }).catch(function(e){ try{ console.warn('LIFF', e); }catch(_){} }).then(resolve);
+      };
+      document.head.appendChild(sc);
+    });
   })();
 
   /* ---------- nav ---------- */
