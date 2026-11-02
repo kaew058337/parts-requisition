@@ -78,6 +78,7 @@ const LINE_CHANNEL_ID = '2012314415';
 const API_FUNCS_ = {
   getBootstrap: getBootstrap,
   addOpeningStock: addOpeningStock,
+  getAwaitingReq: getAwaitingReq,
   cancelRequisition: cancelRequisition,
   checkSerialAlert: checkSerialAlert,
   checkSerialAlerts: checkSerialAlerts,
@@ -848,6 +849,7 @@ function rcFromSheet_(row) { const o = new Array(RC_PHYS_.length); RC_PHYS_.forE
 function rcToSheet_(vals) { return RC_PHYS_.map(li => vals[li]); }
 const SRC_REQ = 'ใบเบิก';
 const SRC_OPEN = 'ยอดยกมา';
+const SRC_PRE = 'รับก่อนเบิก';       // รับพัสดุเข้าคลังก่อนมีใบเบิก (รอผูกใบเบิก / จ่ายตรง)
 const SRC_RET = 'คืนเข้าคลัง';
 const DIRECT = 'จ่ายตรง';
 const XFER_NOTE = 'โอนเข้าใบเบิก';
@@ -920,7 +922,7 @@ function computeLots_() {
   return R_.map((r, i) => {
     const seq = Number(r[RC.SEQ]);
     const src = str_(r[RC.SRC]) || SRC_REQ;
-    const free = src === SRC_OPEN || src === SRC_RET;
+    const free = src === SRC_OPEN || src === SRC_RET || src === SRC_PRE;
     const remain = num_(r[RC.QTY]) - (issued[seq] || 0) - (loanOut[seq] || 0);
     return {
       seq: seq, row: r._row || (i + 2), sh: r._sh || SHEET_RCV, doc: docStr_(r[RC.DOC]), label: free ? src : docStr_(r[RC.DOC]), free: free, src: src,
@@ -1823,14 +1825,36 @@ function addOpeningStock(p) {
     if (type && ITEM_TYPES.indexOf(type) < 0) throw new Error('ประเภทพัสดุไม่ถูกต้อง');
     const sn = str_(p.serial);
     if (sn && qty !== 1) throw new Error('พัสดุที่มี Serial number ต้องจำนวน 1 ต่อ 1 Serial');
+    const source = str_(p.source) === SRC_PRE ? SRC_PRE : SRC_OPEN;   // รับก่อนเบิก = มีวันที่รับจริง (นับประกันได้) / ยอดยกมา = ของเดิมในคลัง
+    if (sn) {
+      const dup = computeLots_().filter(l => l.remain > 0 && snKey_(l.serial) === snKey_(sn))[0];
+      if (dup) throw new Error('Serial ' + sn + ' มีอยู่ในคลังแล้ว (' + dup.label + ')');
+    }
     appendRcv_([
       nextRcvSeq_(), '', str_(p.part), str_(p.name), sn, type, qty, str_(p.unit) || 'EA', '', '',
-      str_(p.cond), '', '', '', parseDate_(todayStr_()), '', '', str_(p.cardId), '', parseDate_(p.expire), str_(p.location), '', '', SRC_OPEN, ''
+      str_(p.cond), '', '', '', parseDate_(todayStr_()), '', '', str_(p.cardId), '', parseDate_(p.expire), str_(p.location), '', str_(p.remark), source, ''
     ]);
-    log_('ยอดยกมา', '', [str_(p.part), str_(p.name), 'x' + qty, sn ? 'S/N ' + sn : '', str_(p.location)].filter(Boolean).join(' | '), p.by);
+    log_(source, '', [str_(p.part), str_(p.name), 'x' + qty, sn ? 'S/N ' + sn : '', str_(p.location)].filter(Boolean).join(' | '), p.by);
     rebuildStock_();
     return { ok: true };
   });
+}
+
+/** รายการ "รับก่อนเบิก" ที่ยังรอผูกใบเบิก (ยังไม่ได้โอนเข้าใบเบิก) : อยู่ในคลัง + จ่ายตรงไปแล้ว */
+function getAwaitingReq() {
+  const lots = computeLots_().filter(l => l.src === SRC_PRE);
+  if (!lots.length) return [];
+  const direct = {}, xfer = {};
+  readIss_().forEach(r => {
+    const k = Number(r[IS.RSEQ]); if (!k) return;
+    if (docStr_(r[IS.DOC]) === DIRECT) direct[k] = (direct[k] || 0) + num_(r[IS.QTY]);
+    else if (str_(r[IS.NOTE]).indexOf(XFER_NOTE) === 0) xfer[k] = (xfer[k] || 0) + num_(r[IS.QTY]);
+  });
+  return lots.map(l => {
+    const pending = l.qty - (xfer[l.seq] || 0);
+    return { seq: l.seq, part: l.part, name: l.name, serial: l.serial, type: l.type, unit: l.unit, qty: l.qty,
+      inStock: Math.max(l.remain, 0), direct: direct[l.seq] || 0, pending: pending, loc: l.loc, received: fmtThai_(l.recvDate), note: l.note };
+  }).filter(x => x.pending > 0).sort((a, b) => b.seq - a.seq);
 }
 
 /** ล็อตยอดยกมา/ของคืนคลังที่ Part number เดียวกับใบเบิก (ให้เลือกรับจากคลัง) : row = ลำดับรับของล็อต */
@@ -2224,7 +2248,8 @@ function warrantyMap_() {
   readRcv_().forEach(r => {
     const k = snKey_(r[RC.SN]);
     if (!k || !isLRU_(r[RC.TYPE])) return;
-    if ((str_(r[RC.SRC]) || SRC_REQ) !== SRC_REQ || !(r[RC.RDATE] instanceof Date)) return;
+    const sr_ = str_(r[RC.SRC]) || SRC_REQ;
+    if ((sr_ !== SRC_REQ && sr_ !== SRC_PRE) || !(r[RC.RDATE] instanceof Date)) return;
     if (!start[k] || r[RC.RDATE] < start[k]) start[k] = r[RC.RDATE];
   });
   readClaims_().forEach(c => {
@@ -2263,7 +2288,7 @@ function getSerialHistory(serial) {
     part = str_(r[RC.PART]); name = str_(r[RC.NAME]); type = str_(r[RC.TYPE]) || type;
     const src = str_(r[RC.SRC]) || SRC_REQ;
     ev.push({ k: k, sn: str_(r[RC.SN]), t: 'rcv', d: r[RC.RDATE] instanceof Date ? r[RC.RDATE] : null, o: 1,
-      text: src === SRC_REQ ? 'รับตามใบเบิก ' + docStr_(r[RC.DOC]) : src === SRC_OPEN ? 'ยอดยกมา (ไม่มีวันที่รับ)' : src, loc: str_(r[RC.LOC]) });
+      text: src === SRC_REQ ? 'รับตามใบเบิก ' + docStr_(r[RC.DOC]) : src === SRC_OPEN ? 'ยอดยกมา (ไม่มีวันที่รับ)' : src === SRC_PRE ? 'รับก่อนเบิก' : src, loc: str_(r[RC.LOC]) });
   });
   readIss_().forEach(r => {
     const k = snKey_(r[IS.SN]);

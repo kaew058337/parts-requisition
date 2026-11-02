@@ -453,7 +453,8 @@
       <input class="search" id="k-search" type="search" placeholder="ค้นหา Part / ชื่อ / Serial / LOCATION">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin:-2px 2px 10px">
         <div class="meta" id="k-sum" style="flex:1;margin:0"></div>
-        <button class="btn ghost sm" id="k-open" title="เพิ่มพัสดุเข้าคลังโดยไม่มีใบเบิก" style="margin:0;flex:none;width:auto;min-height:0;padding:5px 11px;font-size:13px;border-radius:12px">+ ยอดยกมา</button>
+        <button class="btn ghost sm" id="k-aw" title="พัสดุที่รับก่อนเบิกและยังไม่มีใบเบิก" style="display:none;margin:0;flex:none;width:auto;min-height:0;padding:5px 11px;font-size:13px;border-radius:12px">รอใบเบิก</button>
+        <button class="btn ghost sm" id="k-open" title="รับพัสดุเข้าคลังก่อนมีใบเบิก หรือเพิ่มยอดยกมา" style="margin:0;flex:none;width:auto;min-height:0;padding:5px 11px;font-size:13px;border-radius:12px">+ เพิ่มเข้าคลัง</button>
       </div>
       <div id="k-list"><div class="empty"><span class="spin"></span></div></div>
     </div>
@@ -740,11 +741,21 @@
   </div>
 </div>
 
+<!-- ===== sheet: รอใบเบิก ===== -->
+<div class="sheet-bg" id="aw-bg">
+  <div class="sheet">
+    <div class="hd"><b>รอใบเบิก · รับก่อนเบิก</b><button class="x" id="aw-x" aria-label="ปิด">×</button></div>
+    <div class="info">พัสดุที่รับเข้าคลังแล้วแต่ยังไม่มีใบเบิก เมื่อออกใบเบิกแล้ว ให้ไปหน้า <b>รับ</b> เลือกรับจากล็อตนี้เพื่อผูกกับใบเบิก</div>
+    <div id="aw-list"></div>
+  </div>
+</div>
+
 <!-- ===== sheet: ยอดยกมา ===== -->
 <div class="sheet-bg" id="o-bg">
   <div class="sheet">
-    <div class="hd"><b>ยอดยกมา · เพิ่มเข้าคลัง</b><button class="x" id="o-x" aria-label="ปิด">×</button></div>
-    <div class="info">ใช้บันทึกพัสดุที่มีอยู่แล้วในคลัง ไม่ต้องมีใบเบิก เมื่อมีใบเบิก ค่อยเลือกล็อตนี้ในหน้ารับ</div>
+    <div class="hd"><b>เพิ่มพัสดุเข้าคลัง</b><button class="x" id="o-x" aria-label="ปิด">×</button></div>
+    <div class="seg" id="o-src" style="margin-bottom:8px"><button data-s="รับก่อนเบิก" class="on">รับก่อนเบิก</button><button data-s="ยอดยกมา">ยอดยกมา</button></div>
+    <div class="info" id="o-info"></div>
     <label>Part number</label><input id="o-part" list="partlist" autocomplete="off" autocapitalize="characters">
     <label>ชื่อพัสดุ</label><input id="o-name">
     <div class="row2">
@@ -1161,13 +1172,14 @@
       '<div class="no"></div><button class="del" type="button" aria-label="ลบรายการ">×</button>'+
       '<label style="margin-top:0">ประเภทพัสดุ</label><select class="f-type">'+TYPE_OPTS+'</select>'+
       '<label>Part number</label><input class="f-part" list="partlist" autocomplete="off" autocapitalize="characters">'+
+      '<div class="meta f-aw" style="display:none;color:#b45309;margin:4px 0 0"></div>'+
       '<label>ชื่อพัสดุ</label><input class="f-name">'+
       '<div class="row2"><div><label>จำนวน</label><input class="f-qty" type="number" inputmode="decimal" min="0" value="1"></div>'+
       '<div><label>หน่วยนับ</label><input class="f-unit" value="EA" placeholder="EA / ชิ้น / ชุด"></div></div>';
     $('r-items').appendChild(d);
     var part=d.querySelector('.f-part'), name=d.querySelector('.f-name'), unit=d.querySelector('.f-unit');
-    part.addEventListener('change', function(){ autofill(part,name,unit); });
-    part.addEventListener('input', function(){ autofill(part,name,unit); });
+    part.addEventListener('change', function(){ autofill(part,name,unit); hintItem(d); });
+    part.addEventListener('input', function(){ autofill(part,name,unit); hintItem(d); });
     d.querySelector('.del').addEventListener('click', function(){ d.remove(); renumberItems(); });
     renumberItems();
     return d;
@@ -1653,7 +1665,7 @@
   function loadStock(sync){
     /* แสดงข้อมูลเดิมทันที (ถ้ามี) แล้วโหลดใหม่เบื้องหลัง; ไม่เรียก getReconcile ทุกครั้ง (ช้า เพราะล็อกและเขียนชีทใหม่) */
     if(state.stk && state.stk.length){ renderStock(); } else { $('k-list').innerHTML='<div class="empty"><span class="spin"></span></div>'; }
-    run('getStock').then(function(rows){ state.stk=rows; renderStock(); if(sync===true) loadRecon(); })
+    run('getStock').then(function(rows){ state.stk=rows; renderStock(); loadAwaiting(); if(sync===true) loadRecon(); })
       .catch(function(e){ $('k-list').innerHTML='<div class="empty">'+esc(e.message)+'</div>'; });
   }
   function renderStock(){
@@ -1681,7 +1693,7 @@
         if(l.cond) bits.push('COND '+esc(l.cond));
         if(l.location) bits.push(esc(l.location));
         if(l.expire) bits.push('หมดอายุ '+esc(l.expire));
-        return '<div class="meta" style="padding:5px 0;border-top:1px solid var(--line)">'+bits.join(' · ')+'<br>'+(l.docNo==='ยอดยกมา'||l.docNo==='คืนเข้าคลัง'?esc(l.docNo)+(l.note?' ('+esc(l.note)+')':''):'เลขเบิก '+esc(l.docNo))+' · รับ '+esc(l.received)+'<div style="display:flex;gap:8px;margin-top:6px">'+(l.free?'<button class="btn sm" data-is="'+l.seq+'">จ่าย</button>':(l.issRow?'<button class="btn sm" data-ix="'+l.seq+'">จ่าย</button>':''))+'<button class="btn ghost sm" data-bl="'+l.seq+'">ยืมออก</button><button class="btn ghost sm" data-mv="'+l.seq+'">ย้ายที่เก็บ</button></div>'+(l.linkNote?'<div style="color:var(--bad);margin-top:4px">⚠ '+esc(l.linkNote)+'</div>':'')+'</div>';
+        return '<div class="meta" style="padding:5px 0;border-top:1px solid var(--line)">'+bits.join(' · ')+'<br>'+(l.docNo==='ยอดยกมา'||l.docNo==='คืนเข้าคลัง'||l.docNo==='รับก่อนเบิก'?esc(l.docNo)+(l.note?' ('+esc(l.note)+')':''):'เลขเบิก '+esc(l.docNo))+' · รับ '+esc(l.received)+'<div style="display:flex;gap:8px;margin-top:6px">'+(l.free?'<button class="btn sm" data-is="'+l.seq+'">จ่าย</button>':(l.issRow?'<button class="btn sm" data-ix="'+l.seq+'">จ่าย</button>':''))+'<button class="btn ghost sm" data-bl="'+l.seq+'">ยืมออก</button><button class="btn ghost sm" data-mv="'+l.seq+'">ย้ายที่เก็บ</button></div>'+(l.linkNote?'<div style="color:var(--bad);margin-top:4px">⚠ '+esc(l.linkNote)+'</div>':'')+'</div>';
       }).join('');
       return '<div class="card lift" style="padding:14px 16px">'+
         '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><b>'+esc(g.part||'-')+'</b><span class="chip ok">'+fmtNum(g.qty)+' '+esc(g.unit)+'</span></div>'+
@@ -1879,7 +1891,7 @@
     $('bp-list').innerHTML = list.map(function(l){
       return '<div class="pcard" data-bp="'+l.seq+'"><div class="t"><span class="doc">'+esc(l.part||'-')+'</span><span class="chip ok">'+fmtNum(l.qty)+' '+esc(l.unit)+'</span></div>'+
         '<div class="nm">'+esc(l.name)+'</div>'+
-        '<div class="meta">'+(l.serial?'S/N '+esc(l.serial)+' · ':'')+(l.type?esc(l.type)+' · ':'')+(l.location?esc(l.location)+' · ':'')+esc(l.source==='ยอดยกมา'||l.source==='คืนเข้าคลัง'?l.source:'เลขเบิก '+l.source)+'</div></div>';
+        '<div class="meta">'+(l.serial?'S/N '+esc(l.serial)+' · ':'')+(l.type?esc(l.type)+' · ':'')+(l.location?esc(l.location)+' · ':'')+esc(l.source==='ยอดยกมา'||l.source==='คืนเข้าคลัง'||l.source==='รับก่อนเบิก'?l.source:'เลขเบิก '+l.source)+'</div></div>';
     }).join('');
   }
   $('bp-search').addEventListener('input', renderPicker);
@@ -2005,8 +2017,36 @@
     run('checkSerialAlerts', [this.value, $('t-part').value||'']).then(function(l){ if(l && l.length) showSerialAlerts(l, $('t-warn')); }).catch(function(){});
   });
 
-  /* ---------- ยอดยกมา ---------- */
-  $('k-open').addEventListener('click', function(){ snRule('o', $('o-type').value); $('o-bg').classList.add('on'); });
+  /* ---------- รับก่อนเบิก / ยอดยกมา ---------- */
+  state.oSrc = 'รับก่อนเบิก'; state.aw = [];
+  var O_INFO = { 'รับก่อนเบิก':'รับพัสดุเข้าคลังก่อนมีใบเบิก (นับวันรับจริง ประกันเริ่มนับ) จ่ายให้ช่างได้เลย และเมื่อมีใบเบิกค่อยผูกในหน้ารับ',
+                 'ยอดยกมา':'ใช้บันทึกพัสดุที่มีอยู่แล้วในคลังตั้งแต่ก่อนใช้ระบบ ไม่มีวันที่รับ จึงไม่นับประกัน' };
+  function oSrcSet(v){ state.oSrc=v; $('o-info').textContent=O_INFO[v];
+    document.querySelectorAll('#o-src button').forEach(function(b){ b.classList.toggle('on', b.dataset.s===v); }); }
+  $('o-src').addEventListener('click', function(e){ var b=e.target.closest('button'); if(b) oSrcSet(b.dataset.s); });
+  function loadAwaiting(){
+    run('getAwaitingReq').then(function(rows){ state.aw=rows||[]; var b=$('k-aw'); b.style.display=state.aw.length?'':'none'; b.textContent='รอใบเบิก ('+state.aw.length+')'; hintAllItems(); }).catch(function(){});
+  }
+  function awFor(part){ part=String(part||'').trim().toUpperCase(); if(!part) return []; return state.aw.filter(function(x){ return String(x.part).toUpperCase()===part; }); }
+  function hintItem(d){
+    var h=d.querySelector('.f-aw'); if(!h) return; var m=awFor(d.querySelector('.f-part').value);
+    if(!m.length){ h.style.display='none'; return; }
+    var q=0,st=0; m.forEach(function(x){ q+=x.pending; st+=x.inStock; });
+    h.textContent='มีพัสดุรับก่อนเบิกรอใบเบิกอยู่ '+q+' (ในคลัง '+st+') — ออกใบเบิกแล้วให้ไปหน้ารับ เลือกรับจากล็อตเดิม';
+    h.style.display='block';
+  }
+  function hintAllItems(){ document.querySelectorAll('#r-items .item').forEach(hintItem); }
+  $('k-aw').addEventListener('click', function(){
+    var q=state.aw;
+    $('aw-list').innerHTML = q.length ? q.map(function(x){
+      return '<div class="meta" style="padding:8px 0;border-top:1px solid var(--line)"><b>'+esc(x.part)+'</b> · '+esc(x.name)+(x.serial?' · S/N '+esc(x.serial):'')+
+        '<br>รอใบเบิก '+x.pending+' '+esc(x.unit||'')+' · ในคลัง '+x.inStock+(x.direct?' · จ่ายตรงแล้ว '+x.direct:'')+(x.loc?' · '+esc(x.loc):'')+' · รับ '+esc(x.received)+'</div>';
+    }).join('') : '<div class="empty">ไม่มีรายการรอใบเบิก</div>';
+    $('aw-bg').classList.add('on');
+  });
+  $('aw-x').addEventListener('click', function(){ $('aw-bg').classList.remove('on'); });
+  $('aw-bg').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('on'); });
+  $('k-open').addEventListener('click', function(){ oSrcSet(state.oSrc); snRule('o', $('o-type').value); $('o-bg').classList.add('on'); });
   $('o-x').addEventListener('click', function(){ $('o-bg').classList.remove('on'); });
   $('o-bg').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('on'); });
   $('o-type').addEventListener('change', function(){ snRule('o', this.value); });
@@ -2018,12 +2058,12 @@
     var btn=$('o-submit'); busy(btn,true);
     run('addOpeningStock', [{
       part:$('o-part').value, name:$('o-name').value, itemType:$('o-type').value, cond:$('o-cond').value,
-      serial:$('o-sn').value, qty:$('o-qty').value, unit:$('o-unit').value, location:$('o-loc').value, expire:$('o-exp').value, by:state.by
+      serial:$('o-sn').value, qty:$('o-qty').value, unit:$('o-unit').value, location:$('o-loc').value, expire:$('o-exp').value, source:state.oSrc, by:state.by
     }]).then(function(){
       toast('เพิ่มเข้าคลังแล้ว · เพิ่มรายการถัดไปได้เลย');
       ['o-part','o-name','o-sn'].forEach(function(id){ $(id).value=''; });
       $('o-qty').value=1; $('o-unit').value='EA'; snRule('o', $('o-type').value);
-      loadStock(); boot();
+      loadStock(); boot(); loadAwaiting();
     }).catch(function(e){ toast(e.message,true); }).then(function(){ busy(btn,false); });
   });
 
