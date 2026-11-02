@@ -640,6 +640,28 @@ function nextSeq_(sh) {
 }
 
 /** หมายเลขการเบิก 9 หลัก: ลำดับ(3) + วัน(2) + เดือน(2) + ปี พ.ศ. 2 หลักท้าย(2) ; ลำดับเริ่มใหม่ทุกเดือน */
+/** แถวใบเบิกที่ข้อมูลครบพอใช้งาน : ต้องมีหมายเลขการเบิก 9 หลัก และมี Part หรือชื่อ (แถวที่มีแต่ Part ที่ใครวางผิดชีท จะถูกข้าม) */
+function isValidReqRow_(r) {
+  return /^\d{9}$/.test(pad_(str_(r[1]), 9)) && str_(r[1]) !== '' && (str_(r[2]) !== '' || str_(r[3]) !== '');
+}
+
+/** เมนู: ตรวจแถวในชีท เบิก ที่ข้อมูลไม่ครบ (ไม่มีหมายเลขการเบิก) เพื่อให้ลบหรือแก้เอง */
+function findIncompleteRequisitions() {
+  const sh = getSheet_(SHEET_REQ), last = sh.getLastRow(), bad = [];
+  if (last >= 2) sh.getRange(2, 1, last - 1, 15).getValues().forEach((r, i) => {
+    if (r.every(c => str_(c) === '')) return;
+    if (!isValidReqRow_(r)) bad.push({ row: i + 2, part: str_(r[2]), name: str_(r[3]) });
+  });
+  try {
+    const ui = SpreadsheetApp.getUi();
+    ui.alert(bad.length ? 'พบ ' + bad.length + ' แถวในชีท เบิก ที่ข้อมูลไม่ครบ' : 'ไม่พบแถวใบเบิกที่ข้อมูลไม่ครบ',
+      bad.length ? bad.slice(0, 30).map(b => 'แถว ' + b.row + ': ' + (b.part || b.name || '(ว่าง)')).join('\n') +
+        (bad.length > 30 ? '\n... และอีก ' + (bad.length - 30) + ' แถว' : '') +
+        '\n\nแถวเหล่านี้ไม่มีหมายเลขการเบิก ระบบจึงไม่แสดงในประวัติและหน้ารับ ถ้าไม่ใช้ให้ลบแถวทิ้งในชีท เบิก' : '', ui.ButtonSet.OK);
+  } catch (e) { /* ไม่มี UI */ }
+  return bad;
+}
+
 function nextReqSeq_(sh, mm, yy) {
   const last = sh.getLastRow();
   let max = 0;
@@ -977,6 +999,7 @@ function getPendingReceive() {
   const got = receivedMap_();
   const out = [];
   req.getRange(2, 1, last - 1, 15).getValues().forEach((r, i) => {
+    if (!isValidReqRow_(r)) return;                     // แถวข้อมูลไม่ครบ (ไม่มีหมายเลขการเบิก)
     if (isPaid_(r[7]) || isCancelled_(r[7])) return; // รับครบแล้ว / ยกเลิก
     const docNo = pad_(r[1], 9);
     const part = str_(r[2]);
@@ -2169,7 +2192,9 @@ function getHistory(kind, limit) {
 
   const lim = Number(limit) || 100;
   const n = Math.min(lim, last - 1);
-  const vals = sh.getRange(last - n + 1, 1, n, all.length).getValues();
+  let vals = sh.getRange(last - n + 1, 1, n, all.length).getValues();
+  let skipped = 0;
+  if (kind === 'req') { const ok = vals.filter(isValidReqRow_); skipped = vals.length - ok.length; vals = ok; }   // ข้ามแถวที่ข้อมูลไม่ครบ
   // ประวัติรับ: สถานะ "จ่ายให้ช่างแล้ว" เมื่อล็อตนั้นไม่เหลือในคลังและมีการจ่ายให้ช่าง
   const lotMap = {};
   if (kind === 'rcv' || kind === 'rcv2') computeLots_().forEach(l => { lotMap[l.seq] = l; });
@@ -2182,7 +2207,8 @@ function getHistory(kind, limit) {
   return {
     headers: headers,
     rows: items.map(x => cols.map(i => fmtCell_(x.r[i]))),
-    paid: items.map(x => x.paid)
+    paid: items.map(x => x.paid),
+    skipped: skipped
   };
 }
 
@@ -2394,6 +2420,7 @@ function onOpen() {
       .addItem('นำเข้ายอดยกมา', 'importOpeningStock')
       .addSeparator()
       .addItem('ตรวจ Part/Serial ที่กลายเป็นวันที่', 'findDateParts')
+      .addItem('ตรวจแถวใบเบิกที่ข้อมูลไม่ครบ', 'findIncompleteRequisitions')
       .addItem('นำค่าที่แก้ในคลังพัสดุไปแก้ต้นทาง', 'applyStockEdits')
       .addToUi();
   } catch (e) { /* ไม่มี UI */ }

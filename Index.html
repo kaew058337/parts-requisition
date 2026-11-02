@@ -2110,10 +2110,11 @@
       if(!q || r.join(' ').toLowerCase().indexOf(q)>=0) list.push({ r:r, paid:d.paid ? d.paid[i] : false });
     });
     state.histRows = list.map(function(x){ return x.r; });
-    if(!list.length){ $('h-list').innerHTML='<div class="empty">ไม่มีข้อมูล</div>'; return; }
+    var skipNote = (d.skipped>0) ? '<div class="info" style="margin:0 0 10px">ข้าม '+d.skipped+' แถวในชีท เบิก ที่ข้อมูลไม่ครบ (ไม่มีหมายเลขการเบิก) · ตรวจที่เมนูในชีท: ระบบเบิก-จ่าย → ตรวจแถวใบเบิกที่ข้อมูลไม่ครบ</div>' : '';
+    if(!list.length){ $('h-list').innerHTML=skipNote+'<div class="empty">ไม่มีข้อมูล</div>'; return; }
     var iDoc = k==='req' ? 1 : d.headers.indexOf('เลขเอกสารการเบิก');
     var iName = k==='req' ? 3 : (k==='ret' ? 2 : d.headers.indexOf('ชื่อพัสดุ'));
-    $('h-list').innerHTML = list.map(function(x, ri){
+    $('h-list').innerHTML = skipNote + list.map(function(x, ri){
       var r=x.r, head, sub, chip='', btns='';
       if(k==='log'){ head=r[0]; sub=r[3]+(r[4]?' · '+r[4]:'')+' — '+r[1]; }
       else { head = k==='ret' ? '#'+r[0] : (r[iDoc] || ((k==='rcv'||k==='rcv2') ? r[d.headers.indexOf('แหล่งที่มา')] : (k==='iss' ? 'โอนเข้าใบเบิก' : ''))); sub = r[iName]; }
