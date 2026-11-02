@@ -2381,7 +2381,7 @@ function importOpeningStock() {
 /* ---------- นำเข้าใบเบิกจาก Excel : วางรายการหลายบรรทัด ข้อมูลร่วม (เครื่อง/ข้อขัดข้อง/ผู้เบิก) ใส่ครั้งเดียว ---------- */
 
 const SHEET_IMPORT_REQ = 'นำเข้าใบเบิก';
-const MACHINE_LIST = ['70201', '70202', '70203', '70204', '70205', '70206', '70207', 'ALL SAAB'];
+const MACHINE_LIST = ['70201', '70202', '70203', '70204', '70205', '70206', '70207', 'ALL SAAB', 'FLY AWAY KIT 1', 'FLY AWAY KIT 2'];
 const IMPREQ_FIRST_ROW = 11;       // แถวแรกของรายการพัสดุ
 const IMPREQ_DONE = 'ออกใบเบิกแล้ว';
 
