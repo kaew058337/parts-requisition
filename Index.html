@@ -750,11 +750,20 @@
   </div>
 </div>
 
+<!-- ===== sheet: ผูกใบเบิกย้อนหลัง ===== -->
+<div class="sheet-bg" id="lk-bg">
+  <div class="sheet">
+    <div class="hd"><b>ผูกใบเบิก</b><button class="x" id="lk-x" aria-label="ปิด">×</button></div>
+    <div class="info" id="lk-info"></div>
+    <div id="lk-list"></div>
+  </div>
+</div>
+
 <!-- ===== sheet: ยอดยกมา ===== -->
 <div class="sheet-bg" id="o-bg">
   <div class="sheet">
     <div class="hd"><b>เพิ่มพัสดุเข้าคลัง</b><button class="x" id="o-x" aria-label="ปิด">×</button></div>
-    <div class="seg" id="o-src" style="margin-bottom:8px"><button data-s="รับก่อนเบิก" class="on">รับก่อนเบิก</button><button data-s="ยอดยกมา">ยอดยกมา</button></div>
+    <div class="seg" id="o-src" style="margin-bottom:8px"><button data-s="รับก่อนเบิก" class="on" style="flex:1">รับก่อนเบิก</button><button data-s="ยอดยกมา" style="flex:1">ยอดยกมา</button></div>
     <div class="info" id="o-info"></div>
     <label>Part number</label><input id="o-part" list="partlist" autocomplete="off" autocapitalize="characters">
     <label>ชื่อพัสดุ</label><input id="o-name">
@@ -772,6 +781,15 @@
     <div class="row2">
       <div><label>LOCATION</label><input id="o-loc"></div>
       <div><label>วันหมดอายุ</label><input id="o-exp" type="date"></div>
+    </div>
+    <div id="o-now-wrap" style="margin-top:10px;padding:10px 12px;border-radius:14px;background:rgba(26,86,219,.07)">
+      <label style="display:flex;gap:8px;align-items:center;margin:0;font-weight:600"><input type="checkbox" id="o-now" checked style="width:auto;margin:0"> จ่ายให้ช่างทันที (ยังไม่มีใบเบิก)</label>
+      <div id="o-now-f">
+        <div class="row2">
+          <div><label>จ่ายให้ช่าง</label><input id="o-tech" list="techlist" autocomplete="off" placeholder="เลือกหรือพิมพ์ ยศ-ชื่อ"></div>
+          <div><label>TAIL No.</label><input id="o-tail" autocapitalize="characters"></div>
+        </div>
+      </div>
     </div>
     <button class="btn" id="o-submit">บันทึกเข้าคลัง</button>
   </div>
@@ -2019,9 +2037,11 @@
 
   /* ---------- รับก่อนเบิก / ยอดยกมา ---------- */
   state.oSrc = 'รับก่อนเบิก'; state.aw = [];
-  var O_INFO = { 'รับก่อนเบิก':'รับพัสดุเข้าคลังก่อนมีใบเบิก (นับวันรับจริง ประกันเริ่มนับ) จ่ายให้ช่างได้เลย และเมื่อมีใบเบิกค่อยผูกในหน้ารับ',
+  var O_INFO = { 'รับก่อนเบิก':'รับพัสดุเข้าคลังก่อนมีใบเบิก (นับวันรับจริง ประกันเริ่มนับ) จ่ายให้ช่างได้ทันที เมื่อมีใบเบิกแล้วค่อยกด รอใบเบิก → ผูกใบเบิก',
                  'ยอดยกมา':'ใช้บันทึกพัสดุที่มีอยู่แล้วในคลังตั้งแต่ก่อนใช้ระบบ ไม่มีวันที่รับ จึงไม่นับประกัน' };
-  function oSrcSet(v){ state.oSrc=v; $('o-info').textContent=O_INFO[v];
+  function oNowToggle(){ $('o-now-f').style.display = $('o-now').checked ? '' : 'none'; }
+  $('o-now').addEventListener('change', oNowToggle);
+  function oSrcSet(v){ state.oSrc=v; $('o-info').textContent=O_INFO[v]; $('o-now-wrap').style.display = v==='รับก่อนเบิก' ? '' : 'none'; oNowToggle();
     document.querySelectorAll('#o-src button').forEach(function(b){ b.classList.toggle('on', b.dataset.s===v); }); }
   $('o-src').addEventListener('click', function(e){ var b=e.target.closest('button'); if(b) oSrcSet(b.dataset.s); });
   function loadAwaiting(){
@@ -2032,7 +2052,7 @@
     var h=d.querySelector('.f-aw'); if(!h) return; var m=awFor(d.querySelector('.f-part').value);
     if(!m.length){ h.style.display='none'; return; }
     var q=0,st=0; m.forEach(function(x){ q+=x.pending; st+=x.inStock; });
-    h.textContent='มีพัสดุรับก่อนเบิกรอใบเบิกอยู่ '+q+' (ในคลัง '+st+') — ออกใบเบิกแล้วให้ไปหน้ารับ เลือกรับจากล็อตเดิม';
+    h.textContent='มีพัสดุรับก่อนเบิกรอใบเบิกอยู่ '+q+' (ในคลัง '+st+') — ออกใบเบิกนี้แล้ว ให้ผูกที่ปุ่ม รอใบเบิก ในหน้าคลัง (ที่จ่ายไปแล้ว) หรือเลือกรับจากล็อตเดิมในหน้ารับ (ที่ยังอยู่ในคลัง)';
     h.style.display='block';
   }
   function hintAllItems(){ document.querySelectorAll('#r-items .item').forEach(hintItem); }
@@ -2040,10 +2060,35 @@
     var q=state.aw;
     $('aw-list').innerHTML = q.length ? q.map(function(x){
       return '<div class="meta" style="padding:8px 0;border-top:1px solid var(--line)"><b>'+esc(x.part)+'</b> · '+esc(x.name)+(x.serial?' · S/N '+esc(x.serial):'')+
-        '<br>รอใบเบิก '+x.pending+' '+esc(x.unit||'')+' · ในคลัง '+x.inStock+(x.direct?' · จ่ายตรงแล้ว '+x.direct:'')+(x.loc?' · '+esc(x.loc):'')+' · รับ '+esc(x.received)+'</div>';
+        '<br>รอใบเบิก '+x.pending+' '+esc(x.unit||'')+' · ในคลัง '+x.inStock+(x.direct?' · จ่ายตรงแล้ว '+x.direct:'')+(x.loc?' · '+esc(x.loc):'')+' · รับ '+esc(x.received)+
+        (x.direct>0?'<div style="margin-top:6px"><button class="btn sm" data-lk="'+x.seq+'">ผูกใบเบิก</button></div>':'')+'</div>';
     }).join('') : '<div class="empty">ไม่มีรายการรอใบเบิก</div>';
     $('aw-bg').classList.add('on');
   });
+  $('aw-list').addEventListener('click', function(e){
+    var b=e.target.closest('button[data-lk]'); if(!b) return;
+    var seq=Number(b.dataset.lk), it=state.aw.filter(function(x){ return x.seq===seq; })[0]; if(!it) return;
+    state.lkSeq=seq; $('lk-info').textContent='เลือกใบเบิกของ '+it.part+' ที่ออกแล้ว เพื่อผูกกับพัสดุที่จ่ายตรงไปแล้ว '+it.direct+' '+(it.unit||'');
+    $('lk-list').innerHTML='<div class="empty"><span class="spin"></span></div>'; $('lk-bg').classList.add('on');
+    run('getPendingReceive').then(function(rows){
+      var m=rows.filter(function(r){ return String(r.part).toUpperCase()===String(it.part).toUpperCase(); });
+      $('lk-list').innerHTML = m.length ? m.map(function(r){
+        return '<div class="meta" style="padding:8px 0;border-top:1px solid var(--line)"><b>'+esc(r.docNo)+'</b> · เบิก '+r.qty+' · ค้างรับ '+r.remain+(r.machine?' · เครื่อง '+esc(r.machine):'')+
+          '<div style="margin-top:6px"><button class="btn sm" data-ld="'+esc(r.docNo)+'">ผูกใบเบิกนี้</button></div></div>';
+      }).join('') : '<div class="empty">ยังไม่มีใบเบิก '+esc(it.part)+' ที่ค้างรับ — ออกใบเบิกในหน้าเบิกก่อน แล้วกลับมาผูก</div>';
+    }).catch(function(err){ $('lk-list').innerHTML='<div class="empty">'+esc(err.message)+'</div>'; });
+  });
+  $('lk-list').addEventListener('click', function(e){
+    var b=e.target.closest('button[data-ld]'); if(!b) return;
+    if(!state.by){ askBy(function(){ b.click(); }); return; }
+    busy(b,true);
+    run('linkDirectIssue',[{ lotSeq:state.lkSeq, docNo:b.dataset.ld, by:state.by }]).then(function(res){
+      toast('ผูกใบเบิกแล้ว '+res.linked+' ชิ้น'+(res.remainReq>0?' · ใบเบิกยังค้างรับ '+res.remainReq:''));
+      $('lk-bg').classList.remove('on'); $('aw-bg').classList.remove('on'); loadStock(); loadAwaiting(); boot();
+    }).catch(function(err){ toast(err.message,true); busy(b,false); });
+  });
+  $('lk-x').addEventListener('click', function(){ $('lk-bg').classList.remove('on'); });
+  $('lk-bg').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('on'); });
   $('aw-x').addEventListener('click', function(){ $('aw-bg').classList.remove('on'); });
   $('aw-bg').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('on'); });
   $('k-open').addEventListener('click', function(){ oSrcSet(state.oSrc); snRule('o', $('o-type').value); $('o-bg').classList.add('on'); });
@@ -2058,9 +2103,9 @@
     var btn=$('o-submit'); busy(btn,true);
     run('addOpeningStock', [{
       part:$('o-part').value, name:$('o-name').value, itemType:$('o-type').value, cond:$('o-cond').value,
-      serial:$('o-sn').value, qty:$('o-qty').value, unit:$('o-unit').value, location:$('o-loc').value, expire:$('o-exp').value, source:state.oSrc, by:state.by
-    }]).then(function(){
-      toast('เพิ่มเข้าคลังแล้ว · เพิ่มรายการถัดไปได้เลย');
+      serial:$('o-sn').value, qty:$('o-qty').value, unit:$('o-unit').value, location:$('o-loc').value, expire:$('o-exp').value, source:state.oSrc, issueNow:(state.oSrc==='รับก่อนเบิก' && $('o-now').checked), tech:$('o-tech').value, tail:$('o-tail').value, by:state.by
+    }]).then(function(res){
+      toast(res && res.issued ? 'รับเข้าและจ่ายให้ช่างแล้ว · รอผูกใบเบิกภายหลัง' : 'เพิ่มเข้าคลังแล้ว · เพิ่มรายการถัดไปได้เลย');
       ['o-part','o-name','o-sn'].forEach(function(id){ $(id).value=''; });
       $('o-qty').value=1; $('o-unit').value='EA'; snRule('o', $('o-type').value);
       loadStock(); boot(); loadAwaiting();

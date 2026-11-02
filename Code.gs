@@ -79,6 +79,7 @@ const API_FUNCS_ = {
   getBootstrap: getBootstrap,
   addOpeningStock: addOpeningStock,
   getAwaitingReq: getAwaitingReq,
+  linkDirectIssue: linkDirectIssue,
   cancelRequisition: cancelRequisition,
   checkSerialAlert: checkSerialAlert,
   checkSerialAlerts: checkSerialAlerts,
@@ -1159,7 +1160,11 @@ function submitReceive(p) {
 
 /** จ่ายจากล็อตในคลังโดยไม่ต้องมีใบเบิก : เลขเอกสาร = "จ่ายตรง" */
 function issueDirect_(p) {
-  return withLock_(() => {
+  return withLock_(() => { const res = issueDirectCore_(p); rebuildStock_(); return res; });
+}
+
+function issueDirectCore_(p) {
+  {
     const lot = findLot_(p.lotSeq);
     if (!lot) throw new Error('ไม่พบล็อตในคลังที่เลือก');
     if (!lot.free || lot.remain <= 0) throw new Error('ล็อตนี้ไม่ใช่ยอดยกมา/ของคืนคลัง หรือไม่ได้อยู่ในคลัง');
@@ -1172,9 +1177,8 @@ function issueDirect_(p) {
       str_(p.tail), str_(p.tech), [str_(p.remark), 'จ่ายตรงจาก' + lot.label].filter(Boolean).join(' | '), str_(p.by)]);
     log_('จ่าย', DIRECT, [lot.part, lot.name, 'x' + qty, lot.serial ? 'S/N ' + lot.serial : '',
       'ช่าง ' + str_(p.tech), str_(p.tail) ? 'TAIL ' + str_(p.tail) : '', '(จ่ายตรงจาก' + lot.label + ' ไม่มีใบเบิก)'].filter(Boolean).join(' | '), p.by);
-    rebuildStock_();
     return { closed: false, direct: true, left: lot.remain - qty };
-  });
+  }
 }
 
 /** จ่ายจากล็อตในคลัง: มีใบเบิกอ้างอิง -> รับเข้าใบเบิกแล้วจ่ายต่อ ; ไม่มีใบเบิก -> จ่ายตรง */
@@ -1830,13 +1834,17 @@ function addOpeningStock(p) {
       const dup = computeLots_().filter(l => l.remain > 0 && snKey_(l.serial) === snKey_(sn))[0];
       if (dup) throw new Error('Serial ' + sn + ' มีอยู่ในคลังแล้ว (' + dup.label + ')');
     }
+    const issueNow = source === SRC_PRE && !!p.issueNow;
+    if (issueNow && !str_(p.tech)) throw new Error('กรุณากรอกชื่อช่างที่รับพัสดุ (จ่ายทันที)');
+    const newSeq = nextRcvSeq_();
     appendRcv_([
-      nextRcvSeq_(), '', str_(p.part), str_(p.name), sn, type, qty, str_(p.unit) || 'EA', '', '',
+      newSeq, '', str_(p.part), str_(p.name), sn, type, qty, str_(p.unit) || 'EA', '', '',
       str_(p.cond), '', '', '', parseDate_(todayStr_()), '', '', str_(p.cardId), '', parseDate_(p.expire), str_(p.location), '', str_(p.remark), source, ''
     ]);
+    if (issueNow) issueDirectCore_({ lotSeq: newSeq, qty: qty, tech: p.tech, tail: p.tail, payDate: p.payDate || todayStr_(), remark: p.issueRemark, by: p.by });
     log_(source, '', [str_(p.part), str_(p.name), 'x' + qty, sn ? 'S/N ' + sn : '', str_(p.location)].filter(Boolean).join(' | '), p.by);
     rebuildStock_();
-    return { ok: true };
+    return { ok: true, issued: issueNow };
   });
 }
 
@@ -1855,6 +1863,61 @@ function getAwaitingReq() {
     return { seq: l.seq, part: l.part, name: l.name, serial: l.serial, type: l.type, unit: l.unit, qty: l.qty,
       inStock: Math.max(l.remain, 0), direct: direct[l.seq] || 0, pending: pending, loc: l.loc, received: fmtThai_(l.recvDate), note: l.note };
   }).filter(x => x.pending > 0).sort((a, b) => b.seq - a.seq);
+}
+
+/**
+ * ผูกของที่ "จ่ายตรง" ไปแล้ว (รับก่อนเบิก) เข้ากับใบเบิกที่ออกภายหลัง
+ * ระบบสร้างการรับตามใบเบิก + การจ่ายให้ช่างเดิม (ช่าง/TAIL/วันที่เดิม) และบันทึกการโอนออกจากล็อตเดิม
+ */
+function linkDirectIssue(p) {
+  return withLock_(() => {
+    const lot = findLot_(p.lotSeq);
+    if (!lot || !lot.free) throw new Error('ไม่พบล็อตรับก่อนเบิกที่เลือก');
+    const docNo = pad_(str_(p.docNo), 9);
+    const req = getSheet_(SHEET_REQ), rl = req.getLastRow();
+    let rrow = 0, rv = null;
+    if (rl >= 2) req.getRange(2, 1, rl - 1, 15).getValues().forEach((r, i) => {
+      if (!rrow && pad_(r[1], 9) === docNo && str_(r[2]) === lot.part) { rrow = i + 2; rv = r; }
+    });
+    if (!rv) throw new Error('ไม่พบใบเบิกเลขที่ ' + docNo + ' ที่มี Part ' + lot.part);
+    if (isCancelled_(rv[7])) throw new Error('ใบเบิกนี้ถูกยกเลิกแล้ว');
+    const iss = getSheet_(SHEET_ISS), issRows = readIss_();
+    const directs = [];
+    issRows.forEach((r, j) => { if (Number(r[IS.RSEQ]) === lot.seq && docStr_(r[IS.DOC]) === DIRECT && num_(r[IS.QTY]) > 0) directs.push({ j: j, r: r }); });
+    const totalDirect = directs.reduce((a, d) => a + num_(d.r[IS.QTY]), 0);
+    if (totalDirect <= 0) throw new Error('ล็อตนี้ไม่มีรายการจ่ายตรงที่รอผูกใบเบิก');
+    const done = receivedMap_()[docNo + '|' + lot.part] || 0;
+    let need = p.qty === undefined || p.qty === '' || p.qty === null ? Math.min(totalDirect, Math.max(num_(rv[4]) - done, 0) || totalDirect) : num_(p.qty);
+    if (need <= 0) throw new Error('จำนวนที่ผูกต้องมากกว่า 0');
+    if (need > totalDirect) throw new Error('ผูกได้ไม่เกินที่จ่ายตรงไปแล้ว (' + totalDirect + ')');
+    let reqQty = num_(rv[4]), increasedTo = null;
+    if (done + need > reqQty) { reqQty = done + need; req.getRange(rrow, 5).setValue(reqQty); increasedTo = reqQty; }
+    const by = str_(p.by), linked = [];
+    directs.forEach(d => {
+      if (need <= 0) return;
+      const rowQty = num_(d.r[IS.QTY]), take = Math.min(rowQty, need); need -= take;
+      const sheetRow = d.j + 2;
+      iss.getRange(sheetRow, IS.QTY + 1).setValue(rowQty - take);                       // ลดจำนวนจ่ายตรงเดิม
+      if (rowQty - take <= 0) iss.getRange(sheetRow, IS.NOTE + 1).setValue('(ผูกใบเบิก ' + docNo + ' แล้ว)');
+      linked.push({ take: take, date: d.r[IS.DATE], tail: str_(d.r[IS.TAIL]), tech: str_(d.r[IS.TECH]), note: str_(d.r[IS.NOTE]) });
+    });
+    const recvDate = linked[0].date instanceof Date ? linked[0].date : parseDate_(todayStr_());
+    linked.forEach(l => {
+      const seq = nextRcvSeq_();
+      appendRcv_([seq, docNo, lot.part, str_(rv[3]) || lot.name, lot.serial, str_(rv[14]) || lot.type, l.take, str_(rv[5]) || lot.unit, '', '',
+        lot.cond, rv[6], str_(rv[9]), dueDate_(rv[6], rv[9]), l.date instanceof Date ? l.date : recvDate, '', str_(rv[8]), '', '', lot.expire, lot.loc, '',
+        'ผูกใบเบิกย้อนหลังจากรับก่อนเบิก', SRC_REQ, lot.seq]);
+      appendIss_([nextSeq_(iss), l.date instanceof Date ? l.date : recvDate, docNo, lot.seq, lot.part, lot.name, lot.serial, l.take, lot.unit, '', '',
+        XFER_NOTE + ' ' + docNo + ' (ผูกย้อนหลัง)', by]);
+      appendIss_([nextSeq_(iss), l.date instanceof Date ? l.date : recvDate, docNo, seq, lot.part, lot.name, lot.serial, l.take, lot.unit, l.tail, l.tech,
+        [l.note, 'ผูกใบเบิกย้อนหลัง'].filter(Boolean).join(' | '), by]);
+      log_('ผูกใบเบิกย้อนหลัง', docNo, [lot.part, lot.name, 'x' + l.take, lot.serial ? 'S/N ' + lot.serial : '', 'ช่าง ' + l.tech, l.tail ? 'TAIL ' + l.tail : ''].filter(Boolean).join(' | '), by);
+    });
+    const got = receivedMap_()[docNo + '|' + lot.part] || 0;
+    if (got >= reqQty) req.getRange(rrow, 8).setNumberFormat('dd/mm/yyyy').setValue(recvDate);
+    rebuildStock_();
+    return { ok: true, linked: linked.reduce((a, l) => a + l.take, 0), remainReq: Math.max(reqQty - got, 0), increasedTo: increasedTo };
+  });
 }
 
 /** ล็อตยอดยกมา/ของคืนคลังที่ Part number เดียวกับใบเบิก (ให้เลือกรับจากคลัง) : row = ลำดับรับของล็อต */
@@ -2292,7 +2355,7 @@ function getSerialHistory(serial) {
   });
   readIss_().forEach(r => {
     const k = snKey_(r[IS.SN]);
-    if (!chain[k]) return;
+    if (!chain[k] || num_(r[IS.QTY]) <= 0) return;
     const tech = isTechIssue_(r);
     ev.push({ k: k, sn: str_(r[IS.SN]), t: tech ? 'install' : 'out', d: r[IS.DATE] instanceof Date ? r[IS.DATE] : null, o: 2,
       text: tech ? 'จ่ายให้ช่าง/ติดตั้ง' : 'จ่ายออก', machine: str_(r[IS.TAIL]), tech: str_(r[IS.TECH]), doc: docStr_(r[IS.DOC]) });
