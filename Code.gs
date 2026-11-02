@@ -45,7 +45,7 @@ const ITEM_TYPES = ['LRU', 'SP', 'LRU(TCI)', 'SP(TCI)', 'สารเคมี']
 
 const HEADERS = {
   [SHEET_REQ]: ['ลำดับ', 'หมายเลขการเบิก', 'Part number', 'ชื่อ', 'จำนวน', 'หน่วยนับ', 'วันที่เบิก', 'วันที่จ่าย', 'เครื่อง', 'ความเร่งด่วน', 'ข้อขัดข้อง', 'ยศผู้เบิก', 'ชื่อ-สกุลผู้เบิก', 'ตำแหน่งผู้เบิก', 'ประเภทพัสดุ', 'เหตุผลยกเลิก'],
-  [SHEET_RCV]: ['ลำดับรับ', 'เลขเอกสารการเบิก', 'Part number', 'ชื่อพัสดุ', 'serial number', 'ประเภทพัสดุ', 'จำนวน', 'หน่วยนับ', 'ราคา/หน่วย', 'ราคารวม', 'COND', 'วันที่แจ้ง', 'ความเร่งด่วน', 'วันกำหนดส่งพัสดุ', 'วันที่รับ', 'วันที่เกิน', 'TAIL No.', 'card ID', 'TCI', 'หมดอายุ', 'LOCATION', 'ผู้รับ', 'หมายเหตุ', 'แหล่งที่มา', 'อ้างอิง'],
+  [SHEET_RCV]: ['ลำดับรับ', 'เลขเอกสารการเบิก', 'card ID', 'Part number', 'ชื่อพัสดุ', 'serial number', 'ประเภทพัสดุ', 'จำนวน', 'หน่วยนับ', 'ราคา/หน่วย', 'ราคารวม', 'COND', 'วันที่แจ้ง', 'ความเร่งด่วน', 'วันกำหนดส่งพัสดุ', 'วันที่รับ', 'วันที่เกิน', 'TAIL No.', 'TCI', 'หมดอายุ', 'LOCATION', 'ผู้รับ', 'หมายเหตุ', 'แหล่งที่มา', 'อ้างอิง'],
   [SHEET_ISS]: ['ลำดับจ่าย', 'วันที่จ่าย', 'เลขเอกสารการเบิก', 'ลำดับรับ (อ้างอิง)', 'Part number', 'ชื่อพัสดุ', 'serial number', 'จำนวน', 'หน่วยนับ', 'TAIL No.', 'จ่ายให้ช่าง', 'หมายเหตุ', 'ผู้บันทึก'],
   [SHEET_CNT]: ['เลขที่ตรวจนับ', 'วันที่ตรวจนับ', 'LOCATION', 'ลำดับรับ', 'Part number', 'ชื่อพัสดุ', 'serial number', 'ประเภทพัสดุ', 'หน่วยนับ', 'ยอดในระบบ', 'นับได้จริง', 'ผลต่าง', 'ผลการปรับ', 'เหตุผล / หมายเหตุ', 'ผู้ตรวจนับ', 'ผู้ตรวจสอบ / กรรมการ', 'เวลาบันทึก'],
   [SHEET_CLAIM]: ['เลขที่เคลม', 'serial number', 'Part number', 'ชื่อพัสดุ', 'ประเภทพัสดุ', 'วันที่ส่งเคลม', 'ที่หนังสือ', 'ผู้รับเคลม/หน่วยงาน', 'สถานะ', 'วันที่ได้รับกลับ', 'serial number ใหม่', 'หมายเหตุ', 'ผู้บันทึก'],
@@ -176,6 +176,11 @@ function getSheet_(name) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   if (!MIGRATING_ && (name === SHEET_RCV || name === SHEET_RCV2 || name === SHEET_ISS || name === SHEET_STK || name === SHEET_LOAN)) ensureMigrated_(ss);
   let sh = ss.getSheetByName(name);
+  if (sh && (name === SHEET_RCV || name === SHEET_RCV2) && sh.getLastColumn() >= 18 && sh.getRange(1, 3).getValue() !== 'card ID' && sh.getRange(1, 18).getValue() === 'card ID') {
+    // ชีทเดิม: ย้ายคอลัมน์ card ID (R) มาไว้ถัดจาก เลขเอกสารการเบิก (C)
+    sh.moveColumns(sh.getRange(1, 18, sh.getMaxRows(), 1), 3);
+    sh.getRange(1, 3).setNumberFormat('General');
+  }
   if (sh && name === SHEET_REQ && sh.getRange(1, 16).getValue() === '') {
     // ชีทเบิกเดิม: เติมหัวคอลัมน์ผู้เบิก ประเภทพัสดุ และเหตุผลยกเลิกท้ายตาราง
     HDR_STYLE_(sh.getRange(1, 12, 1, 5).setValues([HEADERS[SHEET_REQ].slice(11, 16)]));
@@ -201,12 +206,12 @@ function getSheet_(name) {
       sh.getRange('B2:B').setNumberFormat('@');
       sh.getRange('G2:H').setNumberFormat('dd/mm/yyyy');
     } else if (name === SHEET_RCV || name === SHEET_RCV2) {
-      sh.getRange('B2:B').setNumberFormat('@');
-      sh.getRange('L2:L').setNumberFormat('dd/mm/yyyy');
-      sh.getRange('N2:O').setNumberFormat('dd/mm/yyyy');
-      sh.getRange('T2:T').setNumberFormat('dd/mm/yyyy');
-      sh.getRange('P2:P').setNumberFormat('0');
-      sh.getRange('I2:J').setNumberFormat('#,##0.00');
+      sh.getRange('B2:C').setNumberFormat('@');
+      sh.getRange(2, rcCol_(RC.NOTIFY), 999, 1).setNumberFormat('dd/mm/yyyy');
+      sh.getRange(2, rcCol_(RC.DUE), 999, 2).setNumberFormat('dd/mm/yyyy');
+      sh.getRange(2, rcCol_(RC.EXP), 999, 1).setNumberFormat('dd/mm/yyyy');
+      sh.getRange(2, rcCol_(RC.OVER), 999, 1).setNumberFormat('0');
+      sh.getRange(2, rcCol_(RC.PRICE), 999, 2).setNumberFormat('#,##0.00');
     } else if (name === SHEET_ISS) {
       sh.getRange('B2:B').setNumberFormat('dd/mm/yyyy');
       sh.getRange('C2:C').setNumberFormat('@');
@@ -242,8 +247,8 @@ function getSheet_(name) {
 // คอลัมน์ Part number / Serial ของแต่ละชีท (เลขคอลัมน์ เริ่ม 1) ตั้งเป็นรูปแบบ "ข้อความ" ทั้งคอลัมน์
 const TEXT_COLS_ = {};
 TEXT_COLS_[SHEET_REQ] = [3];
-TEXT_COLS_[SHEET_RCV] = [3, 5];
-TEXT_COLS_[SHEET_RCV2] = [3, 5];
+TEXT_COLS_[SHEET_RCV] = [3, 4, 6];   // Part, serial (หลังย้าย card ID มาคอลัมน์ C)
+TEXT_COLS_[SHEET_RCV2] = [3, 4, 6];
 TEXT_COLS_[SHEET_ISS] = [5, 7];
 TEXT_COLS_[SHEET_STK] = [3, 5];
 TEXT_COLS_[SHEET_LOAN] = [3, 5];
@@ -268,7 +273,7 @@ function ensureTextCols_(sh, name, force) {
   } catch (e) { /* ไม่ให้ล้ม */ }
   let props = null;
   try { props = PropertiesService.getDocumentProperties(); } catch (e) { props = null; }
-  const key = 'txtcols1:' + name;
+  const key = 'txtcols2:' + name;
   if (!force && props && props.getProperty(key)) return;
   try {
     const max = Math.max(sh.getMaxRows(), 2), last = sh.getLastRow();
@@ -317,8 +322,8 @@ function applyStockEdits() {
         }
         if (snCh && !newSn && oldSn) { out.skipped.push('แถว ' + (i + 2) + ' ลบ S/N ไม่ได้ (ต้องมีค่า)'); return; }
         const rrow = r._row, rcv = getSheet_(r._sh), doc = str_(r[RC.DOC]);
-        if (partCh) setTxt(rcv, rrow, RC.PART + 1, newPart);
-        if (snCh) { setTxt(rcv, rrow, RC.SN + 1, newSn); snUsed[snKey_(oldSn)] = 0; if (newSn) snUsed[snKey_(newSn)] = 1; }
+        if (partCh) setTxt(rcv, rrow, rcCol_(RC.PART), newPart);
+        if (snCh) { setTxt(rcv, rrow, rcCol_(RC.SN), newSn); snUsed[snKey_(oldSn)] = 0; if (newSn) snUsed[snKey_(newSn)] = 1; }
         // จ่าย
         issRows.forEach((ir, j) => {
           if (str_(ir[IS.RSEQ]) !== seq) return;
@@ -535,12 +540,7 @@ function migrateFromOld_(ss, old) {
   const ish = getSheet_(SHEET_ISS);
   rcvRows.sort((a, b) => a[0] - b[0]);
   if (rcvRows.length) {
-    rsh.getRange(2, 2, rcvRows.length, 1).setNumberFormat('@');
-    const out = rcvRows.map((row, k) => { const rn = k + 2; row[9] = '=IF(AND(ISNUMBER(G' + rn + '),ISNUMBER(I' + rn + ')),G' + rn + '*I' + rn + ',"")'; row[15] = '=IF(AND(ISNUMBER(N' + rn + '),ISNUMBER(O' + rn + ')),O' + rn + '-N' + rn + ',"")'; return row; });
-    rsh.getRange(2, 1, out.length, HEADERS[SHEET_RCV].length).setValues(out);
-    rsh.getRange(2, 12, out.length, 1).setNumberFormat('dd/mm/yyyy');
-    rsh.getRange(2, 14, out.length, 2).setNumberFormat('dd/mm/yyyy');
-    rsh.getRange(2, 20, out.length, 1).setNumberFormat('dd/mm/yyyy');
+    writeRcvRows_(rsh, 2, rcvRows);
   }
   if (issRows.length) {
     ish.getRange(2, 3, issRows.length, 1).setNumberFormat('@');
@@ -704,7 +704,7 @@ function getRequesters_() {
 
 function getParts_() {
   const map = {};
-  [[SHEET_REQ, 3, 4, 6], [SHEET_RCV, 3, 4, 8], [SHEET_RCV2, 3, 4, 8], [SHEET_RET, 2, 3, 0]].forEach(cfg => {
+  [[SHEET_REQ, 3, 4, 6], [SHEET_RCV, 4, 5, 9], [SHEET_RCV2, 4, 5, 9], [SHEET_RET, 2, 3, 0]].forEach(cfg => {
     const sh = getSheet_(cfg[0]);
     const last = sh.getLastRow();
     if (last < 2) return;
@@ -840,6 +840,12 @@ function submitRequisitionCore_(p) {
 const RC = { SEQ: 0, DOC: 1, PART: 2, NAME: 3, SN: 4, TYPE: 5, QTY: 6, UNIT: 7, PRICE: 8, TOTAL: 9, COND: 10, NOTIFY: 11,
   URG: 12, DUE: 13, RDATE: 14, OVER: 15, TAIL: 16, CARD: 17, TCI: 18, EXP: 19, LOC: 20, RECV: 21, NOTE: 22, SRC: 23, REF: 24 };
 const IS = { SEQ: 0, DATE: 1, DOC: 2, RSEQ: 3, PART: 4, NAME: 5, SN: 6, QTY: 7, UNIT: 8, TAIL: 9, TECH: 10, NOTE: 11, BY: 12 };
+/* ชีท รับ: คอลัมน์ card ID อยู่ถัดจาก เลขเอกสารการเบิก (คอลัมน์ C) ; โค้ดภายในยังใช้ลำดับ RC เดิม แล้วแปลงตอนอ่าน/เขียนชีท */
+const RC_PHYS_ = [0, 1, 17, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20, 21, 22, 23, 24];
+function rcCol_(i) { return RC_PHYS_.indexOf(i) + 1; }                       // ลำดับ RC -> เลขคอลัมน์ในชีท (เริ่ม 1)
+function rcLetter_(i) { return String.fromCharCode(64 + rcCol_(i)); }
+function rcFromSheet_(row) { const o = new Array(RC_PHYS_.length); RC_PHYS_.forEach((li, k) => { o[li] = row[k]; }); return o; }
+function rcToSheet_(vals) { return RC_PHYS_.map(li => vals[li]); }
 const SRC_REQ = 'ใบเบิก';
 const SRC_OPEN = 'ยอดยกมา';
 const SRC_RET = 'คืนเข้าคลัง';
@@ -853,7 +859,7 @@ function readRcv_() {
   [SHEET_RCV, SHEET_RCV2].forEach(name => {
     const sh = getSheet_(name), last = sh.getLastRow();
     if (last < 2) return;
-    sh.getRange(2, 1, last - 1, HEADERS[SHEET_RCV].length).getValues().forEach((r, i) => { r._sh = name; r._row = i + 2; out.push(r); });
+    sh.getRange(2, 1, last - 1, HEADERS[SHEET_RCV].length).getValues().forEach((pr, i) => { const r = rcFromSheet_(pr); r._sh = name; r._row = i + 2; out.push(r); });
   });
   return out;
 }
@@ -880,7 +886,7 @@ function splitReturnRows_() {
   const src = getSheet_(SHEET_RCV), dst = getSheet_(SHEET_RCV2), last = src.getLastRow();
   if (last >= 2) {
     const w = HEADERS[SHEET_RCV].length;
-    const vals = src.getRange(2, 1, last - 1, w).getValues();
+    const vals = src.getRange(2, 1, last - 1, w).getValues().map(rcFromSheet_);
     const move = [];
     vals.forEach((r, i) => { if (str_(r[RC.SRC]) === SRC_RET) move.push({ row: i + 2, v: r }); });
     if (move.length) {
@@ -1007,19 +1013,26 @@ function appendRcv_(vals) {
   return writeRcvRow_(sh, sh.getLastRow() + 1, vals);
 }
 
-function writeRcvRow_(sh, r, vals) {
-  vals = vals.slice();
-  vals[RC.TOTAL] = '=IF(AND(ISNUMBER(G' + r + '),ISNUMBER(I' + r + ')),G' + r + '*I' + r + ',"")';
-  vals[RC.OVER] = '=IF(AND(ISNUMBER(N' + r + '),ISNUMBER(O' + r + ')),O' + r + '-N' + r + ',"")';
-  sh.getRange(r, 2).setNumberFormat('@');
-  sh.getRange(r, 1, 1, vals.length).setValues([vals]);
-  sh.getRange(r, RC.NOTIFY + 1).setNumberFormat('dd/mm/yyyy');
-  sh.getRange(r, RC.DUE + 1, 1, 2).setNumberFormat('dd/mm/yyyy');
-  sh.getRange(r, RC.EXP + 1).setNumberFormat('dd/mm/yyyy');
-  sh.getRange(r, RC.OVER + 1).setNumberFormat('0');
-  sh.getRange(r, RC.PRICE + 1).setNumberFormat('#,##0.00');
-  sh.getRange(r, RC.TOTAL + 1).setNumberFormat('#,##0.00');
-  return r;
+function writeRcvRow_(sh, r, vals) { writeRcvRows_(sh, r, [vals]); return r; }
+
+/** เขียนแถวรับ (ลำดับ RC) ลงชีทตั้งแต่แถว start : ใส่สูตร ยอดรวม/วันที่เกิน + จัดรูปแบบ */
+function writeRcvRows_(sh, start, rows) {
+  const n = rows.length;
+  const out = rows.map((v, k) => {
+    v = v.slice(); const r = start + k;
+    v[RC.TOTAL] = '=IF(AND(ISNUMBER(' + rcLetter_(RC.QTY) + r + '),ISNUMBER(' + rcLetter_(RC.PRICE) + r + ')),' + rcLetter_(RC.QTY) + r + '*' + rcLetter_(RC.PRICE) + r + ',"")';
+    v[RC.OVER] = '=IF(AND(ISNUMBER(' + rcLetter_(RC.DUE) + r + '),ISNUMBER(' + rcLetter_(RC.RDATE) + r + ')),' + rcLetter_(RC.RDATE) + r + '-' + rcLetter_(RC.DUE) + r + ',"")';
+    return rcToSheet_(v);
+  });
+  sh.getRange(start, 2, n, 1).setNumberFormat('@');
+  sh.getRange(start, rcCol_(RC.CARD), n, 1).setNumberFormat('@');
+  sh.getRange(start, 1, n, out[0].length).setValues(out);
+  sh.getRange(start, rcCol_(RC.NOTIFY), n, 1).setNumberFormat('dd/mm/yyyy');
+  sh.getRange(start, rcCol_(RC.DUE), n, 2).setNumberFormat('dd/mm/yyyy');
+  sh.getRange(start, rcCol_(RC.EXP), n, 1).setNumberFormat('dd/mm/yyyy');
+  sh.getRange(start, rcCol_(RC.OVER), n, 1).setNumberFormat('0');
+  sh.getRange(start, rcCol_(RC.PRICE), n, 1).setNumberFormat('#,##0.00');
+  sh.getRange(start, rcCol_(RC.TOTAL), n, 1).setNumberFormat('#,##0.00');
 }
 
 function appendIss_(vals) {
@@ -1111,7 +1124,7 @@ function submitReceive(p) {
     const remain = reqQty - done - qty; // ยังค้างรับตามใบเบิก
 
     const rsh = getSheet_(SHEET_RCV);
-    const seq = nextSeq_(rsh);
+    const seq = nextRcvSeq_();
     appendRcv_([
       seq, p.docNo, str_(rv[2]), str_(rv[3]), sn, itype, qty, str_(rv[5]),
       p.price === '' || p.price === null || p.price === undefined ? '' : num_(p.price), '',
@@ -1270,7 +1283,7 @@ function moveLocation(p) {
     const sameLoc = lot.loc === loc;
     if (sameLoc && want === cur.kit) return { ok: true, from: lot.loc, to: loc, same: true, kit: cur.kit };
     if (cur.kit && want !== cur.kit) kitLeaveCheck_(cur.kit, lot);                    // ชิ้นที่ถูกนำออกไปราชการอยู่ ห้ามย้ายออกจากชุด
-    if (!sameLoc) getSheet_(lot.sh || SHEET_RCV).getRange(lot.row, RC.LOC + 1).setValue(loc);   // LOCATION = ที่จัดเก็บจริง ไม่เกี่ยวกับชุด
+    if (!sameLoc) getSheet_(lot.sh || SHEET_RCV).getRange(lot.row, rcCol_(RC.LOC)).setValue(loc);   // LOCATION = ที่จัดเก็บจริง ไม่เกี่ยวกับชุด
     let kitNote = '';
     if (cur.kit && want === cur.kit) {                                                // อยู่ชุดเดิม: ให้ LOCATION ของรายการชุดตามไปด้วย
       if (!sameLoc) getSheet_(SHEET_KIT).getRange(cur.row, 7).setValue(loc);
@@ -1338,7 +1351,7 @@ function onEdit(e) {
     if (!e || !e.range) return;
     const sh = e.range.getSheet(), name = sh.getName();
     if (name !== SHEET_STK && name !== SHEET_RCV && name !== SHEET_RCV2) return;
-    const col = name === SHEET_STK ? 11 : RC.LOC + 1;
+    const col = name === SHEET_STK ? 11 : rcCol_(RC.LOC);
     splitReturnRows_();
     const c1 = e.range.getColumn(), c2 = c1 + e.range.getNumColumns() - 1;
     if (col < c1 || col > c2) return;
@@ -1348,7 +1361,7 @@ function onEdit(e) {
     const seqs = sh.getRange(r1, 1, n, 1).getValues();
     const locs = sh.getRange(r1, col, n, 1).getValues();
     const others = name === SHEET_STK ? [SHEET_RCV, SHEET_RCV2] : [SHEET_STK];
-    const oCol = name === SHEET_STK ? RC.LOC + 1 : 11;
+    const oCol = name === SHEET_STK ? rcCol_(RC.LOC) : 11;
     const pos = {};   // ลำดับรับ -> {sh, row}
     others.forEach(on => {
       const other = getSheet_(on), oLast = other.getLastRow();
@@ -2578,23 +2591,16 @@ function importOpeningRows_(rows, by) {
     if (errors.length) return { added: 0, errors: errors };
     if (!good.length) return { added: 0, errors: [], empty: true };
     const sh = getSheet_(SHEET_RCV);
-    let seq = nextSeq_(sh);
+    let seq = nextRcvSeq_();
     const start = sh.getLastRow() + 1;
     const today = parseDate_(todayStr_());
-    const out = good.map((g, k) => {
-      const rn = start + k, v = g.v, rv = g.rv;
-      return [seq++, rv ? pad_(rv[1], 9) : '', v[0], v[1], v[2], v[3], v[4], v[5], '',
-        '=IF(AND(ISNUMBER(G' + rn + '),ISNUMBER(I' + rn + ')),G' + rn + '*I' + rn + ',"")',
-        v[6], rv ? rv[6] : '', rv ? str_(rv[9]) : '', rv ? dueDate_(rv[6], rv[9]) : '', v[9] || today,
-        '=IF(AND(ISNUMBER(N' + rn + '),ISNUMBER(O' + rn + ')),O' + rn + '-N' + rn + ',"")',
+    const out = good.map(g => {
+      const v = g.v, rv = g.rv;
+      return [seq++, rv ? pad_(rv[1], 9) : '', v[0], v[1], v[2], v[3], v[4], v[5], '', '',
+        v[6], rv ? rv[6] : '', rv ? str_(rv[9]) : '', rv ? dueDate_(rv[6], rv[9]) : '', v[9] || today, '',
         rv ? str_(rv[8]) : '', v[10], '', v[8], v[7], '', '', rv ? SRC_REQ : SRC_OPEN, ''];
     });
-    sh.getRange(start, 2, out.length, 1).setNumberFormat('@');
-    sh.getRange(start, RC.CARD + 1, out.length, 1).setNumberFormat('@');
-    sh.getRange(start, 1, out.length, out[0].length).setValues(out);
-    sh.getRange(start, RC.NOTIFY + 1, out.length, 1).setNumberFormat('dd/mm/yyyy');
-    sh.getRange(start, RC.DUE + 1, out.length, 2).setNumberFormat('dd/mm/yyyy');
-    sh.getRange(start, RC.EXP + 1, out.length, 1).setNumberFormat('dd/mm/yyyy');
+    writeRcvRows_(sh, start, out);
     // ใบเบิก: รับเกิน -> เพิ่มจำนวนเบิก ; รับครบ -> วันที่จ่าย = วันที่รับ
     Object.keys(addByDoc).forEach(k => {
       const x = addByDoc[k];
