@@ -231,6 +231,14 @@
   .kb-sw{display:flex;flex-direction:column;align-items:center;gap:4px;margin:0;font-size:11px;color:var(--muted);cursor:pointer;flex:none}
   .kdoc{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-radius:14px;background:#f4f8fe;border:1px solid #d5e5f8;margin-top:8px}
   .kdoc .btn{margin:0;width:auto;flex:none}
+  .ka-f{display:none}
+  .ka-f.on{display:block}
+  .ka-lot{display:flex;gap:10px;align-items:center;padding:10px 12px;border:1px solid #e6edf7;border-radius:14px;background:#fff;margin:0 0 8px;cursor:pointer}
+  .ka-lot.on{border-color:var(--navy-royal);background:#eef4ff}
+  .kopen{padding:10px 12px;border-radius:14px;background:#fffaf0;border:1px solid #f3d9a4;margin:0 0 8px}
+  .kopen .acts{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+  .kopen .acts .btn,.kit-acts .btn{margin:0;width:auto;flex:none}
+  .kit-acts{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
   .ci.kit.out{border-left-color:var(--blue)}
   .ci.kit.wait{border-left-color:#f5a524;background:#fffaf0}
   .chip.blue{background:#dcebff;color:#1a56db}
@@ -243,7 +251,7 @@
   input[type=checkbox]:not(.tgl-in):checked::after{transform:translateX(22px)}
   input[type=checkbox]:not(.tgl-in):focus-visible{outline:3px solid rgba(76,141,206,.55);outline-offset:2px}
   input[type=checkbox]:not(.tgl-in):disabled{opacity:.4;cursor:not-allowed}
-  #kn-bg,#kb-bg{z-index:65}
+  #kn-bg,#ka-bg{z-index:65}
   #kr-bg{z-index:66}
   #d-bg{z-index:67}
   #kt-bg .sheet{top:0;max-height:none;border-radius:0;max-width:760px;padding-top:calc(16px + env(safe-area-inset-top))}
@@ -449,6 +457,7 @@
       <button data-m="loan">ยืมอยู่ <span id="k-loan-n"></span></button>
     </div>
     <div id="k-stockpane">
+      <div id="kit-alert" style="display:none"></div>
       <div id="recon-bar" style="display:none;margin:0 0 10px;padding:10px 12px;border-radius:12px;background:#fde7e5;color:var(--bad);font-size:14px"></div>
       <input class="search" id="k-search" type="search" placeholder="ค้นหา Part / ชื่อ / Serial / LOCATION">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin:-2px 2px 10px">
@@ -710,13 +719,6 @@
     <div class="info" id="mv-info"></div>
     <label>LOCATION ใหม่</label><input id="mv-loc" list="mv-locs" autocomplete="off">
     <datalist id="mv-locs"></datalist>
-    <label>ชุดพัสดุ</label>
-    <div class="seg" id="mv-kits" style="grid-template-columns:repeat(3,1fr)">
-      <button type="button" data-kit="" class="on">ไม่อยู่ในชุด</button>
-      <button type="button" data-kit="FLY AWAY KIT 1">KIT 1</button>
-      <button type="button" data-kit="FLY AWAY KIT 2">KIT 2</button>
-    </div>
-    <div class="meta" id="mv-kit-hint" style="display:none;margin-top:8px;color:var(--navy-royal)"></div>
     <div class="meta" style="margin:6px 0">ระบบจะแก้ LOCATION ในชีท รับ และ คลังพัสดุ ให้ตรงกันทันที</div>
     <button class="btn" id="mv-submit">ย้ายที่จัดเก็บ</button>
   </div>
@@ -968,51 +970,87 @@
 <!-- ===== sheet: ชุดพัสดุพิเศษ (FLY AWAY KIT) ===== -->
 <div class="sheet-bg" id="kt-bg">
   <div class="sheet">
-    <div class="hd"><b>ชุด FLY AWAY KIT</b><button class="x" id="kt-x" aria-label="ปิด">×</button></div>
+    <div class="hd"><b>FLY AWAY KIT</b><button class="x" id="kt-x" aria-label="ปิด">×</button></div>
     <div class="ktab" id="kt-tabs"></div>
     <div class="info" id="kt-sum" style="margin-top:0"></div>
     <div class="ct-bar" id="kt-act">
-      <button class="btn" id="kt-out">นำชุดออก</button>
-      <button class="btn ghost" id="kt-back">รับชุดกลับ</button>
+      <button class="btn" id="kt-out">ยืมออก</button>
+      <button class="btn ghost" id="kt-add">+ เพิ่มรายการ</button>
     </div>
+    <div id="kt-open"></div>
     <div id="kt-list"><div class="empty"><span class="spin"></span></div></div>
   </div>
 </div>
 
-<!-- ===== sheet: นำชุดออกไปราชการ ===== -->
+<!-- ===== sheet: ยืมของออกจากชุด ===== -->
 <div class="sheet-bg" id="kn-bg">
   <div class="sheet">
-    <div class="hd"><b id="kn-title">นำชุดออก</b><button class="x" id="kn-x" aria-label="ปิด">×</button></div>
+    <div class="hd"><b id="kn-title">ยืมออก</b><button class="x" id="kn-x" aria-label="ปิด">×</button></div>
     <div class="row2">
-      <div><label>ผู้นำออก</label><input id="kn-who" autocomplete="off"></div>
-      <div><label>กำหนดคืน</label><input id="kn-due" type="date"></div>
+      <div><label>ผู้ยืม</label><input id="kn-who" autocomplete="off"></div>
+      <div><label>กำหนดคืน (ถ้ามี)</label><input id="kn-due" type="date"></div>
     </div>
     <label>ปลายทาง / เหตุผล</label><input id="kn-why" placeholder="เช่น ไปราชการ บน.1">
-    <div class="sec">รายการที่นำออก (ติ๊กออกได้ถ้าไม่นำไป)</div>
+    <div class="sec">รายการที่ยืมออก</div>
     <div id="kn-items"></div>
-    <button class="btn" id="kn-submit" style="margin-top:14px">บันทึกยืมออก</button>
+    <button class="btn" id="kn-submit" style="margin-top:14px">บันทึกยืมออก (รอคืน)</button>
   </div>
 </div>
 
-<!-- ===== sheet: รับชุดกลับ ===== -->
-<div class="sheet-bg" id="kb-bg">
+<!-- ===== sheet: การทำรายการกับชุด (ใช้งานจริง / รับคืน / เติม / ย้ายเข้าคลัง / แก้ไข / เพิ่ม) ===== -->
+<div class="sheet-bg" id="ka-bg">
   <div class="sheet">
-    <div class="hd"><b id="kb-title">รับชุดกลับ</b><button class="x" id="kb-x" aria-label="ปิด">×</button></div>
-    <div class="info">ไม่ต้องทำอะไรกับชิ้นที่ไม่ได้ใช้ ระบบจะรับกลับเข้าคลังให้ ติ๊กเฉพาะชิ้นที่ <b>ใช้ติดตั้งแล้ว</b> ระบบจะออกใบเบิกทดแทนให้ทันที</div>
-    <div id="kb-items"></div>
-    <div id="kb-used" style="display:none">
-      <div class="sec">ข้อมูลใบเบิกทดแทน</div>
+    <div class="hd"><b id="ka-title"></b><button class="x" id="ka-x" aria-label="ปิด">×</button></div>
+    <div class="info" id="ka-info"></div>
+    <div class="ka-f" id="ka-use">
       <div class="row2">
-        <div><label>ติดตั้งที่เครื่อง</label><select id="kb-machine"></select></div>
-        <div><label>ความเร่งด่วน</label><select id="kb-urg"><option value="เบิกธรรมดา">เบิกธรรมดา</option><option value="AOG">AOG</option></select></div>
+        <div><label>จำนวนที่ใช้</label><input id="ka-uqty" type="number" inputmode="decimal" min="0" value="1"></div>
+        <div><label>ติดตั้งที่เครื่อง</label><select id="ka-machine"></select></div>
       </div>
-      <label>ผู้เบิก</label><select id="kb-who"><option value="">เลือกผู้เบิก</option></select>
-      <div id="kb-manual" style="display:none">
-        <div class="row2"><div><label>ยศ</label><input id="kb-rank"></div><div><label>ชื่อ-สกุล</label><input id="kb-fullname"></div></div>
-        <label>ตำแหน่ง</label><input id="kb-position">
+      <label>ช่างที่รับพัสดุ</label><input id="ka-tech" list="techlist" autocomplete="off" placeholder="เลือกหรือพิมพ์ ยศ-ชื่อ">
+      <div class="row2">
+        <div><label>ความเร่งด่วน (ใบเบิกทดแทน)</label><select id="ka-urg"><option value="เบิกธรรมดา">เบิกธรรมดา</option><option value="AOG">AOG</option></select></div>
+        <div id="ka-utype-wrap"><label>ประเภทพัสดุ</label><select id="ka-utype"><option value=""></option><option>LRU</option><option>SP</option><option>LRU(TCI)</option><option>SP(TCI)</option><option>สารเคมี</option></select></div>
+      </div>
+      <label>หมายเหตุ</label><input id="ka-remark">
+    </div>
+    <div class="ka-f" id="ka-return">
+      <div class="row2">
+        <div><label>จำนวนที่คืน</label><input id="ka-rqty" type="number" inputmode="decimal" min="0"></div>
+        <div id="ka-rsn-wrap"><label>S/N ที่คืนมา (ถ้าเปลี่ยน)</label><input id="ka-rsn"></div>
       </div>
     </div>
-    <button class="btn" id="kb-submit" style="margin-top:14px">รับกลับทั้งหมด</button>
+    <div class="ka-f" id="ka-refill">
+      <label>เลือกล็อตในคลังที่จะเติมเข้าชุด</label>
+      <div id="ka-lots"></div>
+      <div id="ka-fqty-wrap"><label>จำนวนที่เติม</label><input id="ka-fqty" type="number" inputmode="decimal" min="0"></div>
+    </div>
+    <div class="ka-f" id="ka-tostock">
+      <div class="row2">
+        <div><label>จำนวนที่ย้ายเข้าคลัง</label><input id="ka-sqty" type="number" inputmode="decimal" min="0"></div>
+        <div><label>LOCATION ในคลัง</label><input id="ka-sloc"></div>
+      </div>
+    </div>
+    <div class="ka-f" id="ka-edit">
+      <div class="ka-new">
+        <div class="row2">
+          <div><label>Part number</label><input id="ka-part" list="partlist" autocomplete="off" autocapitalize="characters"></div>
+          <div><label>ประเภท</label><select id="ka-type"><option value=""></option><option>LRU</option><option>SP</option><option>LRU(TCI)</option><option>SP(TCI)</option><option>สารเคมี</option></select></div>
+        </div>
+        <label>ชื่อพัสดุ</label><input id="ka-name">
+      </div>
+      <label>Serial number</label><input id="ka-sn">
+      <div class="row2">
+        <div><label>จำนวนมาตรฐาน</label><input id="ka-std" type="number" inputmode="decimal" min="0"></div>
+        <div><label>จำนวนที่มี</label><input id="ka-have" type="number" inputmode="decimal" min="0"></div>
+      </div>
+      <div class="row2">
+        <div><label>LOCATION</label><input id="ka-loc"></div>
+        <div><label>หมายเหตุ</label><input id="ka-note"></div>
+      </div>
+    </div>
+    <button class="btn" id="ka-submit" style="margin-top:14px">บันทึก</button>
+    <button class="btn ghost danger" id="ka-del" style="margin-top:8px;display:none">ลบรายการนี้ออกจากชุด</button>
   </div>
 </div>
 
@@ -1683,7 +1721,7 @@
   function loadStock(sync){
     /* แสดงข้อมูลเดิมทันที (ถ้ามี) แล้วโหลดใหม่เบื้องหลัง; ไม่เรียก getReconcile ทุกครั้ง (ช้า เพราะล็อกและเขียนชีทใหม่) */
     if(state.stk && state.stk.length){ renderStock(); } else { $('k-list').innerHTML='<div class="empty"><span class="spin"></span></div>'; }
-    run('getStock').then(function(rows){ state.stk=rows; renderStock(); loadAwaiting(); if(sync===true) loadRecon(); })
+    run('getStock').then(function(rows){ state.stk=rows; renderStock(); loadAwaiting(); loadKitAlerts(); if(sync===true) loadRecon(); })
       .catch(function(e){ $('k-list').innerHTML='<div class="empty">'+esc(e.message)+'</div>'; });
   }
   function renderStock(){
@@ -1705,13 +1743,12 @@
         var bits=[];
         if(l.serial) bits.push('S/N <a class="snl" data-sn="'+esc(l.serial)+'">'+esc(l.serial)+'</a>');
         if(l.warr){ bits.push('<span class="chip '+(l.warr.status==='ok'?'ok':l.warr.status==='soon'?'warn':'bad')+'">'+(l.warr.status==='expired'?'หมดประกัน':'ประกันเหลือ '+l.warr.left+' วัน')+'</span>'); }
-        if(l.kit) bits.push('<b>'+esc(l.kit.replace('FLY AWAY KIT','ชุด KIT'))+'</b>');
         bits.push('จำนวน '+fmtNum(l.qty));
         if(l.type) bits.push(esc(l.type));
         if(l.cond) bits.push('COND '+esc(l.cond));
         if(l.location) bits.push(esc(l.location));
         if(l.expire) bits.push('หมดอายุ '+esc(l.expire));
-        return '<div class="meta" style="padding:5px 0;border-top:1px solid var(--line)">'+bits.join(' · ')+'<br>'+(l.docNo==='ยอดยกมา'||l.docNo==='คืนเข้าคลัง'||l.docNo==='รับก่อนเบิก'?esc(l.docNo)+(l.note?' ('+esc(l.note)+')':''):'เลขเบิก '+esc(l.docNo))+' · รับ '+esc(l.received)+'<div style="display:flex;gap:8px;margin-top:6px">'+(l.free?'<button class="btn sm" data-is="'+l.seq+'">จ่าย</button>':(l.issRow?'<button class="btn sm" data-ix="'+l.seq+'">จ่าย</button>':''))+'<button class="btn ghost sm" data-bl="'+l.seq+'">ยืมออก</button><button class="btn ghost sm" data-mv="'+l.seq+'">ย้ายที่เก็บ</button></div>'+(l.linkNote?'<div style="color:var(--bad);margin-top:4px">⚠ '+esc(l.linkNote)+'</div>':'')+'</div>';
+        return '<div class="meta" style="padding:5px 0;border-top:1px solid var(--line)">'+bits.join(' · ')+'<br>'+(l.docNo==='ยอดยกมา'||l.docNo==='คืนเข้าคลัง'||l.docNo==='รับก่อนเบิก'||l.docNo==='ย้ายจากชุด'?esc(l.docNo)+(l.note?' ('+esc(l.note)+')':''):'เลขเบิก '+esc(l.docNo))+' · รับ '+esc(l.received)+'<div style="display:flex;gap:8px;margin-top:6px">'+(l.free?'<button class="btn sm" data-is="'+l.seq+'">จ่าย</button>':(l.issRow?'<button class="btn sm" data-ix="'+l.seq+'">จ่าย</button>':''))+'<button class="btn ghost sm" data-bl="'+l.seq+'">ยืมออก</button><button class="btn ghost sm" data-mv="'+l.seq+'">ย้ายที่เก็บ</button></div>'+(l.linkNote?'<div style="color:var(--bad);margin-top:4px">⚠ '+esc(l.linkNote)+'</div>':'')+'</div>';
       }).join('');
       return '<div class="card lift" style="padding:14px 16px">'+
         '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><b>'+esc(g.part||'-')+'</b><span class="chip ok">'+fmtNum(g.qty)+' '+esc(g.unit)+'</span></div>'+
@@ -1729,18 +1766,10 @@
     var seen={}, opts='';
     (state.stk||[]).forEach(function(g){ g.lots.forEach(function(x){ if(x.location && !seen[x.location]){ seen[x.location]=1; opts+='<option value="'+esc(x.location)+'">'; } }); });
     $('mv-locs').innerHTML=opts;
-    $('mv-loc').value=l.location||''; mvSetKit(l.kit||'');
+    $('mv-loc').value=l.location||'';
     $('mv-bg').classList.add('on');
     setTimeout(function(){ $('mv-loc').focus(); $('mv-loc').select(); },50);
   });
-  function mvSetKit(k){
-    state.mvKit = k;
-    Array.prototype.forEach.call($('mv-kits').querySelectorAll('button'), function(b){ b.classList.toggle('on', b.dataset.kit===k); });
-    var cur = (state.mv && state.mv.kit) || '', h = $('mv-kit-hint');
-    if(k===cur){ h.style.display = k ? '' : 'none'; h.textContent = k ? 'พัสดุนี้อยู่ใน '+k+' (ย้ายที่เก็บแล้วยังอยู่ในชุดเหมือนเดิม)' : ''; }
-    else { h.style.display=''; h.textContent = k ? 'จะเพิ่มพัสดุนี้เข้ารายการของ '+k+' และนับรวมในชุด (ที่จัดเก็บยังเป็น LOCATION ด้านบน)' : 'จะเอาพัสดุนี้ออกจากรายการของ '+cur; }
-  }
-  $('mv-kits').addEventListener('click', function(e){ var b=e.target.closest('button[data-kit]'); if(b) mvSetKit(b.dataset.kit); });
   $('mv-x').addEventListener('click', function(){ $('mv-bg').classList.remove('on'); });
   $('mv-bg').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('on'); });
   $('mv-submit').addEventListener('click', function(){
@@ -1749,11 +1778,9 @@
     var loc=$('mv-loc').value.trim();
     if(!loc){ toast('กรุณาระบุที่จัดเก็บใหม่',true); return; }
     var b=this; busy(b,true);
-    run('moveLocation', [{ seq:l.seq, location:loc, kit:state.mvKit||'', by:state.by }]).then(function(res){
+    run('moveLocation', [{ seq:l.seq, location:loc, by:state.by }]).then(function(res){
       $('mv-bg').classList.remove('on');
-      var kitMsg = (res.kit||'') !== (res.kitFrom||'') ? (res.kit ? ' · เพิ่มเข้า '+res.kit+' แล้ว' : ' · เอาออกจาก '+res.kitFrom+' แล้ว') : '';
-      toast(res.same ? 'ไม่มีการเปลี่ยนแปลง' : 'ย้ายแล้ว → '+res.to+kitMsg);
-      if(kitMsg && typeof kt!=='undefined' && kt) kt.data=null;
+      toast(res.same ? 'ไม่มีการเปลี่ยนแปลง' : 'ย้ายแล้ว → '+res.to);
       loadStock();
     }).catch(function(err){ toast(err.message,true); }).then(function(){ busy(b,false); });
   });
@@ -1909,7 +1936,7 @@
     $('bp-list').innerHTML = list.map(function(l){
       return '<div class="pcard" data-bp="'+l.seq+'"><div class="t"><span class="doc">'+esc(l.part||'-')+'</span><span class="chip ok">'+fmtNum(l.qty)+' '+esc(l.unit)+'</span></div>'+
         '<div class="nm">'+esc(l.name)+'</div>'+
-        '<div class="meta">'+(l.serial?'S/N '+esc(l.serial)+' · ':'')+(l.type?esc(l.type)+' · ':'')+(l.location?esc(l.location)+' · ':'')+esc(l.source==='ยอดยกมา'||l.source==='คืนเข้าคลัง'||l.source==='รับก่อนเบิก'?l.source:'เลขเบิก '+l.source)+'</div></div>';
+        '<div class="meta">'+(l.serial?'S/N '+esc(l.serial)+' · ':'')+(l.type?esc(l.type)+' · ':'')+(l.location?esc(l.location)+' · ':'')+esc(l.source==='ยอดยกมา'||l.source==='คืนเข้าคลัง'||l.source==='รับก่อนเบิก'||l.source==='ย้ายจากชุด'?l.source:'เลขเบิก '+l.source)+'</div></div>';
     }).join('');
   }
   $('bp-search').addEventListener('input', renderPicker);
@@ -2581,62 +2608,84 @@
     });
   });
 
-  /* ---------- ชุดพัสดุพิเศษ (FLY AWAY KIT) ---------- */
-  var kt = { data:null, cur:0, back:[], lastDocs:[] };
+  /* ---------- FLY AWAY KIT (แยกจากคลัง) ---------- */
+  var kt = { data:null, cur:0, lastDocs:[] };
   function ktKit(){ return kt.data && kt.data.kits[kt.cur]; }
   function ktOpen(){ $('kt-bg').classList.add('on'); ktLoad(); }
   function ktLoad(){
-    $('kt-list').innerHTML='<div class="empty"><span class="spin"></span></div>';
-    run('getKits').then(function(d){ kt.data=d; if(kt.cur>=d.kits.length) kt.cur=0; ktRender(); })
+    if(!kt.data) $('kt-list').innerHTML='<div class="empty"><span class="spin"></span></div>';
+    return run('getKits').then(function(d){ kt.data=d; if(kt.cur>=d.kits.length) kt.cur=0; ktRender(); loadKitAlerts(); })
       .catch(function(e){ $('kt-list').innerHTML='<div class="empty">'+esc(e.message)+'</div>'; });
+  }
+  function ktChip(it){
+    var c='';
+    if(it.out>0) c+='<span class="chip blue">ยืมอยู่ '+fmtNum(it.out)+(it.holders[0]?' · '+esc(it.holders[0].who):'')+'</span> ';
+    if(it.waiting>0){ var r=it.refills[0]; c+='<span class="chip warn">รอเติม '+fmtNum(it.waiting)+(r&&r.doc?' · ใบเบิก '+esc(r.doc)+(r.docGot>0?' (รับแล้ว)':' (ยังไม่รับ)'):'')+'</span> '; }
+    if(it.missing>0 && !it.out && !it.waiting) c+='<span class="chip bad">ขาด '+fmtNum(it.missing)+'</span> ';
+    if(!c) c='<span class="chip ok">ครบ</span>';
+    return c;
   }
   function ktRender(){
     var d=kt.data, k=ktKit(); if(!k) return;
     $('kt-tabs').style.gridTemplateColumns='repeat('+d.kits.length+',1fr)';
     $('kt-tabs').innerHTML=d.kits.map(function(x,i){
-      var bad=x.items.filter(function(it){ return it.missing; }).length, out=x.loans.length;
-      return '<button data-i="'+i+'" class="'+(i===kt.cur?'on':'')+'">'+esc(x.name)+(bad?' <span class="chip bad">ขาด '+bad+'</span>':(out?' <span class="chip">ออก '+out+'</span>':''))+'</button>';
+      return '<button data-i="'+i+'" class="'+(i===kt.cur?'on':'')+'">'+esc(x.name.replace('FLY AWAY KIT','KIT'))+(x.short?' <span class="chip bad">ไม่ครบ '+x.short+'</span>':(x.items.length?' <span class="chip ok">ครบ</span>':''))+'</button>';
     }).join('');
-    var items=k.items, bad=items.filter(function(it){ return it.missing; }).length;
-    var out=k.loans.filter(function(l){ return !l.used; }), wait=k.loans.filter(function(l){ return l.used; });
-    var line = '<b>'+esc(k.name)+'</b> · '+items.length+' รายการ · ';
-    if(!items.length) line = '<b>'+esc(k.name)+'</b> ยังไม่มีรายการ<br><span class="meta">เปิดชีทแล้วใช้เมนู “ระบบเบิก-จ่าย → สร้าง/เปิดชีท ชุดพัสดุ” กรอกรายการ แล้ว “เพิ่มรายการชุดเข้าคลัง”</span>';
-    else if(out.length) line += '<b style="color:var(--navy-royal)">นำออกอยู่ '+out.length+' รายการ</b>'+(out[0].borrower?' · '+esc(out[0].borrower):'')+(out[0].due?' · กำหนดคืน '+esc(out[0].due):'')+(out[0].late?' <b style="color:var(--bad)">(เกิน '+out[0].late+' วัน)</b>':'');
-    else if(bad) line += '<b style="color:var(--bad)">ขาด '+bad+' รายการ</b>';
-    else if(wait.length) line += '<b style="color:#9a5b00">รอเบิกทดแทน '+wait.length+' รายการ</b>';
-    else line += '<b style="color:var(--ok)">ครบทุกรายการ</b>';
+    var items=k.items, line='<b>'+esc(k.name)+'</b> · '+items.length+' รายการ · ';
+    if(!items.length) line='<b>'+esc(k.name)+'</b> ยังไม่มีรายการ — กด + เพิ่มรายการ หรือกรอกในชีท ชุดพัสดุ (เมนู ระบบเบิก-จ่าย)';
+    else if(k.short) line+='<b style="color:var(--bad)">ไม่ครบ '+k.short+' รายการ (ขาด '+fmtNum(k.shortQty)+' ชิ้น)</b>';
+    else line+='<b style="color:var(--ok)">ครบทุกรายการ</b>';
+    if(k.lastUse) line+='<br><span class="meta">ใช้ล่าสุด '+esc(k.lastUse.date)+' · '+esc(k.lastUse.act)+(k.lastUse.who?' · '+esc(k.lastUse.who):'')+(k.lastUse.machine?' · เครื่อง '+esc(k.lastUse.machine):'')+'</span>';
     $('kt-sum').innerHTML=line;
-    $('kt-out').disabled = !items.some(function(it){ return it.inKit>0 && it.onHand>=Math.min(it.inKit,1); });
-    $('kt-back').disabled = !out.length;
-    $('kt-list').innerHTML = items.map(function(it){
-      var chips='';
-      if(it.out>0) chips+='<span class="chip blue">นำออก '+fmtNum(it.out)+'</span> ';
-      if(it.waiting>0) chips+='<span class="chip warn">รอเบิกทดแทน '+fmtNum(it.waiting)+(it.refs.length?' · '+esc(it.refs[0]):'')+'</span> ';
-      if(it.missing) chips+='<span class="chip bad">ไม่พบในคลัง (มี '+fmtNum(it.onHand)+' ต้องมี '+fmtNum(it.inKit)+')</span> ';
-      if(!chips) chips='<span class="chip ok">ครบ '+fmtNum(it.qty)+'</span>';
-      var cls = it.missing ? 'bad' : (it.waiting>0 ? 'wait' : (it.out>0 ? 'out' : 'ok'));
+    $('kt-out').disabled = !items.some(function(it){ return it.have>0; });
+    $('kt-open').innerHTML = k.open.length ? '<div class="sec">ค้างอยู่ ('+k.open.length+')</div>'+k.open.map(function(e,i){
+      var loan = e.act==='ยืมออก';
+      return '<div class="kopen"><b>'+esc(e.part||e.name)+'</b> '+esc(e.name)+(e.serial?' · S/N '+esc(e.serial):'')+' · x'+fmtNum(e.qty)+
+        '<div class="meta">'+(loan ? 'ยืมออก '+esc(e.date)+' · '+esc(e.who)+(e.due?' · กำหนดคืน '+esc(e.due):'')+(e.late?' · <b style="color:var(--bad)">เลยกำหนด '+e.late+' วัน</b>':'')+(e.note?' · '+esc(e.note):'')
+          : 'ใช้งานจริง '+esc(e.date)+' · ช่าง '+esc(e.who)+' · เครื่อง '+esc(e.machine)+' · ใบเบิกทดแทน <b>'+esc(e.doc)+'</b> '+(e.docGot>0?'(รับพัสดุแล้ว — เติมเข้าชุดได้)':'(ยังไม่ได้รับพัสดุ)'))+'</div>'+
+        '<div class="acts">'+(loan ? '<button class="btn sm" data-ko="ret" data-i="'+i+'">รับคืน</button><button class="btn ghost sm" data-ko="use" data-i="'+i+'">ใช้งานจริง</button>'
+          : '<button class="btn sm" data-ko="fill" data-i="'+i+'">เติมจากคลัง</button>')+'</div></div>';
+    }).join('') : '';
+    $('kt-list').innerHTML = items.length ? items.map(function(it){
+      var cls = it.waiting>0 ? 'wait' : (it.out>0 ? 'out' : (it.missing>0 ? 'bad' : 'ok'));
       return '<div class="ci kit '+cls+'"><div class="ci-h"><div><b>'+esc(it.part||'-')+'</b><div>'+esc(it.name)+'</div>'+
-        '<div class="meta">'+(it.serial?'S/N '+esc(it.serial)+' · ':'')+(it.type?esc(it.type)+' · ':'')+'จำนวน '+fmtNum(it.qty)+(it.loc?' · '+esc(it.loc):'')+'</div></div></div>'+
-        '<div style="margin-top:8px">'+chips+'</div></div>';
-    }).join('');
+        '<div class="meta">'+(it.serial?'S/N '+esc(it.serial)+' · ':'')+(it.type?esc(it.type)+' · ':'')+'มี <b>'+fmtNum(it.have)+'</b> / มาตรฐาน '+fmtNum(it.std)+(it.loc?' · '+esc(it.loc):'')+'</div></div></div>'+
+        '<div style="margin-top:8px">'+ktChip(it)+'</div>'+
+        (it.last?'<div class="meta" style="margin-top:4px">ใช้ล่าสุด '+esc(it.last.date)+' · '+esc(it.last.act)+(it.last.who?' · '+esc(it.last.who):'')+(it.last.machine?' · เครื่อง '+esc(it.last.machine):'')+'</div>':'')+
+        '<div class="kit-acts"><button class="btn sm" data-ki="use" data-row="'+it.row+'"'+(it.have>0?'':' disabled')+'>ใช้งานจริง</button>'+
+        '<button class="btn ghost sm" data-ki="fill" data-row="'+it.row+'"'+(it.have<it.std?'':' disabled')+'>เติมจากคลัง</button>'+
+        '<button class="btn ghost sm" data-ki="tostock" data-row="'+it.row+'"'+(it.have>0?'':' disabled')+'>ย้ายเข้าคลัง</button>'+
+        '<button class="btn ghost sm" data-ki="edit" data-row="'+it.row+'">แก้ไข</button></div></div>';
+    }).join('') : '';
   }
+  function kitItem(row){ var k=ktKit(); return k && k.items.filter(function(x){ return x.row===Number(row); })[0]; }
+
+  /* แจ้งเตือนชุดไม่ครบ (หน้าคลัง + จุดสีบนปุ่มเมนู) */
+  function loadKitAlerts(){
+    run('getKitAlerts').then(function(rows){
+      var el=$('kit-alert');
+      $('menu-dot').classList.toggle('on', !!(rows&&rows.length));
+      if(!rows||!rows.length){ el.style.display='none'; el.innerHTML=''; return; }
+      el.style.cssText='display:block;margin:0 0 10px;padding:10px 12px;border-radius:12px;background:#fff4e0;color:#9a5b00;font-size:14px;cursor:pointer';
+      el.innerHTML=rows.map(function(a){ return '⚠ <b>'+esc(a.kit)+'</b> ไม่ครบ '+a.short+' รายการ (ขาด '+fmtNum(a.shortQty)+' ชิ้น)'; }).join('<br>')+'<div class="meta" style="margin-top:2px">แตะเพื่อดูรายละเอียด</div>';
+    }).catch(function(){});
+  }
+  $('kit-alert').addEventListener('click', ktOpen);
   $('kit-btn').addEventListener('click', ktOpen);
   $('kt-x').addEventListener('click', function(){ $('kt-bg').classList.remove('on'); });
   $('kt-tabs').addEventListener('click', function(e){ var b=e.target.closest('button[data-i]'); if(!b) return; kt.cur=Number(b.dataset.i); ktRender(); });
 
-  /* ----- นำชุดออก ----- */
+  /* ----- ยืมออก (หลายรายการ) ----- */
   function addDays(n){ var d=new Date(); d.setDate(d.getDate()+n); return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }
   $('kt-out').addEventListener('click', function(){
     var k=ktKit(); if(!k) return;
-    $('kn-title').textContent='นำ '+k.name+' ออก';
+    $('kn-title').textContent='ยืม '+k.name+' ออก';
     try{ $('kn-who').value = localStorage.getItem('kit-who') || ''; }catch(e){ $('kn-who').value=''; }
-    $('kn-why').value=''; $('kn-due').value=addDays(14);
-    $('kn-items').innerHTML = k.items.filter(function(it){ return it.inKit>0; }).map(function(it){
-      var ok = it.onHand>=Math.min(it.inKit,1);
-      var qmax = Math.min(it.inKit, it.onHand);
-      return '<div class="kn-row"><input type="checkbox" class="kn-c" data-row="'+it.row+'" '+(ok?'checked':'disabled')+'>'+
-        '<div style="flex:1;min-width:0"><b>'+esc(it.part||'-')+'</b> '+esc(it.name)+'<div class="meta">'+(it.serial?'S/N '+esc(it.serial)+' · ':'')+(ok?'ในชุด '+fmtNum(it.inKit):'ไม่พบในคลัง')+'</div></div>'+
-        (!it.serial && qmax>1 && ok ? '<input type="number" inputmode="decimal" class="kq" data-row="'+it.row+'" min="1" max="'+qmax+'" value="'+qmax+'">' : '')+'</div>';
+    $('kn-why').value=''; $('kn-due').value='';
+    $('kn-items').innerHTML = k.items.filter(function(it){ return it.have>0; }).map(function(it){
+      return '<div class="kn-row"><input type="checkbox" class="kn-c" data-row="'+it.row+'">'+
+        '<div style="flex:1;min-width:0"><b>'+esc(it.part||'-')+'</b> '+esc(it.name)+'<div class="meta">'+(it.serial?'S/N '+esc(it.serial)+' · ':'')+'ในชุด '+fmtNum(it.have)+'</div></div>'+
+        (!it.serial && it.have>1 ? '<input type="number" inputmode="decimal" class="kq" data-row="'+it.row+'" min="1" max="'+it.have+'" value="'+it.have+'">' : '')+'</div>';
     }).join('');
     $('kn-bg').classList.add('on');
   });
@@ -2644,89 +2693,124 @@
   $('kn-submit').addEventListener('click', function(){
     if(!state.by){ askBy(function(){ $('kn-submit').click(); }); return; }
     var k=ktKit(), who=$('kn-who').value.trim();
-    if(!who){ toast('กรุณาระบุผู้นำออก',true); return; }
-    if(!$('kn-due').value){ toast('กรุณาระบุกำหนดคืน',true); return; }
+    if(!who){ toast('กรุณาระบุผู้ยืม',true); return; }
     var items=[];
     document.querySelectorAll('#kn-items .kn-c:checked').forEach(function(c){
       var q=document.querySelector('#kn-items .kq[data-row="'+c.dataset.row+'"]');
-      var it=k.items.filter(function(x){ return String(x.row)===c.dataset.row; })[0];
-      items.push({ row:Number(c.dataset.row), qty: q ? n(q.value) : Math.min(it.inKit,it.onHand) });
+      items.push({ row:Number(c.dataset.row), qty: q ? n(q.value) : 1 });
     });
     if(!items.length){ toast('ยังไม่ได้เลือกรายการ',true); return; }
     var b=this; busy(b,true);
     run('kitCheckout',[{ kit:k.name, borrower:who, purpose:$('kn-why').value.trim(), dueDate:$('kn-due').value, items:items, by:state.by }]).then(function(r){
       try{ localStorage.setItem('kit-who',who); }catch(e){}
-      $('kn-bg').classList.remove('on'); toast('นำออกแล้ว '+r.count+' รายการ'); ktLoad();
+      $('kn-bg').classList.remove('on'); toast('บันทึกยืมออก '+r.count+' รายการ · รอคืน'); ktLoad();
     }).catch(function(err){ toast(err.message,true); }).then(function(){ busy(b,false); });
   });
 
-  /* ----- รับชุดกลับ ----- */
-  function kbWhoFill(){
-    var sel=$('kb-who'), list=state.users||[], want='';
-    try{ var o=JSON.parse(localStorage.getItem('req-by')||'null'); if(o) want=o.name||''; }catch(e){}
-    sel.innerHTML='<option value="">เลือกผู้เบิก</option>'+list.map(function(u,i){ return '<option value="'+i+'">'+esc((u.rank?u.rank+' ':'')+u.fullName)+'</option>'; }).join('')+'<option value="manual">กรอกเอง</option>';
-    var idx=-1; list.forEach(function(u,i){ if(u.fullName===want) idx=i; });
-    sel.value = idx>=0 ? String(idx) : (list.length?'':'manual');
-    kbWho();
+  /* ----- ทำรายการเดี่ยว (ใช้งานจริง / รับคืน / เติม / ย้ายเข้าคลัง / แก้ไข / เพิ่ม) ----- */
+  var ka = { mode:'', row:0, id:0, lot:0, lots:[] };
+  function kaShow(mode, title, info, btn){
+    ka.mode=mode; $('ka-title').textContent=title; $('ka-info').innerHTML=info||''; $('ka-info').style.display=info?'':'none';
+    ['use','return','refill','tostock','edit'].forEach(function(m){ $('ka-'+m).classList.toggle('on', m===mode || (mode==='new'&&m==='edit')); });
+    document.querySelector('#ka-edit .ka-new').style.display = mode==='new' ? '' : 'none';
+    $('ka-submit').textContent=btn; $('ka-del').style.display = mode==='edit' ? '' : 'none';
+    $('ka-bg').classList.add('on');
   }
-  function kbWho(){
-    var v=$('kb-who').value; $('kb-manual').style.display = v==='manual'?'block':'none';
-    if(v!=='' && v!=='manual'){ var u=state.users[Number(v)]; $('kb-rank').value=u.rank||''; $('kb-fullname').value=u.fullName||''; $('kb-position').value=u.position||''; }
-    else if(v===''){ $('kb-rank').value=''; $('kb-fullname').value=''; $('kb-position').value=''; }
+  function itemInfo(it){ return '<b>'+esc(it.part||'-')+'</b> '+esc(it.name)+(it.serial?'<br>S/N '+esc(it.serial):'')+'<br><span class="meta">ในชุดมี '+fmtNum(it.have)+' / มาตรฐาน '+fmtNum(it.std)+'</span>'; }
+  function machineOpts(){ $('ka-machine').innerHTML='<option value="">เลือกหมายเลขเครื่อง</option>'+(kt.data.machines||[]).map(function(m){ return '<option>'+esc(m)+'</option>'; }).join(''); }
+  function kaUse(it, loan){
+    ka.row=it?it.row:0; ka.id=loan?loan.id:0;
+    var x = loan || it, have = loan ? loan.qty : it.have;
+    kaShow('use','ใช้งานจริง · ออกใบเบิกทดแทน', itemInfo({part:x.part,name:x.name,serial:x.serial,have:have,std:it?it.std:have})+'<br><span class="meta">ระบบจ่ายให้ช่าง และออกใบเบิกทดแทนให้ทันที (เครื่องของใบเบิก = '+esc(ktKit().name)+')</span>','ยืนยัน · ออกใบเบิกทดแทน');
+    ka.type = (it&&it.type)||(loan&&loan.type)||''; ka.sn=x.serial||'';
+    $('ka-uqty').value = 1; $('ka-uqty').disabled = !!x.serial; machineOpts();
+    try{ $('ka-tech').value = localStorage.getItem('kit-tech') || ''; }catch(e){ $('ka-tech').value=''; }
+    $('ka-urg').value='เบิกธรรมดา'; $('ka-remark').value=''; $('ka-utype').value='';
+    $('ka-utype-wrap').style.display = ka.type ? 'none' : '';
   }
-  $('kb-who').addEventListener('change', kbWho);
-  function kbRefresh(){
-    var used=document.querySelectorAll('#kb-items .kb-u:checked').length;
-    $('kb-used').style.display = used ? 'block' : 'none';
-    $('kb-submit').textContent = used ? 'ยืนยัน · ออกใบเบิกทดแทน '+used+' รายการ' : 'รับกลับทั้งหมด (ไม่ได้ใช้เลย)';
-    document.querySelectorAll('#kb-items .kb-row').forEach(function(r){
-      var on=r.querySelector('.kb-u').checked; r.classList.toggle('on',on);
-      var x=r.querySelector('.kq'), t=r.querySelector('.kb-t'); if(x) x.style.display=on?'':'none'; if(t) t.style.display=on?'':'none';
-    });
+  function kaRefill(it){
+    ka.row=it.row; ka.lot=0; ka.lots=[];
+    kaShow('refill','เติมเข้าชุดจากคลัง', itemInfo(it)+'<br><span class="meta">ตัดยอดคลัง บวกยอดชุด (ขาดอีก '+fmtNum(it.missing)+')</span>','เติมเข้าชุด');
+    $('ka-lots').innerHTML='<div class="empty"><span class="spin"></span></div>'; $('ka-fqty-wrap').style.display='none'; $('ka-submit').disabled=true;
+    run('kitCandidates',[{ row:it.row }]).then(function(rows){
+      ka.lots=rows;
+      $('ka-lots').innerHTML = rows.length ? rows.map(function(l,i){
+        return '<div class="ka-lot" data-i="'+i+'"><div style="flex:1;min-width:0"><b>'+(l.serial?'S/N '+esc(l.serial):'จำนวน '+fmtNum(l.qty))+'</b><div class="meta">'+esc(l.label)+(l.loc?' · '+esc(l.loc):'')+(l.cond?' · COND '+esc(l.cond):'')+(l.received?' · รับ '+esc(l.received):'')+'</div></div></div>';
+      }).join('') : '<div class="empty">ไม่มี '+esc(it.part||it.name)+' ในคลัง — รับพัสดุเข้าคลังก่อน (ตามใบเบิกทดแทน) แล้วกลับมาเติม</div>';
+    }).catch(function(e){ $('ka-lots').innerHTML='<div class="empty">'+esc(e.message)+'</div>'; });
   }
-  $('kt-back').addEventListener('click', function(){
-    var k=ktKit(); if(!k) return;
-    kt.back = k.loans.filter(function(l){ return !l.used; });
-    $('kb-title').textContent='รับ '+k.name+' กลับ';
-    $('kb-items').innerHTML = kt.back.map(function(l,i){
-      return '<div class="kb-row"><label class="kb-sw"><input type="checkbox" class="kb-u" data-i="'+i+'"><span>ใช้ติดตั้ง</span></label>'+
-        '<div style="flex:1;min-width:0"><b>'+esc(l.part||'-')+'</b> '+esc(l.name)+'<div class="meta">'+(l.serial?'S/N '+esc(l.serial)+' · ':'')+'นำออก '+fmtNum(l.out)+' '+esc(l.unit||'')+'</div>'+
-        (!l.type?'<select class="kb-t" data-i="'+i+'" style="display:none;margin-top:6px"><option value="">เลือกประเภทพัสดุ</option><option>LRU</option><option>SP</option><option>LRU(TCI)</option><option>SP(TCI)</option><option>สารเคมี</option></select>':'')+'</div>'+
-        (!l.serial && l.out>1 ? '<input type="number" inputmode="decimal" class="kq" data-i="'+i+'" min="1" max="'+l.out+'" value="'+l.out+'" style="display:none" title="จำนวนที่ใช้">' : '')+'</div>';
-    }).join('');
-    $('kb-machine').innerHTML='<option value="">เลือกหมายเลขเครื่อง</option>'+(kt.data.machines||[]).map(function(m){ return '<option>'+esc(m)+'</option>'; }).join('');
-    $('kb-urg').value='เบิกธรรมดา';
-    kbWhoFill(); kbRefresh();
-    $('kb-bg').classList.add('on');
+  $('ka-lots').addEventListener('click', function(e){
+    var c=e.target.closest('.ka-lot'); if(!c) return; var l=ka.lots[Number(c.dataset.i)]; if(!l) return;
+    ka.lot=l.seq; document.querySelectorAll('#ka-lots .ka-lot').forEach(function(x){ x.classList.toggle('on', x===c); });
+    var it=kitItem(ka.row), room=it?Math.max(it.std-it.have,0):l.qty;
+    $('ka-fqty-wrap').style.display = l.serial ? 'none' : ''; $('ka-fqty').value = Math.min(l.qty, room||l.qty); $('ka-submit').disabled=false;
   });
-  $('kb-items').addEventListener('change', kbRefresh);
-  $('kb-x').addEventListener('click', function(){ $('kb-bg').classList.remove('on'); });
-  $('kb-submit').addEventListener('click', function(){
-    if(!state.by){ askBy(function(){ $('kb-submit').click(); }); return; }
-    var items=[], anyUsed=false;
-    kt.back.forEach(function(l,i){
-      var row=document.querySelector('#kb-items .kb-u[data-i="'+i+'"]'), used=row.checked;
-      var q=document.querySelector('#kb-items .kq[data-i="'+i+'"]'), t=document.querySelector('#kb-items .kb-t[data-i="'+i+'"]');
-      if(used) anyUsed=true;
-      items.push({ seq:l.seq, used:used, qty: used && q ? n(q.value) : l.out, itemType: t?t.value:'' });
-    });
-    var p={ items:items, installedOn:$('kb-machine').value, urgency:$('kb-urg').value, rank:$('kb-rank').value.trim(), fullName:$('kb-fullname').value.trim(), position:$('kb-position').value.trim(), by:state.by };
-    if(anyUsed){
-      if(!p.installedOn){ toast('กรุณาเลือกเครื่องที่ติดตั้ง',true); return; }
-      if(!p.fullName){ toast('กรุณาเลือกผู้เบิก',true); return; }
+  function kaToStock(it){
+    ka.row=it.row; kaShow('tostock','ย้ายเข้าคลัง', itemInfo(it)+'<br><span class="meta">ตัดยอดชุด บวกยอดคลัง (ไม่ใช่การใช้งาน)</span>','ย้ายเข้าคลัง');
+    $('ka-sqty').value=it.have; $('ka-sqty').disabled=!!it.serial; $('ka-sloc').value=it.loc||'';
+  }
+  function kaEdit(it){
+    ka.row=it.row; kaShow('edit','แก้ไขรายการในชุด', '<b>'+esc(it.part||'-')+'</b> '+esc(it.name)+'<br><span class="meta">แก้ยอดให้ตรงของจริงได้เลย ระบบบันทึกประวัติการแก้ไขไว้</span>','บันทึกการแก้ไข');
+    $('ka-sn').value=it.serial||''; $('ka-std').value=it.std; $('ka-have').value=it.have; $('ka-loc').value=it.loc||''; $('ka-note').value=it.note||'';
+  }
+  function kaNew(){
+    var k=ktKit(); ka.row=0;
+    kaShow('new','เพิ่มรายการเข้า '+k.name,'','เพิ่มรายการ');
+    ['ka-part','ka-name','ka-sn','ka-loc','ka-note'].forEach(function(id){ $(id).value=''; }); $('ka-type').value=''; $('ka-std').value=1; $('ka-have').value=0;
+  }
+  $('kt-add').addEventListener('click', kaNew);
+  $('ka-part').addEventListener('change', function(){ autofill($('ka-part'), $('ka-name')); });
+  $('ka-x').addEventListener('click', function(){ $('ka-bg').classList.remove('on'); });
+  $('kt-list').addEventListener('click', function(e){
+    var b=e.target.closest('button[data-ki]'); if(!b||b.disabled) return;
+    var it=kitItem(b.dataset.row); if(!it) return;
+    var m=b.dataset.ki;
+    if(m==='use') kaUse(it,null); else if(m==='fill') kaRefill(it); else if(m==='tostock') kaToStock(it); else kaEdit(it);
+  });
+  $('kt-open').addEventListener('click', function(e){
+    var b=e.target.closest('button[data-ko]'); if(!b) return;
+    var ent=ktKit().open[Number(b.dataset.i)]; if(!ent) return; var it=kitItem(ent.row);
+    if(b.dataset.ko==='fill'){ if(it) kaRefill(it); return; }
+    if(b.dataset.ko==='use'){ kaUse(it||null, ent); return; }
+    ka.id=ent.id; kaShow('return','รับคืนเข้าชุด', '<b>'+esc(ent.part||ent.name)+'</b> '+esc(ent.name)+(ent.serial?'<br>S/N '+esc(ent.serial):'')+'<br><span class="meta">ยืมโดย '+esc(ent.who)+' · x'+fmtNum(ent.qty)+'</span>','บันทึกรับคืน');
+    $('ka-rqty').value=ent.qty; $('ka-rqty').disabled=!!ent.serial; $('ka-rsn').value=''; $('ka-rsn-wrap').style.display=ent.serial?'':'none';
+  });
+  $('ka-del').addEventListener('click', function(){
+    if(!state.by){ askBy(function(){ $('ka-del').click(); }); return; }
+    if(!confirm('ลบรายการนี้ออกจากชุด?')) return;
+    var b=this; busy(b,true);
+    run('kitDeleteRow',[{ row:ka.row, by:state.by }]).then(function(){ $('ka-bg').classList.remove('on'); toast('ลบรายการแล้ว'); ktLoad(); })
+      .catch(function(err){ toast(err.message,true); }).then(function(){ busy(b,false); });
+  });
+  $('ka-submit').addEventListener('click', function(){
+    if(!state.by){ askBy(function(){ $('ka-submit').click(); }); return; }
+    var k=ktKit(), m=ka.mode, call, args, done;
+    if(m==='use'){
+      if(!$('ka-machine').value){ toast('กรุณาเลือกเครื่องที่ติดตั้ง',true); return; }
+      if(!$('ka-tech').value.trim()){ toast('กรุณากรอกช่างที่รับพัสดุ',true); return; }
+      call='kitUse'; args={ row:ka.row, loanId:ka.id, kit:k.name, qty:n($('ka-uqty').value), tech:$('ka-tech').value.trim(), machine:$('ka-machine').value, urgency:$('ka-urg').value, remark:$('ka-remark').value.trim(), itemType:$('ka-utype').value||ka.type, by:state.by };
+      done=function(r){
+        try{ localStorage.setItem('kit-tech',args.tech); }catch(e){}
+        kt.lastDocs=[{ docNo:r.docNo, machine:r.machine, part:r.part, name:r.name, qty:r.qty, unit:r.unit, issue:r.issue, rank:'', fullName:r.tech, urgency:r.urgency, itemType:r.itemType, position:'' }];
+        $('kr-sum').innerHTML='จ่ายให้ช่าง '+esc(r.tech)+' · เครื่อง '+esc(r.useMachine)+'<br>ออกใบเบิกทดแทน 1 ใบ — ชุดจะขึ้นว่าไม่ครบจนกว่าจะเติมเข้าชุด';
+        $('kr-docs').innerHTML='<div class="kdoc"><span><b>'+esc(r.docNo)+'</b><br><span class="meta">'+esc(r.part||r.name)+' x'+fmtNum(r.qty)+'</span></span><button class="btn ghost sm" data-pr="0">พิมพ์ใบเบิก</button></div>';
+        $('ka-bg').classList.remove('on'); $('kr-bg').classList.add('on');
+      };
+    } else if(m==='return'){
+      call='kitReturn'; args={ id:ka.id, qty:n($('ka-rqty').value), serial:$('ka-rsn').value.trim(), by:state.by }; done=function(){ toast('รับคืนเข้าชุดแล้ว'); };
+    } else if(m==='refill'){
+      if(!ka.lot){ toast('กรุณาเลือกล็อตในคลัง',true); return; }
+      call='kitRefill'; args={ row:ka.row, lotSeq:ka.lot, qty:n($('ka-fqty').value), by:state.by }; done=function(){ toast('เติมเข้าชุดแล้ว'); loadStock(); };
+    } else if(m==='tostock'){
+      call='kitToStock'; args={ row:ka.row, qty:n($('ka-sqty').value), location:$('ka-sloc').value.trim(), by:state.by }; done=function(){ toast('ย้ายเข้าคลังแล้ว'); loadStock(); };
+    } else if(m==='edit'){
+      call='kitSetRow'; args={ row:ka.row, std:$('ka-std').value, have:$('ka-have').value, serial:$('ka-sn').value.trim(), loc:$('ka-loc').value.trim(), note:$('ka-note').value.trim(), by:state.by }; done=function(){ toast('แก้ไขแล้ว'); };
+    } else {
+      call='kitAddRow'; args={ kit:k.name, part:$('ka-part').value.trim(), name:$('ka-name').value.trim(), type:$('ka-type').value, serial:$('ka-sn').value.trim(), std:$('ka-std').value, have:$('ka-have').value, loc:$('ka-loc').value.trim(), note:$('ka-note').value.trim(), by:state.by }; done=function(){ toast('เพิ่มรายการแล้ว'); };
     }
     var b=this; busy(b,true);
-    run('kitBack',[p]).then(function(r){
-      try{ if(anyUsed) localStorage.setItem('req-by', JSON.stringify({ who:p.fullName, rank:p.rank, name:p.fullName, pos:p.position })); }catch(e){}
-      kt.lastDocs = (r.docs||[]).map(function(d){
-        return { docNo:d.docNo, machine:d.machine, part:d.part, name:d.name, qty:d.qty, unit:d.unit, issue:d.issue, rank:p.rank, fullName:p.fullName, urgency:d.urgency, itemType:d.itemType, position:p.position };
-      });
-      $('kr-sum').innerHTML = (r.back?'รับกลับเข้าคลัง '+r.back+' รายการ':'') + (r.back && kt.lastDocs.length?' · ':'') + (kt.lastDocs.length?'ออกใบเบิกทดแทน '+kt.lastDocs.length+' ใบ':'');
-      $('kr-docs').innerHTML = kt.lastDocs.map(function(d,i){
-        return '<div class="kdoc"><span><b>'+esc(d.docNo)+'</b><br><span class="meta">'+esc(d.part||d.name)+' x'+fmtNum(d.qty)+'</span></span><button class="btn ghost sm" data-pr="'+i+'">พิมพ์ใบเบิก</button></div>';
-      }).join('');
-      $('kb-bg').classList.remove('on'); $('kr-bg').classList.add('on'); ktLoad();
-    }).catch(function(err){ toast(err.message,true); }).then(function(){ busy(b,false); });
+    run(call,[args]).then(function(r){ done(r); if(m!=='use') $('ka-bg').classList.remove('on'); ktLoad(); })
+      .catch(function(err){ toast(err.message,true); }).then(function(){ busy(b,false); });
   });
   $('kr-docs').addEventListener('click', function(e){ var b=e.target.closest('button[data-pr]'); if(b) printForm(kt.lastDocs[Number(b.dataset.pr)]); });
   $('kr-close').addEventListener('click', function(){ $('kr-bg').classList.remove('on'); });

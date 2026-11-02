@@ -17,6 +17,7 @@ const SHEET_LOAN = 'ยืมพัสดุ';
 const SHEET_CNT = 'ตรวจนับ';
 const SHEET_KIT = 'ชุดพัสดุ';
 const SHEET_CLAIM = 'เคลม';
+const SHEET_KITLOG = 'ประวัติชุด';   // ประวัติการเคลื่อนไหวของ FLY AWAY KIT (ยืม/ใช้งานจริง/เติม/ย้าย)
 const SHEET_RCV2 = 'รับคืนเข้าคลัง';   // ประวัติรับ "คืนเข้าคลัง" แยกจากรับปกติ (โครงสร้างเหมือนชีท รับ)
 const WARRANTY_DAYS = 365;        // ประกัน 1 ปี นับจากวันที่รับ (LRU / LRU(TCI)) ; ของที่เคลมกลับมานับใหม่จากวันที่ได้รับกลับ
 const WARRANTY_SOON_DAYS = 60;    // เตือน "ใกล้หมดประกัน" เมื่อเหลือไม่เกินกี่วัน
@@ -49,7 +50,8 @@ const HEADERS = {
   [SHEET_ISS]: ['ลำดับจ่าย', 'วันที่จ่าย', 'เลขเอกสารการเบิก', 'ลำดับรับ (อ้างอิง)', 'Part number', 'ชื่อพัสดุ', 'serial number', 'จำนวน', 'หน่วยนับ', 'TAIL No.', 'จ่ายให้ช่าง', 'หมายเหตุ', 'ผู้บันทึก'],
   [SHEET_CNT]: ['เลขที่ตรวจนับ', 'วันที่ตรวจนับ', 'LOCATION', 'ลำดับรับ', 'Part number', 'ชื่อพัสดุ', 'serial number', 'ประเภทพัสดุ', 'หน่วยนับ', 'ยอดในระบบ', 'นับได้จริง', 'ผลต่าง', 'ผลการปรับ', 'เหตุผล / หมายเหตุ', 'ผู้ตรวจนับ', 'ผู้ตรวจสอบ / กรรมการ', 'เวลาบันทึก'],
   [SHEET_CLAIM]: ['เลขที่เคลม', 'serial number', 'Part number', 'ชื่อพัสดุ', 'ประเภทพัสดุ', 'วันที่ส่งเคลม', 'ที่หนังสือ', 'ผู้รับเคลม/หน่วยงาน', 'สถานะ', 'วันที่ได้รับกลับ', 'serial number ใหม่', 'หมายเหตุ', 'ผู้บันทึก'],
-  [SHEET_KIT]: ['ชุด', 'Part number', 'ชื่อพัสดุ', 'ประเภทพัสดุ', 'serial number', 'จำนวนมาตรฐาน', 'LOCATION', 'หมายเหตุ'],
+  [SHEET_KIT]: ['ชุด', 'Part number', 'ชื่อพัสดุ', 'ประเภทพัสดุ', 'serial number', 'จำนวนมาตรฐาน', 'จำนวนที่มี', 'LOCATION', 'หมายเหตุ'],
+  [SHEET_KITLOG]: ['เลขที่', 'วันที่', 'ชุด', 'Part number', 'ชื่อพัสดุ', 'serial number', 'ประเภทพัสดุ', 'จำนวน', 'รายการ', 'ผู้ถือ/ช่าง', 'เครื่อง', 'กำหนดคืน', 'สถานะ', 'เลขใบเบิกทดแทน', 'วันที่ปิด', 'หมายเหตุ', 'ผู้บันทึก'],
   [SHEET_USR]: ['ยศ', 'ชื่อ-สกุล', 'ตำแหน่ง'],
   [SHEET_TECH]: ['ยศ-ชื่อ นามสกุล'],
   [SHEET_RCVR]: ['ยศ-ชื่อ นามสกุล'],
@@ -79,6 +81,17 @@ const API_FUNCS_ = {
   getBootstrap: getBootstrap,
   addOpeningStock: addOpeningStock,
   getAwaitingReq: getAwaitingReq,
+  getKits: getKits,
+  getKitAlerts: getKitAlerts,
+  kitCheckout: kitCheckout,
+  kitReturn: kitReturn,
+  kitUse: kitUse,
+  kitCandidates: kitCandidates,
+  kitRefill: kitRefill,
+  kitToStock: kitToStock,
+  kitSetRow: kitSetRow,
+  kitAddRow: kitAddRow,
+  kitDeleteRow: kitDeleteRow,
   linkDirectIssue: linkDirectIssue,
   cancelRequisition: cancelRequisition,
   checkSerialAlert: checkSerialAlert,
@@ -94,7 +107,6 @@ const API_FUNCS_ = {
   getWarrantyList: getWarrantyList,
   submitClaim: submitClaim,
   updateClaim: updateClaim,
-  getKits: getKits,
   getLoans: getLoans,
   getLoansForPart: getLoansForPart,
   getNextReturnNo: getNextReturnNo,
@@ -105,8 +117,6 @@ const API_FUNCS_ = {
   getReturnable: getReturnable,
   getStock: getStock,
   issueFromLot: issueFromLot,
-  kitBack: kitBack,
-  kitCheckout: kitCheckout,
   moveLocation: moveLocation,
   returnLoan: returnLoan,
   submitBorrow: submitBorrow,
@@ -183,6 +193,12 @@ function getSheet_(name) {
     sh.moveColumns(sh.getRange(1, 18, sh.getMaxRows(), 1), 3);
     sh.getRange(1, 3).setNumberFormat('General');
   }
+  if (sh && name === SHEET_KIT && str_(sh.getRange(1, 7).getValue()) === 'LOCATION') {
+    // ชีทชุดพัสดุรูปแบบเก่า: เพิ่มคอลัมน์ จำนวนที่มี ก่อน LOCATION (ค่าเดิมว่าง = 0 ให้กรอกยอดจริง)
+    sh.insertColumnBefore(7);
+    HDR_STYLE_(sh.getRange(1, 7).setValue('จำนวนที่มี'));
+    sh.getRange('G2:G').setNumberFormat('General');
+  }
   if (sh && name === SHEET_REQ && sh.getRange(1, 16).getValue() === '') {
     // ชีทเบิกเดิม: เติมหัวคอลัมน์ผู้เบิก ประเภทพัสดุ และเหตุผลยกเลิกท้ายตาราง
     HDR_STYLE_(sh.getRange(1, 12, 1, 5).setValues([HEADERS[SHEET_REQ].slice(11, 16)]));
@@ -231,6 +247,13 @@ function getSheet_(name) {
     } else if (name === SHEET_KIT) {
       sh.getRange('B2:B').setNumberFormat('@');
       sh.getRange('E2:E').setNumberFormat('@');
+    } else if (name === SHEET_KITLOG) {
+      sh.getRange('B2:B').setNumberFormat('dd/mm/yyyy');
+      sh.getRange('D2:D').setNumberFormat('@');
+      sh.getRange('F2:F').setNumberFormat('@');
+      sh.getRange('L2:L').setNumberFormat('dd/mm/yyyy');
+      sh.getRange('N2:N').setNumberFormat('@');
+      sh.getRange('O2:O').setNumberFormat('dd/mm/yyyy');
     } else if (name === SHEET_CNT) {
       sh.getRange('A2:A').setNumberFormat('@');
       sh.getRange('B2:B').setNumberFormat('dd/mm/yyyy');
@@ -256,6 +279,7 @@ TEXT_COLS_[SHEET_STK] = [3, 5];
 TEXT_COLS_[SHEET_LOAN] = [3, 5];
 TEXT_COLS_[SHEET_RET] = [2, 5, 6];
 TEXT_COLS_[SHEET_KIT] = [2, 5];
+TEXT_COLS_[SHEET_KITLOG] = [4, 6, 14];
 TEXT_COLS_[SHEET_CNT] = [5, 7];
 TEXT_COLS_[SHEET_CLAIM] = [2, 3, 11];
 const TXT_DONE_ = {};
@@ -348,9 +372,8 @@ function applyStockEdits() {
             pick.forEach(o => setTxt(req, o.k + 2, 3, newPart));
           }
         }
-        // ชุดพัสดุ / เคลม ที่อ้าง S/N เดิม
+        // เคลม ที่อ้าง S/N เดิม
         if (snCh && oldSn) {
-          readKit_().forEach(k => { if (snKey_(k.serial) === snKey_(oldSn)) { setTxt(getSheet_(SHEET_KIT), k.row, 5, newSn); if (partCh) setTxt(getSheet_(SHEET_KIT), k.row, 2, newPart); } });
           readClaims_().forEach(c => {
             const sh = getSheet_(SHEET_CLAIM);
             if (snKey_(c.sn) === snKey_(oldSn)) { setTxt(sh, c.row, 2, newSn); if (partCh) setTxt(sh, c.row, 3, newPart); }
@@ -850,6 +873,7 @@ function rcFromSheet_(row) { const o = new Array(RC_PHYS_.length); RC_PHYS_.forE
 function rcToSheet_(vals) { return RC_PHYS_.map(li => vals[li]); }
 const SRC_REQ = 'ใบเบิก';
 const SRC_OPEN = 'ยอดยกมา';
+const SRC_KIT = 'ย้ายจากชุด';       // ย้ายพัสดุจาก FLY AWAY KIT กลับเข้าคลัง
 const SRC_PRE = 'รับก่อนเบิก';       // รับพัสดุเข้าคลังก่อนมีใบเบิก (รอผูกใบเบิก / จ่ายตรง)
 const SRC_RET = 'คืนเข้าคลัง';
 const DIRECT = 'จ่ายตรง';
@@ -923,7 +947,7 @@ function computeLots_() {
   return R_.map((r, i) => {
     const seq = Number(r[RC.SEQ]);
     const src = str_(r[RC.SRC]) || SRC_REQ;
-    const free = src === SRC_OPEN || src === SRC_RET || src === SRC_PRE;
+    const free = src === SRC_OPEN || src === SRC_RET || src === SRC_PRE || src === SRC_KIT;
     const remain = num_(r[RC.QTY]) - (issued[seq] || 0) - (loanOut[seq] || 0);
     return {
       seq: seq, row: r._row || (i + 2), sh: r._sh || SHEET_RCV, doc: docStr_(r[RC.DOC]), label: free ? src : docStr_(r[RC.DOC]), free: free, src: src,
@@ -1012,7 +1036,7 @@ function getPendingReceive() {
 
 function appendRcv_(vals) {
   splitReturnRows_();
-  const sh = getSheet_(str_(vals[RC.SRC]) === SRC_RET ? SHEET_RCV2 : SHEET_RCV);
+  const sh = getSheet_(str_(vals[RC.SRC]) === SRC_RET || str_(vals[RC.SRC]) === SRC_KIT ? SHEET_RCV2 : SHEET_RCV);
   return writeRcvRow_(sh, sh.getLastRow() + 1, vals);
 }
 
@@ -1082,7 +1106,6 @@ function submitReceive(p) {
     // รับจากของที่ยืมไปใช้จริง (ปิดยืมด้วยใบเบิกนี้) : ของออกจากคลังตอนยืมแล้ว จึงไม่ตัดล็อตซ้ำ
     let loanSeq = Number(p.loanSeq) || 0;
     const lsh = getSheet_(SHEET_LOAN);
-    if (!loanSeq && !lotSeq) loanSeq = findKitLoanForDoc_(lsh, p.docNo, str_(rv[2]), qty) || 0;   // ใบเบิกทดแทนของชุดพัสดุ : ผูกกับรายการที่ใช้ติดตั้งให้อัตโนมัติ
     let loan = null, loanRow = 0, loanLot = null;
     if (loanSeq) {
       if (lotSeq) throw new Error('เลือกแหล่งที่มาได้อย่างเดียว');
@@ -1141,7 +1164,6 @@ function submitReceive(p) {
     }
     if (loan) {
       closeLoanQty_(lsh, loanRow, loan, qty, LOAN_USED, p.docNo, 'ใช้งานจริง x' + qty + ' (ปิดด้วยใบเบิก ' + p.docNo + ')');
-      kitAfterReceive_(loan, sn);
     }
     log_('รับ', p.docNo, [str_(rv[2]), str_(rv[3]), 'x' + qty, sn ? 'S/N ' + sn : '',
       lot ? '(จาก' + lot.label + ')' : (loan ? '(ปิดยืมเลขที่ ' + loanSeq + ')' : ''),
@@ -1255,7 +1277,6 @@ function issueCore_(p) {
 
 function getStock() {
   const info = reqInfoMap_();
-  const kitRows_ = readKit_();
   const warr_ = warrantyMap_();
   const groups = {};
   computeLots_().filter(l => l.remain > 0).forEach(l => {
@@ -1267,7 +1288,6 @@ function getStock() {
       location: l.loc, expire: fmtThai_(l.expire), received: fmtThai_(l.recvDate), note: l.note,
       issRow: l.free ? 0 : l.seq, issSeq: l.free ? 0 : l.seq, linkNote: '',
       machine: l.free ? '' : ((info[l.doc + '|' + l.part] || {}).machine || ''),
-      kit: kitOfLot_(l, kitRows_).kit,
       warr: l.serial && isLRU_(l.type) ? (warr_[snKey_(l.serial)] || null) : null
     });
   });
@@ -1283,72 +1303,12 @@ function moveLocation(p) {
     if (!loc) throw new Error('กรุณาระบุที่จัดเก็บใหม่');
     const lot = computeLots_().filter(l => l.seq === Number(p.seq))[0];
     if (!lot || lot.remain <= 0) throw new Error('ไม่พบพัสดุในคลัง (อาจถูกจ่ายไปแล้ว) กรุณารีเฟรช');
-    const cur = kitOfLot_(lot);                                                       // ชุดที่ล็อตนี้อยู่ตอนนี้ ('' = ไม่อยู่ในชุด)
-    const want = p.kit === undefined || p.kit === null ? cur.kit : str_(p.kit);       // ไม่ส่งมา = คงสถานะชุดเดิม
-    if (want && kitNames_().indexOf(want) < 0) throw new Error('ไม่รู้จักชุด ' + want);
-    const sameLoc = lot.loc === loc;
-    if (sameLoc && want === cur.kit) return { ok: true, from: lot.loc, to: loc, same: true, kit: cur.kit };
-    if (cur.kit && want !== cur.kit) kitLeaveCheck_(cur.kit, lot);                    // ชิ้นที่ถูกนำออกไปราชการอยู่ ห้ามย้ายออกจากชุด
-    if (!sameLoc) getSheet_(lot.sh || SHEET_RCV).getRange(lot.row, rcCol_(RC.LOC)).setValue(loc);   // LOCATION = ที่จัดเก็บจริง ไม่เกี่ยวกับชุด
-    let kitNote = '';
-    if (cur.kit && want === cur.kit) {                                                // อยู่ชุดเดิม: ให้ LOCATION ของรายการชุดตามไปด้วย
-      if (!sameLoc) getSheet_(SHEET_KIT).getRange(cur.row, 7).setValue(loc);
-    } else {
-      if (cur.kit) kitLeave_(cur.kit, lot);
-      if (want) kitNote = ensureKitRow_(want, lot, loc).added;
-    }
-    log_('ย้ายที่จัดเก็บ', lot.doc, [lot.part, lot.serial ? 'S/N ' + lot.serial : '', (lot.loc || '(ว่าง)') + ' → ' + loc,
-      cur.kit !== want ? 'ชุด: ' + (cur.kit || '-') + ' → ' + (want || '-') : ''].filter(Boolean).join(' | '), p.by);
+    if (lot.loc === loc) return { ok: true, from: lot.loc, to: loc, same: true };
+    getSheet_(lot.sh || SHEET_RCV).getRange(lot.row, rcCol_(RC.LOC)).setValue(loc);
+    log_('ย้ายที่จัดเก็บ', lot.doc, [lot.part, lot.serial ? 'S/N ' + lot.serial : '', (lot.loc || '(ว่าง)') + ' → ' + loc].filter(Boolean).join(' | '), p.by);
     rebuildStock_();
-    return { ok: true, from: lot.loc, to: loc, kit: want, kitFrom: cur.kit, kitAdded: kitNote };
+    return { ok: true, from: lot.loc, to: loc };
   });
-}
-
-function kitNames_() {
-  const n = KIT_NAMES.slice();
-  readKit_().forEach(r => { if (n.indexOf(r.kit) < 0) n.push(r.kit); });
-  return n;
-}
-/** ล็อตนี้อยู่ในชุดไหน: มี S/N = ตรงตาม Part+S/N ; ไม่มี S/N = Part เดียวกันและ LOCATION ตรงกับรายการชุด */
-function kitOfLot_(lot, kitRows) {
-  const sn = snKey_(lot.serial);
-  const r = (kitRows || readKit_()).filter(x => kitSamePart_(x, lot.part, lot.name) &&
-    (sn ? snKey_(x.serial) === sn : (!x.serial && x.loc === lot.loc)))[0];
-  return r ? { kit: r.kit, row: r.row, qty: r.qty } : { kit: '', row: 0, qty: 0 };
-}
-
-/** ตรวจก่อนย้ายพัสดุออกจากชุด: ถ้าชิ้นนั้นถูกนำออกไปราชการ/รอเบิกทดแทนอยู่ ให้ย้ายไม่ได้ */
-function kitLeaveCheck_(kit, lot) {
-  const st = kitState_(kit);
-  st.items.forEach(i => {
-    if (kitSamePart_(i, lot.part, lot.name) && (!i.serial || snKey_(i.serial) === snKey_(lot.serial)) && (i.out > 0 || i.waiting > 0))
-      throw new Error('พัสดุนี้ถูกนำออกไปราชการ/รอเบิกทดแทนอยู่ ย้ายออกจาก ' + kit + ' ไม่ได้ ให้ปิดรายการนำออกก่อน');
-  });
-}
-/** ย้ายพัสดุออกจากชุด: เอาออกจากรายการชุด (มี S/N = ลบแถว, ไม่มี S/N = ลดจำนวนมาตรฐาน) */
-function kitLeave_(kit, lot) {
-  const sh = getSheet_(SHEET_KIT), sn = snKey_(lot.serial);
-  const r = readKit_().filter(x => x.kit === kit && kitSamePart_(x, lot.part, lot.name) &&
-    (sn ? snKey_(x.serial) === sn : (!x.serial && x.loc === lot.loc)))[0];
-  if (!r) return;
-  const left = sn ? 0 : r.qty - lot.remain;
-  if (left > 0) sh.getRange(r.row, 6).setValue(left); else sh.deleteRow(r.row);
-}
-
-/** เพิ่มพัสดุเข้ารายการของชุด (ชีท ชุดพัสดุ) โดยเก็บ LOCATION = ที่จัดเก็บจริงของล็อต */
-function ensureKitRow_(kit, lot, loc) {
-  const sn = snKey_(lot.serial), sh = getSheet_(SHEET_KIT);
-  const rows = readKit_().filter(r => r.kit === kit && kitSamePart_(r, lot.part, lot.name));
-  if (sn) {
-    const same = rows.filter(r => snKey_(r.serial) === sn)[0];
-    if (same) { sh.getRange(same.row, 7).setValue(loc); return { added: 'exists' }; }
-  } else {
-    const r = rows.filter(x => !x.serial && x.loc === loc)[0];
-    if (r) { sh.getRange(r.row, 6).setValue(r.qty + lot.remain); return { added: 'qty' }; }
-  }
-  const row = [kit, lot.part, lot.name, lot.type, lot.serial, sn ? 1 : lot.remain, loc, 'เพิ่มจากหน้าย้ายที่จัดเก็บ'];
-  sh.getRange(sh.getLastRow() + 1, 1, 1, row.length).setValues([row]);
-  return { added: 'new' };
 }
 
 /** เมื่อแก้ LOCATION ในชีท คลังพัสดุ หรือ รับ ด้วยมือ -> แก้อีกชีทให้ตรงกันทันที (simple trigger ทำงานเอง ไม่ต้องตั้งค่า) */
@@ -1554,229 +1514,352 @@ function getCountHistory(limit) {
 }
 
 
-/* ---------- ชุดพัสดุพิเศษ (FLY AWAY KIT 1 / 2) ---------- */
-/*
- * ชีท "ชุดพัสดุ" = รายการมาตรฐานของแต่ละชุด (ชุด, Part, ชื่อ, ประเภท, S/N, จำนวน, LOCATION)
- * นำชุดออกไปราชการ = ยืมพัสดุเป็นรายชิ้น (ชีท ยืมพัสดุ) โดยใส่แท็ก [KIT:ชื่อชุด] ไว้หน้าเหตุผล
- * กลับมาแล้ว  - ไม่ได้ใช้        -> คืนเข้าคลัง
- *             - ใช้ติดตั้งแล้ว   -> ออกใบเบิกทดแทนทันที (เครื่อง = ชื่อชุด) รายการยืมยังเปิดค้างไว้จนกว่าจะรับของทดแทน
- *                                  เมื่อรับพัสดุตามใบเบิกนั้น ระบบปิดรายการยืมให้เอง และปรับ S/N ในชีทชุดพัสดุเป็นตัวใหม่
- * สถานะชุดคำนวณจากรายการยืมที่ยังเปิด จึงไม่ต้องเก็บสถานะแยก
+/* ---------- FLY AWAY KIT 1 / 2 (แยกจากคลังพัสดุ) ----------
+ * ชีท "ชุดพัสดุ"  = รายการมาตรฐานของแต่ละชุด + จำนวนที่มีอยู่จริงในชุด (ผู้ใช้กรอกยอดยกมาเอง ไม่ผ่านชีท รับ)
+ * ชีท "ประวัติชุด" = ทุกการเคลื่อนไหว: ยืมออก (รอคืน) / ใช้งานจริง (ออกใบเบิกทดแทน รอเติม) / เติมจากคลัง / ย้ายเข้าคลัง / ปรับยอด
+ * ย้ายระหว่างชุดกับคลังทีละทิศทาง: เติมจากคลัง = ตัดยอดคลัง บวกยอดชุด ; ย้ายเข้าคลัง = ตัดยอดชุด บวกยอดคลัง
  */
 const KIT_NAMES = ['FLY AWAY KIT 1', 'FLY AWAY KIT 2'];
-const KIT_USED = 'ใช้ติดตั้ง รอเบิกทดแทน';
-const KIT_TAG_RE = /^\[KIT:([^\]]+)\]\s*/;
+const KL = { ID: 0, DATE: 1, KIT: 2, PART: 3, NAME: 4, SN: 5, TYPE: 6, QTY: 7, ACT: 8, WHO: 9, MACHINE: 10, DUE: 11, STATUS: 12, DOC: 13, CLOSED: 14, NOTE: 15, BY: 16 };
+const KA_LOAN = 'ยืมออก', KA_USE = 'ใช้งานจริง', KA_REFILL = 'เติมจากคลัง', KA_TOSTOCK = 'ย้ายเข้าคลัง', KA_ADJ = 'ปรับยอด', KA_BACK = 'คืนเข้าชุด';
+const KS_WAIT = 'รอคืน', KS_RETURNED = 'คืนแล้ว', KS_NEED = 'รอเติม', KS_FILLED = 'เติมแล้ว', KS_USED = 'ใช้งานแล้ว', KS_DONE = 'เสร็จ';
+const KIT_XFER_DOC = 'ย้ายเข้าชุด';
 
-function kitOfLoan_(v) { const m = str_(v[11]).match(KIT_TAG_RE); return m ? m[1] : ''; }
 function snKey_(x) { return str_(x).toUpperCase(); }
 
 function readKit_() {
   const sh = getSheet_(SHEET_KIT), last = sh.getLastRow();
   if (last < 2) return [];
-  return sh.getRange(2, 1, last - 1, 8).getValues().map((r, i) => ({
+  return sh.getRange(2, 1, last - 1, 9).getValues().map((r, i) => ({
     row: i + 2, kit: str_(r[0]), part: str_(r[1]), name: str_(r[2]), type: str_(r[3]), serial: str_(r[4]),
-    qty: num_(r[5]) || 1, loc: str_(r[6]), note: str_(r[7])
+    std: num_(r[5]) || 0, have: num_(r[6]) || 0, loc: str_(r[7]), note: str_(r[8])
   })).filter(x => x.kit && (x.part || x.name));
 }
 function kitSamePart_(row, part, name) { return row.part ? row.part === str_(part) : row.name === str_(name); }
-function kitMatchLoan_(row, v) { return row.kit === kitOfLoan_(v) && kitSamePart_(row, v[2], v[3]) && snKey_(row.serial) === snKey_(v[4]); }
-function kitLots_(row, lots) {
-  const m = lots.filter(l => l.remain > 0 && kitSamePart_(row, l.part, l.name) && (!row.serial || snKey_(l.serial) === snKey_(row.serial)));
-  if (row.loc && !row.serial) { const at = m.filter(l => l.loc === row.loc); if (at.length) return at; }   // Part เดียวกันอยู่คนละชุด: ดูเฉพาะที่เก็บของชุดนี้ก่อน
-  return m;
-}
-function kitLot_(row, lots, need) {
-  const c = kitLots_(row, lots).filter(l => l.remain >= (need || 1));
-  return c.filter(l => row.loc && l.loc === row.loc)[0] || c[0] || null;
+
+function readKitLog_() {
+  const sh = getSheet_(SHEET_KITLOG), last = sh.getLastRow();
+  if (last < 2) return [];
+  return sh.getRange(2, 1, last - 1, HEADERS[SHEET_KITLOG].length).getValues().map((r, i) => ({ row: i + 2, v: r }));
 }
 
-function kitState_(kit) {
-  const rows = readKit_().filter(r => r.kit === kit);
-  const lots = computeLots_();
-  const lsh = getSheet_(SHEET_LOAN), last = lsh.getLastRow();
-  const loans = (last >= 2 ? lsh.getRange(2, 1, last - 1, 20).getValues() : []).filter(v => str_(v[13]) === LOAN_OPEN && kitOfLoan_(v) === kit);
-  const today = parseDate_(todayStr_());
-  const items = rows.map(r => {
-    let out = 0, waiting = 0; const refs = [];
-    loans.forEach(v => {
-      if (!kitMatchLoan_(r, v)) return;
-      if (str_(v[15]) === KIT_USED) { waiting += num_(v[8]); if (str_(v[16])) refs.push(str_(v[16]).split(',')[0].trim()); } else out += num_(v[8]);
-    });
-    const inKit = Math.max(0, r.qty - out - waiting);
-    const onHand = kitLots_(r, lots).reduce((a, l) => a + l.remain, 0);
-    return { row: r.row, part: r.part, name: r.name, type: r.type, serial: r.serial, qty: r.qty, loc: r.loc, note: r.note,
-      out: out, waiting: waiting, inKit: inKit, onHand: onHand, refs: refs, missing: onHand < inKit };
-  });
-  const loanList = loans.map(v => {
-    const due = v[12] instanceof Date ? v[12] : null;
-    return { seq: Number(v[0]), part: str_(v[2]), name: str_(v[3]), serial: str_(v[4]), type: str_(v[5]), unit: str_(v[7]), out: num_(v[8]),
-      borrower: str_(v[9]), purpose: str_(v[11]).replace(KIT_TAG_RE, ''), date: fmtThai_(v[1]), due: fmtThai_(v[12]),
-      late: due && due < today && str_(v[15]) !== KIT_USED ? Math.round((today - due) / 86400000) : 0,
-      used: str_(v[15]) === KIT_USED, docRef: str_(v[16]).split(',')[0].trim() };
-  }).sort((a, b) => b.seq - a.seq);
-  return { kit: kit, items: items, loans: loanList, lots: lots };
+/** บันทึกประวัติชุด 1 แถว (เรียกในล็อกเดียวกับการแก้ชีทชุด) */
+function appendKitLog_(o) {
+  const sh = getSheet_(SHEET_KITLOG), r = sh.getLastRow() + 1;
+  const id = nextSeq_(sh);
+  const row = [id, parseDate_(todayStr_()), o.kit, str_(o.part), str_(o.name), str_(o.serial), str_(o.type), num_(o.qty), o.act, str_(o.who), str_(o.machine),
+    o.due ? parseDate_(o.due) : '', str_(o.status), str_(o.doc), '', str_(o.note), str_(o.by)];
+  sh.getRange(r, 4).setNumberFormat('@'); sh.getRange(r, 6).setNumberFormat('@'); sh.getRange(r, 14).setNumberFormat('@');
+  sh.getRange(r, 2).setNumberFormat('dd/mm/yyyy'); sh.getRange(r, 12).setNumberFormat('dd/mm/yyyy'); sh.getRange(r, 15).setNumberFormat('dd/mm/yyyy');
+  sh.getRange(r, 1, 1, row.length).setValues([row]);
+  return id;
+}
+function closeKitLog_(entry, status) {
+  const sh = getSheet_(SHEET_KITLOG);
+  sh.getRange(entry.row, KL.STATUS + 1).setValue(status);
+  sh.getRange(entry.row, KL.CLOSED + 1).setNumberFormat('dd/mm/yyyy').setValue(parseDate_(todayStr_()));
 }
 
-/** ข้อมูลหน้า "ชุดพิเศษ" */
+/** หาแถวของชุดที่ตรงกับรายการประวัติ (kit + part + S/N) */
+function kitRowFor_(rows, kit, part, name, sn) {
+  const c = rows.filter(r => r.kit === kit && kitSamePart_(r, part, name));
+  if (!c.length) return null;
+  const k = snKey_(sn);
+  return (k && c.filter(r => snKey_(r.serial) === k)[0]) || c.filter(r => !r.serial)[0] || c[0];
+}
+
+function kitFmt_(d) { return d instanceof Date ? fmtThai_(d) : ''; }
+
+/** ข้อมูลหน้า "ชุด FLY AWAY KIT" */
 function getKits() {
+  const rows = readKit_(), logs = readKitLog_(), got = receivedMap_(), today = parseDate_(todayStr_());
   const names = KIT_NAMES.slice();
-  readKit_().forEach(r => { if (names.indexOf(r.kit) < 0) names.push(r.kit); });
+  rows.forEach(r => { if (names.indexOf(r.kit) < 0) names.push(r.kit); });
+  const last = {}, open = {};   // แถว -> วันที่ล่าสุด ; แถว -> รายการค้าง
+  logs.forEach(l => {
+    const v = l.v, kit = str_(v[KL.KIT]);
+    const r = kitRowFor_(rows, kit, v[KL.PART], v[KL.NAME], v[KL.SN]);
+    const act = str_(v[KL.ACT]), st = str_(v[KL.STATUS]);
+    if (r && (act === KA_LOAN || act === KA_USE) && v[KL.DATE] instanceof Date && (!last[r.row] || v[KL.DATE] >= last[r.row].d)) last[r.row] = { d: v[KL.DATE], act: act, who: str_(v[KL.WHO]), machine: str_(v[KL.MACHINE]) };
+    if (r && ((act === KA_LOAN && st === KS_WAIT) || (act === KA_USE && st === KS_NEED))) (open[r.row] = open[r.row] || []).push(l);
+  });
+  const entry = l => {
+    const v = l.v, act = str_(v[KL.ACT]), due = v[KL.DUE] instanceof Date ? v[KL.DUE] : null, doc = str_(v[KL.DOC]);
+    return { id: Number(v[KL.ID]), date: kitFmt_(v[KL.DATE]), act: act, part: str_(v[KL.PART]), name: str_(v[KL.NAME]), serial: str_(v[KL.SN]), type: str_(v[KL.TYPE]),
+      qty: num_(v[KL.QTY]), who: str_(v[KL.WHO]), machine: str_(v[KL.MACHINE]), due: kitFmt_(due), note: str_(v[KL.NOTE]),
+      late: act === KA_LOAN && due && due < today ? Math.round((today - due) / 86400000) : 0, doc: doc, docGot: doc ? (got[doc + '|' + str_(v[KL.PART])] || 0) : 0 };
+  };
   return {
     machines: MACHINE_LIST.filter(m => KIT_NAMES.indexOf(m) < 0),
-    kits: names.map(k => { const st = kitState_(k); return { name: k, items: st.items, loans: st.loans }; })
+    kits: names.map(kit => {
+      const mine = rows.filter(r => r.kit === kit);
+      const items = mine.map(r => {
+        const op = (open[r.row] || []).map(entry);
+        const out = op.filter(e => e.act === KA_LOAN), wait = op.filter(e => e.act === KA_USE);
+        const lu = last[r.row];
+        return { row: r.row, part: r.part, name: r.name, type: r.type, serial: r.serial, std: r.std, have: r.have, loc: r.loc, note: r.note,
+          missing: Math.max(r.std - r.have, 0), out: out.reduce((a, e) => a + e.qty, 0), waiting: wait.reduce((a, e) => a + e.qty, 0),
+          holders: out, refills: wait, last: lu ? { date: kitFmt_(lu.d), act: lu.act, who: lu.who, machine: lu.machine } : null };
+      });
+      const openAll = [];
+      items.forEach(i => { i.holders.concat(i.refills).forEach(e => openAll.push(Object.assign({ row: i.row }, e))); });
+      openAll.sort((a, b) => b.id - a.id);
+      let lastUse = null;
+      Object.keys(last).forEach(k => { const x = last[k]; if (rows.filter(r => r.row === Number(k))[0].kit === kit && (!lastUse || x.d > lastUse.d)) lastUse = x; });
+      return { name: kit, items: items, open: openAll,
+        short: items.filter(i => i.missing > 0).length, shortQty: items.reduce((a, i) => a + i.missing, 0),
+        lastUse: lastUse ? { date: kitFmt_(lastUse.d), act: lastUse.act, who: lastUse.who, machine: lastUse.machine } : null };
+    })
   };
 }
 
-/** นำชุดออกไปราชการ (เลือกเป็นรายชิ้น) p = {kit, borrower, purpose, dueDate, items:[{row, qty}], by} */
+/** แจ้งเตือนชุดไม่ครบ (เบา: อ่านเฉพาะชีทชุด) */
+function getKitAlerts() {
+  const out = {};
+  readKit_().forEach(r => {
+    const o = out[r.kit] || (out[r.kit] = { kit: r.kit, total: 0, short: 0, shortQty: 0 });
+    o.total++;
+    if (r.std > r.have) { o.short++; o.shortQty += r.std - r.have; }
+  });
+  return Object.keys(out).map(k => out[k]).filter(o => o.short > 0);
+}
+
+function kitRowCheck_(row, kit) {
+  const r = readKit_().filter(x => x.row === Number(row))[0];
+  if (!r || (kit && r.kit !== kit)) throw new Error('ไม่พบรายการในชุด (แถว ' + row + ') กรุณารีเฟรช');
+  return r;
+}
+function kitLabel_(r) { return (r.part || r.name) + (r.serial ? ' S/N ' + r.serial : ''); }
+function kitSetHave_(r, have, serial) {
+  const sh = getSheet_(SHEET_KIT);
+  sh.getRange(r.row, 7).setNumberFormat('General').setValue(have);
+  if (serial !== undefined) sh.getRange(r.row, 5).setNumberFormat('@').setValue(serial);
+}
+
+/** นำของออกจากชุดไปราชการ/ยืม (รอคืน) p = {kit, borrower, purpose, dueDate, items:[{row, qty}], by} */
 function kitCheckout(p) {
   return withLock_(() => {
     const kit = str_(p.kit);
     if (!kit) throw new Error('ไม่ได้ระบุชุด');
-    if (!str_(p.borrower)) throw new Error('กรุณาระบุผู้นำชุดออก');
-    if (!p.dueDate) throw new Error('กรุณาระบุวันกำหนดคืน');
+    if (!str_(p.borrower)) throw new Error('กรุณาระบุผู้ยืม/ผู้นำออก');
     const items = p.items || [];
     if (!items.length) throw new Error('ยังไม่ได้เลือกรายการที่จะนำออก');
-    const st = kitState_(kit), byRow = {};
-    st.items.forEach(i => { byRow[i.row] = i; });
-    const rows = readKit_().filter(r => r.kit === kit), rowOf = {};
-    rows.forEach(r => { rowOf[r.row] = r; });
-    const left = {};
-    st.lots.forEach(l => { left[l.seq] = l.remain; });
-    const plan = [];
-    items.forEach(it => {
-      const i = byRow[Number(it.row)], r = rowOf[Number(it.row)];
-      if (!i || !r) throw new Error('ไม่พบรายการในชุด (แถว ' + it.row + ')');
-      const q = num_(it.qty);
-      const label = (i.part || i.name) + (i.serial ? ' S/N ' + i.serial : '');
-      if (q <= 0) throw new Error(label + ': จำนวนต้องมากกว่า 0');
-      if (q > i.inKit) throw new Error(label + ': ในชุดเหลือ ' + i.inKit + ' ไม่พอที่จะนำออก ' + q);
-      const cand = kitLots_(r, st.lots).filter(l => left[l.seq] >= q);
-      const lot = cand.filter(l => r.loc && l.loc === r.loc)[0] || cand[0];
-      if (!lot) throw new Error(label + ': ไม่พบในคลังตามจำนวนที่ต้องการ (ยังไม่ได้เพิ่มยอดยกมา หรือถูกจ่าย/ยืมไปแล้ว)');
-      left[lot.seq] -= q;
-      plan.push({ lot: lot, q: q, label: label });
+    const plan = items.map(it => {
+      const r = kitRowCheck_(it.row, kit), q = num_(it.qty);
+      if (q <= 0) throw new Error(kitLabel_(r) + ': จำนวนต้องมากกว่า 0');
+      if (q > r.have) throw new Error(kitLabel_(r) + ': ในชุดมี ' + r.have + ' ไม่พอที่จะนำออก ' + q);
+      return { r: r, q: q };
     });
     plan.forEach(x => {
-      borrowCore_({ lotSeq: x.lot.seq, qty: x.q, borrower: str_(p.borrower), borrowerType: 'อื่น ๆ',
-        purpose: '[KIT:' + kit + '] ' + str_(p.purpose), dueDate: p.dueDate, by: p.by });
+      kitSetHave_(x.r, x.r.have - x.q);
+      appendKitLog_({ kit: kit, part: x.r.part, name: x.r.name, serial: x.r.serial, type: x.r.type, qty: x.q, act: KA_LOAN, who: p.borrower,
+        due: p.dueDate, status: KS_WAIT, note: p.purpose, by: p.by });
+      log_('ชุดพัสดุ ยืมออก', '', [kit, x.r.part || x.r.name, 'x' + x.q, x.r.serial ? 'S/N ' + x.r.serial : '', 'ผู้ยืม ' + str_(p.borrower)].filter(Boolean).join(' | '), p.by);
     });
     return { ok: true, count: plan.length };
   });
 }
 
-function kitLoanCheck_(lsh, seq, needNotUsed) {
-  const fl = findLoan_(lsh, seq);
-  if (!fl) throw new Error('ไม่พบรายการนำออก');
-  if (str_(fl.v[13]) !== LOAN_OPEN) throw new Error('รายการนี้ปิดไปแล้ว');
-  if (!kitOfLoan_(fl.v)) throw new Error('รายการนี้ไม่ใช่ของชุดพัสดุ');
-  if (needNotUsed && str_(fl.v[15]) === KIT_USED) throw new Error('รายการนี้ใช้ติดตั้งและออกใบเบิกทดแทนไปแล้ว รอรับพัสดุตามใบเบิก ' + str_(fl.v[16]).split(',')[0]);
-  return fl;
+function kitLogOpen_(id, act, status) {
+  const e = readKitLog_().filter(l => Number(l.v[KL.ID]) === Number(id))[0];
+  if (!e) throw new Error('ไม่พบรายการ');
+  if (str_(e.v[KL.ACT]) !== act || str_(e.v[KL.STATUS]) !== status) throw new Error('รายการนี้ปิดไปแล้ว กรุณารีเฟรช');
+  return e;
 }
 
-/** ชุดกลับมา ชิ้นนี้ไม่ได้ใช้ -> คืนเข้าคลัง p = {seq, qty, by} */
+/** ของที่ยืมออกกลับมาแล้ว p = {id, qty?, serial?, by} */
 function kitReturn(p) {
   return withLock_(() => {
-    kitLoanCheck_(getSheet_(SHEET_LOAN), p.seq, true);
-    return returnLoanCore_({ seq: p.seq, qty: p.qty, by: p.by });
+    const e = kitLogOpen_(p.id, KA_LOAN, KS_WAIT), v = e.v, kit = str_(v[KL.KIT]);
+    const out = num_(v[KL.QTY]), q = p.qty === undefined || p.qty === '' || p.qty === null ? out : num_(p.qty);
+    if (q <= 0 || q > out) throw new Error('จำนวนที่คืนต้องมากกว่า 0 และไม่เกิน ' + out);
+    const rows = readKit_();
+    let r = kitRowFor_(rows, kit, v[KL.PART], v[KL.NAME], v[KL.SN]);
+    if (!r) throw new Error('ไม่พบรายการนี้ในชีท ชุดพัสดุ (ถูกลบไปแล้ว) กรุณาเพิ่มรายการกลับก่อน');
+    const newSn = str_(p.serial);
+    if (newSn && q !== 1) throw new Error('พัสดุที่มี S/N คืนทีละ 1 ชิ้น');
+    kitSetHave_(r, r.have + q, newSn ? newSn : undefined);
+    const sh = getSheet_(SHEET_KITLOG);
+    if (q < out) {
+      sh.getRange(e.row, KL.QTY + 1).setValue(out - q);
+      appendKitLog_({ kit: kit, part: v[KL.PART], name: v[KL.NAME], serial: newSn || v[KL.SN], type: v[KL.TYPE], qty: q, act: KA_BACK, who: v[KL.WHO], status: KS_RETURNED, note: 'คืนบางส่วน (อ้างเลขที่ ' + v[KL.ID] + ')', by: p.by });
+    } else {
+      if (newSn) sh.getRange(e.row, KL.SN + 1).setNumberFormat('@').setValue(newSn);
+      closeKitLog_(e, KS_RETURNED);
+    }
+    log_('ชุดพัสดุ รับคืน', '', [kit, str_(v[KL.PART]) || str_(v[KL.NAME]), 'x' + q, newSn ? 'S/N ' + newSn : (str_(v[KL.SN]) ? 'S/N ' + str_(v[KL.SN]) : '')].filter(Boolean).join(' | '), p.by);
+    return { ok: true };
   });
-}
-
-/** ชิ้นนี้ใช้ติดตั้งแล้ว -> ออกใบเบิกทดแทนทันที
- *  p = {seq, qty, installedOn, rank, fullName, position, urgency, issue, itemType, by} */
-function kitUsed(p) { return withLock_(() => kitUsedCore_(p)); }
-function kitUsedCore_(p) {
-  {
-    const lsh = getSheet_(SHEET_LOAN);
-    const fl = kitLoanCheck_(lsh, p.seq, true), v = fl.v, kit = kitOfLoan_(v);
-    const out = num_(v[8]), q = num_(p.qty);
-    if (q <= 0 || q > out) throw new Error('จำนวนที่ใช้ต้องมากกว่า 0 และไม่เกินที่นำออก (' + out + ')');
-    const type = str_(v[5]) || str_(p.itemType);
-    if (ITEM_TYPES.indexOf(type) < 0) throw new Error('ไม่ทราบประเภทพัสดุ กรุณาใส่ประเภท (LRU / SP / LRU(TCI) / SP(TCI) / สารเคมี) ในชีท ชุดพัสดุ');
-    if (!str_(p.installedOn)) throw new Error('กรุณาเลือกเครื่องที่ติดตั้ง');
-    if (!str_(p.fullName)) throw new Error('กรุณาเลือกผู้เบิก');
-    const urgency = str_(p.urgency) === 'AOG' ? 'AOG' : 'เบิกธรรมดา';
-    const issue = str_(p.issue) || ('เบิกทดแทนชุด ' + kit + ' (ใช้ติดตั้งที่เครื่อง ' + str_(p.installedOn) + ')');
-    if (q < out) returnLoanCore_({ seq: p.seq, qty: out - q, by: p.by });   // ส่วนที่ไม่ได้ใช้ คืนเข้าคลังก่อน
-    const r = submitRequisitionCore_({ date: todayStr_(), urgency: urgency, machine: kit, issue: issue,
-      items: [{ part: str_(v[2]), name: str_(v[3]), qty: q, unit: str_(v[7]) || 'EA' }],
-      rank: str_(p.rank), fullName: str_(p.fullName), position: str_(p.position), itemType: type, by: p.by });
-    const today = parseDate_(todayStr_());
-    lsh.getRange(fl.row, 16).setValue(KIT_USED);
-    lsh.getRange(fl.row, 17).setNumberFormat('@').setValue(r.docNo);
-    lsh.getRange(fl.row, 13).setNumberFormat('dd/mm/yyyy').setValue(dueDate_(today, urgency));
-    const old = str_(lsh.getRange(fl.row, 19).getValue());
-    lsh.getRange(fl.row, 19).setValue([old, fmtThai_(today) + ' ใช้ติดตั้งที่เครื่อง ' + str_(p.installedOn) + ' x' + q + ' → เบิกทดแทนใบเบิก ' + r.docNo].filter(Boolean).join(' ; '));
-    log_('ชุดพัสดุ ใช้ติดตั้ง', r.docNo, [kit, str_(v[2]), str_(v[3]), 'x' + q, str_(v[4]) ? 'S/N ' + str_(v[4]) : '', 'เครื่อง ' + str_(p.installedOn), 'เบิกทดแทน'].filter(Boolean).join(' | '), p.by);
-    return { ok: true, docNo: r.docNo, part: str_(v[2]), name: str_(v[3]), qty: q, unit: str_(v[7]) || 'EA', itemType: type, machine: kit, issue: issue, urgency: urgency };
-  }
 }
 
 /**
- * รับชุดกลับ (ครั้งเดียวจบ) : ชิ้นที่ไม่ได้ใช้ -> คืนเข้าคลัง, ชิ้นที่ใช้ติดตั้ง -> ออกใบเบิกทดแทน
- * p = {items:[{seq, used, qty}], installedOn, rank, fullName, position, urgency, by}
+ * ใช้งานจริง : จ่ายให้ช่าง + ออกใบเบิกทดแทนทันที (เครื่องของใบเบิก = ชื่อชุด)
+ * p = {row, qty, tech, machine, urgency, remark, itemType, loanId?, by}
+ * loanId = ใช้จากของที่ยืมออกไปแล้ว (ไม่ตัดยอดในชุดซ้ำ)
  */
-function kitBack(p) {
+function kitUse(p) {
   return withLock_(() => {
-    const items = p.items || [];
-    if (!items.length) throw new Error('ไม่มีรายการ');
-    const lsh = getSheet_(SHEET_LOAN);
-    const used = items.filter(i => i.used === true || i.used === 'true');
-    // ตรวจทุกรายการก่อนลงมือ เพื่อไม่ให้ทำค้างครึ่งทาง
-    items.forEach(i => {
-      const fl = kitLoanCheck_(lsh, i.seq, true);
-      if ((i.used === true || i.used === 'true') && ITEM_TYPES.indexOf(str_(fl.v[5]) || str_(i.itemType)) < 0)
-        throw new Error('ไม่ทราบประเภทพัสดุของ ' + (str_(fl.v[2]) || str_(fl.v[3])) + ' กรุณาเลือกประเภทพัสดุ');
-      const q = num_(i.qty);
-      if (q <= 0 || q > num_(fl.v[8])) throw new Error('จำนวนของ ' + (str_(fl.v[2]) || str_(fl.v[3])) + ' ต้องมากกว่า 0 และไม่เกินที่นำออก (' + num_(fl.v[8]) + ')');
-    });
-    if (used.length) {
-      if (!str_(p.installedOn)) throw new Error('กรุณาเลือกเครื่องที่ติดตั้ง');
-      if (!str_(p.fullName)) throw new Error('กรุณาเลือกผู้เบิก');
+    let e = null, r = null, kit = str_(p.kit), part, name, sn, type, avail;
+    if (p.loanId) {
+      e = kitLogOpen_(p.loanId, KA_LOAN, KS_WAIT);
+      kit = str_(e.v[KL.KIT]); part = str_(e.v[KL.PART]); name = str_(e.v[KL.NAME]); sn = str_(e.v[KL.SN]); type = str_(e.v[KL.TYPE]); avail = num_(e.v[KL.QTY]);
+      r = kitRowFor_(readKit_(), kit, part, name, sn);
+    } else {
+      r = kitRowCheck_(p.row, kit);
+      kit = r.kit; part = r.part; name = r.name; sn = r.serial; type = r.type; avail = r.have;
     }
-    const docs = [];
-    let back = 0;
-    items.forEach(i => {
-      if (i.used === true || i.used === 'true') {
-        docs.push(kitUsedCore_({ seq: i.seq, qty: i.qty, installedOn: p.installedOn, rank: p.rank, fullName: p.fullName,
-          position: p.position, urgency: p.urgency, itemType: i.itemType, by: p.by }));
-      } else {
-        returnLoanCore_({ seq: i.seq, qty: i.qty, by: p.by });
-        back++;
-      }
-    });
-    return { ok: true, back: back, docs: docs };
+    const q = num_(p.qty);
+    if (q <= 0) throw new Error('จำนวนที่ใช้ต้องมากกว่า 0');
+    if (q > avail) throw new Error('จำนวนที่ใช้เกินที่มี (' + avail + ')');
+    if (sn && q !== 1) throw new Error('พัสดุที่มี S/N ใช้ทีละ 1 ชิ้น');
+    if (!str_(p.tech)) throw new Error('กรุณากรอกชื่อช่างที่รับพัสดุ');
+    if (!str_(p.machine)) throw new Error('กรุณาเลือกเครื่องที่ติดตั้ง');
+    type = type || str_(p.itemType);
+    if (ITEM_TYPES.indexOf(type) < 0) throw new Error('ไม่ทราบประเภทพัสดุ กรุณาระบุประเภท (LRU / SP / LRU(TCI) / SP(TCI) / สารเคมี)');
+    const urgency = str_(p.urgency) === 'AOG' ? 'AOG' : 'เบิกธรรมดา';
+    const issue = ['เบิกทดแทน ' + kit + ' (ใช้งานที่เครื่อง ' + str_(p.machine) + ' ช่าง ' + str_(p.tech) + ')', str_(p.remark)].filter(Boolean).join(' | ');
+    const req = submitRequisitionCore_({ date: todayStr_(), urgency: urgency, machine: kit, issue: issue,
+      items: [{ part: part, name: name, qty: q, unit: 'EA' }], rank: '', fullName: str_(p.tech), position: '', itemType: type, by: p.by });
+    const doc = req.docs[0].docNo;
+    if (e) {   // ใช้จากของที่ยืมออก : ปิด/ลดรายการยืม
+      const out = num_(e.v[KL.QTY]);
+      if (q < out) getSheet_(SHEET_KITLOG).getRange(e.row, KL.QTY + 1).setValue(out - q); else closeKitLog_(e, KS_USED);
+    } else {
+      kitSetHave_(r, r.have - q, r.have - q <= 0 && sn ? '' : undefined);   // LRU ที่ใช้ไปแล้ว เหลือช่องว่างรอ S/N ตัวใหม่
+    }
+    appendKitLog_({ kit: kit, part: part, name: name, serial: sn, type: type, qty: q, act: KA_USE, who: p.tech, machine: p.machine, status: KS_NEED, doc: doc, note: p.remark, by: p.by });
+    log_('ชุดพัสดุ ใช้งานจริง', doc, [kit, part || name, 'x' + q, sn ? 'S/N ' + sn : '', 'เครื่อง ' + str_(p.machine), 'ช่าง ' + str_(p.tech), '→ ใบเบิกทดแทน ' + doc].filter(Boolean).join(' | '), p.by);
+    return { ok: true, docNo: doc, part: part, name: name, qty: q, unit: 'EA', itemType: type, machine: kit, issue: issue, urgency: urgency, tech: str_(p.tech), useMachine: str_(p.machine) };
   });
 }
 
-/** ใบเบิกทดแทนของชุด: หารายการยืมที่รอรับของทดแทนด้วยใบเบิกนี้ (ใช้ตอนรับพัสดุ) */
-function findKitLoanForDoc_(lsh, docNo, part, qty) {
-  const last = lsh.getLastRow();
-  if (last < 2 || !docNo) return 0;
-  const all = lsh.getRange(2, 1, last - 1, 20).getValues();
-  for (let i = 0; i < all.length; i++) {
-    const v = all[i];
-    if (str_(v[13]) !== LOAN_OPEN || str_(v[15]) !== KIT_USED || !kitOfLoan_(v)) continue;
-    if (str_(v[16]).split(',').map(x => x.trim()).indexOf(String(docNo)) < 0) continue;
-    if (str_(part) && str_(v[2]) !== str_(part)) continue;
-    if (num_(qty) > num_(v[8])) continue;
-    return Number(v[0]);
-  }
-  return 0;
+/** ล็อตในคลังที่เติมเข้าชุดได้ (Part เดียวกับรายการ) p = {row} */
+function kitCandidates(p) {
+  const r = kitRowCheck_(p.row);
+  const lots = computeLots_().filter(l => l.remain > 0 && kitSamePart_(r, l.part, l.name) && !l.loanOpen);
+  return lots.map(l => ({ seq: l.seq, serial: l.serial, qty: l.remain, loc: l.loc, label: l.label, cond: l.cond, unit: l.unit, received: fmtThai_(l.recvDate) }));
 }
 
-/** รับของทดแทนแล้ว: ถ้ารายการในชุดมี S/N ให้เปลี่ยนเป็น S/N ตัวใหม่ */
-function kitAfterReceive_(loan, newSn) {
-  try {
-    if (!kitOfLoan_(loan)) return;
-    const row = readKit_().filter(r => kitMatchLoan_(r, loan))[0];
-    if (!row || !row.serial) return;
-    getSheet_(SHEET_KIT).getRange(row.row, 5).setNumberFormat('@').setValue(str_(newSn));
-  } catch (e) { /* ไม่ขัดจังหวะการรับพัสดุ */ }
+/** เติมเข้าชุดจากคลัง (ตัดยอดคลัง บวกยอดชุด) p = {row, lotSeq, qty, by} */
+function kitRefill(p) {
+  return withLock_(() => {
+    const r = kitRowCheck_(p.row);
+    const lot = findLot_(p.lotSeq);
+    if (!lot || lot.remain <= 0 || !kitSamePart_(r, lot.part, lot.name)) throw new Error('ไม่พบล็อตในคลังที่เลือก หรือไม่ตรงกับรายการในชุด');
+    const q = lot.serial ? 1 : num_(p.qty);
+    if (q <= 0) throw new Error('จำนวนต้องมากกว่า 0');
+    if (q > lot.remain) throw new Error('ในคลังเหลือ ' + lot.remain);
+    if (r.have + q > r.std) throw new Error('เติมแล้วจะเกินจำนวนมาตรฐานของชุด (' + r.std + ') ถ้าต้องการให้แก้จำนวนมาตรฐานก่อน');
+    appendIss_([nextSeq_(getSheet_(SHEET_ISS)), parseDate_(todayStr_()), KIT_XFER_DOC, lot.seq, lot.part, lot.name, lot.serial, q, lot.unit, '', '',
+      'ย้ายเข้า ' + r.kit, str_(p.by)]);
+    kitSetHave_(r, r.have + q, lot.serial ? lot.serial : undefined);
+    // ปิดรายการ "รอเติม" ที่ตรงกัน (เก่าสุดก่อน)
+    let left = q;
+    readKitLog_().filter(l => str_(l.v[KL.ACT]) === KA_USE && str_(l.v[KL.STATUS]) === KS_NEED && kitRowFor_([r], str_(l.v[KL.KIT]), l.v[KL.PART], l.v[KL.NAME], l.v[KL.SN])).forEach(l => {
+      if (left <= 0) return;
+      const w = num_(l.v[KL.QTY]);
+      if (w <= left) { closeKitLog_(l, KS_FILLED); left -= w; }
+      else { getSheet_(SHEET_KITLOG).getRange(l.row, KL.QTY + 1).setValue(w - left); left = 0; }
+    });
+    appendKitLog_({ kit: r.kit, part: lot.part, name: lot.name, serial: lot.serial, type: lot.type || r.type, qty: q, act: KA_REFILL, status: KS_DONE, note: 'จากคลัง ' + lot.label + (lot.loc ? ' @' + lot.loc : ''), by: p.by });
+    log_('ชุดพัสดุ เติมจากคลัง', '', [r.kit, lot.part || lot.name, 'x' + q, lot.serial ? 'S/N ' + lot.serial : '', 'จาก ' + lot.label].filter(Boolean).join(' | '), p.by);
+    rebuildStock_();
+    return { ok: true };
+  });
 }
 
-/** เมนู: สร้าง/เปิดชีท ชุดพัสดุ ให้กรอกรายการมาตรฐานของชุด */
+/** ย้ายออกจากชุดเข้าคลัง (ตัดยอดชุด บวกยอดคลัง) p = {row, qty, location, by} */
+function kitToStock(p) {
+  return withLock_(() => {
+    const r = kitRowCheck_(p.row);
+    const q = num_(p.qty);
+    if (q <= 0) throw new Error('จำนวนต้องมากกว่า 0');
+    if (q > r.have) throw new Error('ในชุดมี ' + r.have);
+    if (r.serial && q !== 1) throw new Error('พัสดุที่มี S/N ย้ายทีละ 1 ชิ้น');
+    const loc = str_(p.location) || r.loc;
+    if (r.serial) {
+      const dup = computeLots_().filter(l => l.remain > 0 && snKey_(l.serial) === snKey_(r.serial))[0];
+      if (dup) throw new Error('S/N ' + r.serial + ' มีอยู่ในคลังแล้ว (' + dup.label + ')');
+    }
+    appendRcv_([nextRcvSeq_(), '', r.part, r.name, r.serial, r.type, q, 'EA', '', '', '', '', '', '', parseDate_(todayStr_()), '', '', '', '', '', loc, '',
+      'ย้ายจาก ' + r.kit, SRC_KIT, '']);
+    kitSetHave_(r, r.have - q, r.have - q <= 0 && r.serial ? '' : undefined);
+    appendKitLog_({ kit: r.kit, part: r.part, name: r.name, serial: r.serial, type: r.type, qty: q, act: KA_TOSTOCK, status: KS_DONE, note: loc ? 'เข้าคลัง @' + loc : '', by: p.by });
+    log_('ชุดพัสดุ ย้ายเข้าคลัง', '', [r.kit, r.part || r.name, 'x' + q, r.serial ? 'S/N ' + r.serial : '', loc].filter(Boolean).join(' | '), p.by);
+    rebuildStock_();
+    return { ok: true };
+  });
+}
+
+/** แก้รายการในชุดโดยตรง (ยอดที่มี / จำนวนมาตรฐาน / S/N / LOCATION / หมายเหตุ) p = {row, std, have, serial, loc, note, name, by} */
+function kitSetRow(p) {
+  return withLock_(() => {
+    const r = kitRowCheck_(p.row);
+    const std = p.std === undefined || p.std === '' ? r.std : num_(p.std), have = p.have === undefined || p.have === '' ? r.have : num_(p.have);
+    if (std < 0 || have < 0) throw new Error('จำนวนต้องไม่ติดลบ');
+    const serial = p.serial === undefined ? r.serial : str_(p.serial);
+    if (serial && have > 1) throw new Error('รายการที่มี S/N มีได้ไม่เกิน 1 ชิ้น');
+    if (serial && snKey_(serial) !== snKey_(r.serial) && readKit_().some(x => x.row !== r.row && x.kit === r.kit && snKey_(x.serial) === snKey_(serial)))
+      throw new Error('S/N ' + serial + ' ซ้ำกับรายการอื่นในชุดเดียวกัน');
+    const sh = getSheet_(SHEET_KIT);
+    sh.getRange(r.row, 6).setValue(std);
+    sh.getRange(r.row, 7).setNumberFormat('General').setValue(have);
+    sh.getRange(r.row, 5).setNumberFormat('@').setValue(serial);
+    if (p.loc !== undefined) sh.getRange(r.row, 8).setValue(str_(p.loc));
+    if (p.note !== undefined) sh.getRange(r.row, 9).setValue(str_(p.note));
+    const ch = [];
+    if (std !== r.std) ch.push('มาตรฐาน ' + r.std + '→' + std);
+    if (have !== r.have) ch.push('มี ' + r.have + '→' + have);
+    if (serial !== r.serial) ch.push('S/N ' + (r.serial || '-') + '→' + (serial || '-'));
+    if (p.loc !== undefined && str_(p.loc) !== r.loc) ch.push('LOCATION ' + (r.loc || '-') + '→' + (str_(p.loc) || '-'));
+    if (ch.length) {
+      appendKitLog_({ kit: r.kit, part: r.part, name: r.name, serial: serial, type: r.type, qty: have, act: KA_ADJ, status: KS_DONE, note: ch.join(' ; '), by: p.by });
+      log_('ชุดพัสดุ แก้ไข', '', [r.kit, r.part || r.name, ch.join(' ; ')].join(' | '), p.by);
+    }
+    return { ok: true };
+  });
+}
+
+/** เพิ่มรายการใหม่เข้าชุด p = {kit, part, name, type, serial, std, have, loc, note, by} */
+function kitAddRow(p) {
+  return withLock_(() => {
+    const kit = str_(p.kit);
+    if (!kit) throw new Error('ไม่ได้ระบุชุด');
+    if (!str_(p.part) && !str_(p.name)) throw new Error('กรุณากรอก Part number หรือชื่อพัสดุ');
+    if (!str_(p.name)) throw new Error('กรุณากรอกชื่อพัสดุ');
+    const type = str_(p.type);
+    if (type && ITEM_TYPES.indexOf(type) < 0) throw new Error('ประเภทพัสดุไม่ถูกต้อง');
+    const std = p.std === undefined || p.std === '' ? 1 : num_(p.std), have = p.have === undefined || p.have === '' ? 0 : num_(p.have), sn = str_(p.serial);
+    if (std <= 0) throw new Error('จำนวนมาตรฐานต้องมากกว่า 0');
+    if (have < 0 || (sn && have > 1)) throw new Error('จำนวนที่มีไม่ถูกต้อง');
+    if (sn && readKit_().some(x => x.kit === kit && snKey_(x.serial) === snKey_(sn))) throw new Error('S/N ' + sn + ' ซ้ำกับรายการอื่นในชุดเดียวกัน');
+    const sh = getSheet_(SHEET_KIT), r = sh.getLastRow() + 1;
+    sh.getRange(r, 2).setNumberFormat('@'); sh.getRange(r, 5).setNumberFormat('@');
+    sh.getRange(r, 1, 1, 9).setValues([[kit, str_(p.part), str_(p.name), type, sn, std, have, str_(p.loc), str_(p.note)]]);
+    appendKitLog_({ kit: kit, part: p.part, name: p.name, serial: sn, type: type, qty: have, act: KA_ADJ, status: KS_DONE, note: 'เพิ่มรายการใหม่ (มาตรฐาน ' + std + ')', by: p.by });
+    log_('ชุดพัสดุ เพิ่มรายการ', '', [kit, str_(p.part) || str_(p.name), 'มาตรฐาน ' + std, 'มี ' + have].join(' | '), p.by);
+    return { ok: true, row: r };
+  });
+}
+
+/** ลบรายการออกจากชุด (ต้องไม่มีรายการค้าง) p = {row, by} */
+function kitDeleteRow(p) {
+  return withLock_(() => {
+    const r = kitRowCheck_(p.row);
+    const busy = readKitLog_().some(l => ((str_(l.v[KL.ACT]) === KA_LOAN && str_(l.v[KL.STATUS]) === KS_WAIT) || (str_(l.v[KL.ACT]) === KA_USE && str_(l.v[KL.STATUS]) === KS_NEED)) &&
+      kitRowFor_([r], str_(l.v[KL.KIT]), l.v[KL.PART], l.v[KL.NAME], l.v[KL.SN]));
+    if (busy) throw new Error('รายการนี้ยังมีของยืมออก/รอเติมค้างอยู่ ลบไม่ได้');
+    getSheet_(SHEET_KIT).deleteRow(r.row);
+    appendKitLog_({ kit: r.kit, part: r.part, name: r.name, serial: r.serial, type: r.type, qty: r.have, act: KA_ADJ, status: KS_DONE, note: 'ลบรายการออกจากชุด', by: p.by });
+    log_('ชุดพัสดุ ลบรายการ', '', [r.kit, r.part || r.name].join(' | '), p.by);
+    return { ok: true };
+  });
+}
+
+/** เมนู: สร้าง/เปิดชีท ชุดพัสดุ ให้กรอกรายการมาตรฐานและยอดที่มีอยู่ของแต่ละชุด */
 function createKitSheet() {
   const sh = getSheet_(SHEET_KIT);
+  getSheet_(SHEET_KITLOG);
   try {
     const A = SpreadsheetApp.newDataValidation().requireValueInList(KIT_NAMES, true).setAllowInvalid(true).build();
     const D = SpreadsheetApp.newDataValidation().requireValueInList(ITEM_TYPES, true).setAllowInvalid(true).build();
@@ -1784,37 +1867,12 @@ function createKitSheet() {
     sh.getRange('D2:D500').setDataValidation(D);
     sh.setFrozenRows(1);
     SpreadsheetApp.getActiveSpreadsheet().setActiveSheet(sh);
-    SpreadsheetApp.getUi().alert('กรอกรายการของแต่ละชุดในชีท "ชุดพัสดุ" 1 แถวต่อ 1 รายการ (ชุด / Part / ชื่อ / ประเภท / S/N / จำนวน / LOCATION)\nถ้ารายการเหล่านี้ยังไม่อยู่ในคลัง ให้เลือกเมนู "เพิ่มรายการชุดเข้าคลัง (ยอดยกมา)" ต่อ');
+    SpreadsheetApp.getUi().alert('กรอกรายการของแต่ละชุดในชีท "ชุดพัสดุ" 1 แถวต่อ 1 รายการ\n\n' +
+      '• ชุด = FLY AWAY KIT 1 หรือ 2\n• จำนวนมาตรฐาน = จำนวนที่ชุดต้องมี\n• จำนวนที่มี = ที่มีอยู่จริงตอนนี้ (ยอดยกมา — ไม่ผ่านชีท รับ และไม่ปนกับคลัง)\n' +
+      '• รายการที่มี S/N: 1 แถวต่อ 1 S/N (มาตรฐาน 1) ถ้าช่องว่างรอ S/N ให้เว้น S/N และใส่จำนวนที่มี 0\n\n' +
+      'หลังกรอกแล้วเปิดดูและแก้ยอดได้ที่เมนู ชุดพัสดุ ในแอป');
   } catch (e) { /* ไม่มี UI */ }
   return { ok: true };
-}
-
-/** เมนู: เพิ่มรายการในชีท ชุดพัสดุ ที่ยังไม่มีในคลัง เข้าเป็นยอดยกมา */
-function importKitToStock() {
-  const names = KIT_NAMES.slice();
-  readKit_().forEach(r => { if (names.indexOf(r.kit) < 0) names.push(r.kit); });
-  const have = {}, out = [];
-  names.forEach(kit => {
-    kitState_(kit).items.forEach(i => {
-      // ที่ควรอยู่ในคลัง = จำนวนมาตรฐาน - ที่นำออกอยู่ - ที่รอเบิกทดแทน ; ขาดเท่าไรจึงเพิ่มเข้าเป็นยอดยกมา
-      const key = kit + '|' + (i.part || i.name) + '|' + snKey_(i.serial);
-      if (!(key in have)) have[key] = i.onHand;
-      const need = i.serial ? Math.min(1, i.inKit) : i.inKit;
-      const take = Math.min(have[key], need);
-      have[key] -= take;
-      const miss = need - take;
-      if (miss > 0) out.push([i.part, i.name, i.type, i.serial, miss, '', '', i.loc, '', '', '', '', '']);
-    });
-  });
-  let msg;
-  if (!out.length) msg = 'ทุกรายการในชีท ชุดพัสดุ มีอยู่ในคลังแล้ว';
-  else {
-    const res = importOpeningRows_(out, 'เมนูชุดพัสดุ');
-    msg = res.errors && res.errors.length ? 'เพิ่มไม่สำเร็จ (ยังไม่ได้เพิ่มรายการใดเลย)\n' + res.errors.slice(0, 8).map(e => 'แถวที่ ' + e.row + ': ' + e.msg).join('\n')
-      : 'เพิ่มเข้าคลังเป็นยอดยกมาแล้ว ' + res.added + ' รายการ';
-  }
-  try { SpreadsheetApp.getUi().alert(msg); } catch (e) { /* ไม่มี UI */ }
-  return { message: msg };
 }
 
 /* ---------- ยอดยกมา: เพิ่มพัสดุที่มีอยู่แล้วเข้าคลังโดยไม่ต้องมีใบเบิก ---------- */
@@ -2360,6 +2418,13 @@ function getSerialHistory(serial) {
     ev.push({ k: k, sn: str_(r[IS.SN]), t: tech ? 'install' : 'out', d: r[IS.DATE] instanceof Date ? r[IS.DATE] : null, o: 2,
       text: tech ? 'จ่ายให้ช่าง/ติดตั้ง' : 'จ่ายออก', machine: str_(r[IS.TAIL]), tech: str_(r[IS.TECH]), doc: docStr_(r[IS.DOC]) });
   });
+  readKitLog_().forEach(l => {   // LRU ที่ใช้งานจริงจาก FLY AWAY KIT = ติดตั้งบนเครื่อง
+    const v = l.v, k = snKey_(v[KL.SN]);
+    if (!k || !chain[k] || str_(v[KL.ACT]) !== KA_USE) return;
+    part = part || str_(v[KL.PART]); name = name || str_(v[KL.NAME]); type = type || str_(v[KL.TYPE]);
+    ev.push({ k: k, sn: str_(v[KL.SN]), t: 'install', d: v[KL.DATE] instanceof Date ? v[KL.DATE] : null, o: 2,
+      text: 'ใช้งานจริงจาก ' + str_(v[KL.KIT]), machine: str_(v[KL.MACHINE]), tech: str_(v[KL.WHO]), doc: str_(v[KL.DOC]) });
+  });
   const ret = getSheet_(SHEET_RET), rl = ret.getLastRow();
   if (rl >= 2) ret.getRange(2, 1, rl - 1, 14).getValues().forEach(r => {
     const k = snKey_(r[4]);
@@ -2741,7 +2806,6 @@ function onOpen() {
       .addItem('นำเข้ายอดยกมา', 'importOpeningStock')
       .addSeparator()
       .addItem('สร้าง/เปิดชีท ชุดพัสดุ (FLY AWAY KIT)', 'createKitSheet')
-      .addItem('เพิ่มรายการชุดเข้าคลัง (ยอดยกมา)', 'importKitToStock')
       .addSeparator()
       .addItem('ตรวจ Part/Serial ที่กลายเป็นวันที่', 'findDateParts')
       .addItem('นำค่าที่แก้ในคลังพัสดุไปแก้ต้นทาง', 'applyStockEdits')
