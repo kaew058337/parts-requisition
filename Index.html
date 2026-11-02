@@ -515,6 +515,7 @@
     <div class="seg" id="h-seg">
       <button data-k="req" class="on">เบิก</button>
       <button data-k="rcv">รับ</button>
+      <button data-k="rcv2">คืนเข้าคลัง</button>
       <button data-k="iss">จ่าย</button>
       <button data-k="ret">ส่งคืน</button>
       <button data-k="log">บันทึก</button>
@@ -819,6 +820,7 @@
     <select id="ex-kind">
       <option value="stock">คลังพัสดุคงเหลือ</option>
       <option value="rcv">ประวัติรับพัสดุ</option>
+      <option value="rcv2">ประวัติคืนเข้าคลัง</option>
       <option value="iss">ประวัติจ่ายพัสดุ</option>
       <option value="req">ประวัติใบเบิก</option>
       <option value="loan">รายการยืมออกที่ยังไม่คืน</option>
@@ -2130,7 +2132,7 @@
     $('h-list').innerHTML = list.map(function(x, ri){
       var r=x.r, head, sub, chip='', btns='';
       if(k==='log'){ head=r[0]; sub=r[3]+(r[4]?' · '+r[4]:'')+' — '+r[1]; }
-      else { head = k==='ret' ? '#'+r[0] : (r[iDoc] || (k==='rcv' ? r[d.headers.indexOf('แหล่งที่มา')] : (k==='iss' ? 'โอนเข้าใบเบิก' : ''))); sub = r[iName]; }
+      else { head = k==='ret' ? '#'+r[0] : (r[iDoc] || ((k==='rcv'||k==='rcv2') ? r[d.headers.indexOf('แหล่งที่มา')] : (k==='iss' ? 'โอนเข้าใบเบิก' : ''))); sub = r[iName]; }
       if(k==='req'){
         var st=reqState(r[7]);
         chip = st==='cancel' ? '<span class="chip bad">ยกเลิก</span>' : '<span class="chip '+(st==='paid'?'ok':'')+'">'+(st==='paid'?'จ่ายแล้ว':'ค้างจ่าย')+'</span>';
@@ -2140,7 +2142,7 @@
         }
       }
       else if(k==='ret'){ btns='<div style="display:flex;gap:8px;margin-top:10px"><button class="btn ghost sm" data-pr="'+ri+'">พิมพ์ใบส่งคืน</button></div>'; chip = r[12] ? '<span class="chip ok">'+esc(r[12])+'</span>' : ''; }
-      else if(k==='rcv'){ var srcv=r[d.headers.indexOf('แหล่งที่มา')]; chip='<span class="chip '+(x.paid?'ok':'')+'">'+(x.paid?'จ่ายให้ช่างแล้ว':(srcv&&srcv!=='ใบเบิก'?esc(srcv):'รับแล้ว รอจ่ายให้ช่าง'))+'</span>'; }
+      else if(k==='rcv'||k==='rcv2'){ var srcv=r[d.headers.indexOf('แหล่งที่มา')]; chip='<span class="chip '+(x.paid?'ok':'')+'">'+(x.paid?'จ่ายให้ช่างแล้ว':(srcv&&srcv!=='ใบเบิก'?esc(srcv):'รับแล้ว รอจ่ายให้ช่าง'))+'</span>'; }
       else if(k==='iss'){ chip=x.paid?'<span class="chip ok">จ่ายให้ช่างแล้ว</span>':'<span class="chip">โอนเข้าใบเบิก</span>'; }
       var kv = d.headers.map(function(hd,i){
         var v = hd==='ความเร่งด่วน' ? urg(r[i]) : r[i];
@@ -2380,8 +2382,8 @@
   function exThai(iso){ var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(iso||''); return m? m[3]+'/'+m[2]+'/'+(Number(m[1])+543) : ''; }
   function exKey(thai){ var m=/(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(thai||''); return m? (Number(m[3])-543)*10000+Number(m[2])*100+Number(m[1]) : 0; }
   function exIso(v){ return v? Number(v.replace(/-/g,'')) : 0; }
-  var EX_NAMES = { stock:'คลังพัสดุคงเหลือ', rcv:'ประวัติรับพัสดุ', iss:'ประวัติจ่ายพัสดุ', req:'ประวัติใบเบิก', loan:'รายการยืมออกที่ยังไม่คืน', claims:'รายการเคลม', warranty:'LRU ใกล้หมดประกัน (เหลือไม่เกิน 60 วัน)' };
-  function exToggle(){ var k=$('ex-kind').value; $('ex-range').style.display = (k==='rcv'||k==='iss'||k==='req') ? '' : 'none'; $('ex-info').textContent=''; }
+  var EX_NAMES = { stock:'คลังพัสดุคงเหลือ', rcv:'ประวัติรับพัสดุ', rcv2:'ประวัติคืนเข้าคลัง', iss:'ประวัติจ่ายพัสดุ', req:'ประวัติใบเบิก', loan:'รายการยืมออกที่ยังไม่คืน', claims:'รายการเคลม', warranty:'LRU ใกล้หมดประกัน (เหลือไม่เกิน 60 วัน)' };
+  function exToggle(){ var k=$('ex-kind').value; $('ex-range').style.display = (k==='rcv'||k==='rcv2'||k==='iss'||k==='req') ? '' : 'none'; $('ex-info').textContent=''; }
   function exOpen(){
     var t=state.today||new Date().toISOString().slice(0,10);
     if(!$('ex-to').value) $('ex-to').value=t;

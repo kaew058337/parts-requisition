@@ -17,6 +17,7 @@ const SHEET_LOAN = 'ยืมพัสดุ';
 const SHEET_CNT = 'ตรวจนับ';
 const SHEET_KIT = 'ชุดพัสดุ';
 const SHEET_CLAIM = 'เคลม';
+const SHEET_RCV2 = 'รับคืนเข้าคลัง';   // ประวัติรับ "คืนเข้าคลัง" แยกจากรับปกติ (โครงสร้างเหมือนชีท รับ)
 const WARRANTY_DAYS = 365;        // ประกัน 1 ปี นับจากวันที่รับ (LRU / LRU(TCI)) ; ของที่เคลมกลับมานับใหม่จากวันที่ได้รับกลับ
 const WARRANTY_SOON_DAYS = 60;    // เตือน "ใกล้หมดประกัน" เมื่อเหลือไม่เกินกี่วัน
 const CLAIM_SENT = 'ส่งเคลมแล้ว';
@@ -167,12 +168,13 @@ function setup() {
 
 let MIGRATING_ = false;
 let MIGRATION_NOTE_ = '';
+HEADERS[SHEET_RCV2] = HEADERS[SHEET_RCV];
 const HDR_STYLE_ = (rg) => rg.setFontWeight('bold').setBackground('#1a56db').setFontColor('#ffffff')
   .setHorizontalAlignment('center').setVerticalAlignment('middle').setWrap(true);
 
 function getSheet_(name) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  if (!MIGRATING_ && (name === SHEET_RCV || name === SHEET_ISS || name === SHEET_STK || name === SHEET_LOAN)) ensureMigrated_(ss);
+  if (!MIGRATING_ && (name === SHEET_RCV || name === SHEET_RCV2 || name === SHEET_ISS || name === SHEET_STK || name === SHEET_LOAN)) ensureMigrated_(ss);
   let sh = ss.getSheetByName(name);
   if (sh && name === SHEET_REQ && sh.getRange(1, 16).getValue() === '') {
     // ชีทเบิกเดิม: เติมหัวคอลัมน์ผู้เบิก ประเภทพัสดุ และเหตุผลยกเลิกท้ายตาราง
@@ -198,7 +200,7 @@ function getSheet_(name) {
     if (name === SHEET_REQ) {
       sh.getRange('B2:B').setNumberFormat('@');
       sh.getRange('G2:H').setNumberFormat('dd/mm/yyyy');
-    } else if (name === SHEET_RCV) {
+    } else if (name === SHEET_RCV || name === SHEET_RCV2) {
       sh.getRange('B2:B').setNumberFormat('@');
       sh.getRange('L2:L').setNumberFormat('dd/mm/yyyy');
       sh.getRange('N2:O').setNumberFormat('dd/mm/yyyy');
@@ -241,6 +243,7 @@ function getSheet_(name) {
 const TEXT_COLS_ = {};
 TEXT_COLS_[SHEET_REQ] = [3];
 TEXT_COLS_[SHEET_RCV] = [3, 5];
+TEXT_COLS_[SHEET_RCV2] = [3, 5];
 TEXT_COLS_[SHEET_ISS] = [5, 7];
 TEXT_COLS_[SHEET_STK] = [3, 5];
 TEXT_COLS_[SHEET_LOAN] = [3, 5];
@@ -290,7 +293,7 @@ function applyStockEdits() {
     const out = { applied: [], skipped: [] };
     if (last >= 2) {
       const sRows = stk.getRange(2, 1, last - 1, HEADERS[SHEET_STK].length).getValues();
-      const rcv = getSheet_(SHEET_RCV), iss = getSheet_(SHEET_ISS), loan = getSheet_(SHEET_LOAN);
+      const iss = getSheet_(SHEET_ISS), loan = getSheet_(SHEET_LOAN);
       const rc = readRcv_();
       const rcBySeq = {};
       rc.forEach((r, i) => { rcBySeq[str_(r[RC.SEQ])] = i; });
@@ -313,7 +316,7 @@ function applyStockEdits() {
           out.skipped.push('แถว ' + (i + 2) + ' S/N ' + newSn + ' ซ้ำกับรายการอื่น'); return;
         }
         if (snCh && !newSn && oldSn) { out.skipped.push('แถว ' + (i + 2) + ' ลบ S/N ไม่ได้ (ต้องมีค่า)'); return; }
-        const rrow = idx + 2, doc = str_(r[RC.DOC]);
+        const rrow = r._row, rcv = getSheet_(r._sh), doc = str_(r[RC.DOC]);
         if (partCh) setTxt(rcv, rrow, RC.PART + 1, newPart);
         if (snCh) { setTxt(rcv, rrow, RC.SN + 1, newSn); snUsed[snKey_(oldSn)] = 0; if (newSn) snUsed[snKey_(newSn)] = 1; }
         // จ่าย
@@ -701,7 +704,7 @@ function getRequesters_() {
 
 function getParts_() {
   const map = {};
-  [[SHEET_REQ, 3, 4, 6], [SHEET_RCV, 3, 4, 8], [SHEET_RET, 2, 3, 0]].forEach(cfg => {
+  [[SHEET_REQ, 3, 4, 6], [SHEET_RCV, 3, 4, 8], [SHEET_RCV2, 3, 4, 8], [SHEET_RET, 2, 3, 0]].forEach(cfg => {
     const sh = getSheet_(cfg[0]);
     const last = sh.getLastRow();
     if (last < 2) return;
@@ -843,9 +846,50 @@ const SRC_RET = 'คืนเข้าคลัง';
 const DIRECT = 'จ่ายตรง';
 const XFER_NOTE = 'โอนเข้าใบเบิก';
 
+/** อ่านรับทั้งหมด = ชีท รับ + ชีท รับคืนเข้าคลัง (แต่ละแถวมี _sh = ชื่อชีท, _row = เลขแถวจริง) */
 function readRcv_() {
-  const sh = getSheet_(SHEET_RCV), last = sh.getLastRow();
-  return last >= 2 ? sh.getRange(2, 1, last - 1, HEADERS[SHEET_RCV].length).getValues() : [];
+  splitReturnRows_();
+  const out = [];
+  [SHEET_RCV, SHEET_RCV2].forEach(name => {
+    const sh = getSheet_(name), last = sh.getLastRow();
+    if (last < 2) return;
+    sh.getRange(2, 1, last - 1, HEADERS[SHEET_RCV].length).getValues().forEach((r, i) => { r._sh = name; r._row = i + 2; out.push(r); });
+  });
+  return out;
+}
+
+/** ลำดับรับถัดไป (นับรวมทั้งสองชีท) */
+function nextRcvSeq_() {
+  let max = 0;
+  [SHEET_RCV, SHEET_RCV2].forEach(name => {
+    const sh = getSheet_(name), last = sh.getLastRow();
+    if (last < 2) return;
+    sh.getRange(2, 1, last - 1, 1).getValues().forEach(r => { const n = Number(r[0]); if (n > max) max = n; });
+  });
+  return max + 1;
+}
+
+/** ย้ายแถวเดิมที่ แหล่งที่มา = คืนเข้าคลัง จากชีท รับ ไปชีท รับคืนเข้าคลัง (ทำครั้งเดียว) */
+let SPLIT_DONE_ = false;
+function splitReturnRows_() {
+  if (SPLIT_DONE_) return;
+  SPLIT_DONE_ = true;
+  let props = null;
+  try { props = PropertiesService.getDocumentProperties(); } catch (e) { props = null; }
+  if (props && props.getProperty('retsplit1')) return;
+  const src = getSheet_(SHEET_RCV), dst = getSheet_(SHEET_RCV2), last = src.getLastRow();
+  if (last >= 2) {
+    const w = HEADERS[SHEET_RCV].length;
+    const vals = src.getRange(2, 1, last - 1, w).getValues();
+    const move = [];
+    vals.forEach((r, i) => { if (str_(r[RC.SRC]) === SRC_RET) move.push({ row: i + 2, v: r }); });
+    if (move.length) {
+      move.forEach(m => writeRcvRow_(dst, dst.getLastRow() + 1, m.v));
+      for (let k = move.length - 1; k >= 0; k--) src.deleteRow(move[k].row);   // ลบจากล่างขึ้นบน
+      log_('แยกชีท', '', 'ย้ายประวัติคืนเข้าคลัง ' + move.length + ' แถว ไปชีท ' + SHEET_RCV2, 'ระบบ');
+    }
+  }
+  if (props) props.setProperty('retsplit1', '1');
 }
 function readIss_() {
   const sh = getSheet_(SHEET_ISS), last = sh.getLastRow();
@@ -873,7 +917,7 @@ function computeLots_() {
     const free = src === SRC_OPEN || src === SRC_RET;
     const remain = num_(r[RC.QTY]) - (issued[seq] || 0) - (loanOut[seq] || 0);
     return {
-      seq: seq, row: i + 2, doc: docStr_(r[RC.DOC]), label: free ? src : docStr_(r[RC.DOC]), free: free, src: src,
+      seq: seq, row: r._row || (i + 2), sh: r._sh || SHEET_RCV, doc: docStr_(r[RC.DOC]), label: free ? src : docStr_(r[RC.DOC]), free: free, src: src,
       part: str_(r[RC.PART]), name: str_(r[RC.NAME]), serial: str_(r[RC.SN]), type: str_(r[RC.TYPE]), unit: str_(r[RC.UNIT]),
       qty: num_(r[RC.QTY]), issued: issued[seq] || 0, loanOut: loanOut[seq] || 0, loanOpen: loanOpen[seq] || 0,
       remain: remain, cond: str_(r[RC.COND]), loc: str_(r[RC.LOC]), expire: r[RC.EXP] instanceof Date ? r[RC.EXP] : '',
@@ -958,8 +1002,13 @@ function getPendingReceive() {
 }
 
 function appendRcv_(vals) {
-  const sh = getSheet_(SHEET_RCV);
-  const r = sh.getLastRow() + 1;
+  splitReturnRows_();
+  const sh = getSheet_(str_(vals[RC.SRC]) === SRC_RET ? SHEET_RCV2 : SHEET_RCV);
+  return writeRcvRow_(sh, sh.getLastRow() + 1, vals);
+}
+
+function writeRcvRow_(sh, r, vals) {
+  vals = vals.slice();
   vals[RC.TOTAL] = '=IF(AND(ISNUMBER(G' + r + '),ISNUMBER(I' + r + ')),G' + r + '*I' + r + ',"")';
   vals[RC.OVER] = '=IF(AND(ISNUMBER(N' + r + '),ISNUMBER(O' + r + ')),O' + r + '-N' + r + ',"")';
   sh.getRange(r, 2).setNumberFormat('@');
@@ -1221,7 +1270,7 @@ function moveLocation(p) {
     const sameLoc = lot.loc === loc;
     if (sameLoc && want === cur.kit) return { ok: true, from: lot.loc, to: loc, same: true, kit: cur.kit };
     if (cur.kit && want !== cur.kit) kitLeaveCheck_(cur.kit, lot);                    // ชิ้นที่ถูกนำออกไปราชการอยู่ ห้ามย้ายออกจากชุด
-    if (!sameLoc) getSheet_(SHEET_RCV).getRange(lot.row, RC.LOC + 1).setValue(loc);   // LOCATION = ที่จัดเก็บจริง ไม่เกี่ยวกับชุด
+    if (!sameLoc) getSheet_(lot.sh || SHEET_RCV).getRange(lot.row, RC.LOC + 1).setValue(loc);   // LOCATION = ที่จัดเก็บจริง ไม่เกี่ยวกับชุด
     let kitNote = '';
     if (cur.kit && want === cur.kit) {                                                // อยู่ชุดเดิม: ให้ LOCATION ของรายการชุดตามไปด้วย
       if (!sameLoc) getSheet_(SHEET_KIT).getRange(cur.row, 7).setValue(loc);
@@ -1288,8 +1337,9 @@ function onEdit(e) {
   try {
     if (!e || !e.range) return;
     const sh = e.range.getSheet(), name = sh.getName();
-    if (name !== SHEET_STK && name !== SHEET_RCV) return;
+    if (name !== SHEET_STK && name !== SHEET_RCV && name !== SHEET_RCV2) return;
     const col = name === SHEET_STK ? 11 : RC.LOC + 1;
+    splitReturnRows_();
     const c1 = e.range.getColumn(), c2 = c1 + e.range.getNumColumns() - 1;
     if (col < c1 || col > c2) return;
     const r1 = Math.max(e.range.getRow(), 2), r2 = e.range.getRow() + e.range.getNumRows() - 1;
@@ -1297,18 +1347,19 @@ function onEdit(e) {
     const n = r2 - r1 + 1;
     const seqs = sh.getRange(r1, 1, n, 1).getValues();
     const locs = sh.getRange(r1, col, n, 1).getValues();
-    const other = getSheet_(name === SHEET_STK ? SHEET_RCV : SHEET_STK);
-    const oLast = other.getLastRow();
-    if (oLast < 2) return;
+    const others = name === SHEET_STK ? [SHEET_RCV, SHEET_RCV2] : [SHEET_STK];
     const oCol = name === SHEET_STK ? RC.LOC + 1 : 11;
-    const oSeqs = other.getRange(2, 1, oLast - 1, 1).getValues();
-    const pos = {};
-    oSeqs.forEach((r, i) => { if (r[0] !== '') pos[Number(r[0])] = i + 2; });
+    const pos = {};   // ลำดับรับ -> {sh, row}
+    others.forEach(on => {
+      const other = getSheet_(on), oLast = other.getLastRow();
+      if (oLast < 2) return;
+      other.getRange(2, 1, oLast - 1, 1).getValues().forEach((r, i) => { if (r[0] !== '') pos[Number(r[0])] = { sh: other, row: i + 2 }; });
+    });
     let changed = 0;
     seqs.forEach((r, i) => {
-      const row = pos[Number(r[0])];
-      if (!row || r[0] === '') return;
-      other.getRange(row, oCol).setValue(str_(locs[i][0]));
+      const t = pos[Number(r[0])];
+      if (!t || r[0] === '') return;
+      t.sh.getRange(t.row, oCol).setValue(str_(locs[i][0]));
       changed++;
     });
     if (changed) log_('ย้ายที่จัดเก็บ', '', 'แก้ LOCATION ในชีท ' + name + ' ' + changed + ' รายการ (ซิงค์ชีทอื่นให้ตรงกัน)', 'แก้ในชีท');
@@ -1364,7 +1415,7 @@ function getCountList(loc) {
 
 function addFoundRcv_(o, loc, note) {
   return appendRcv_([
-    nextSeq_(getSheet_(SHEET_RCV)), '', o.part, o.name, o.serial, o.type, o.qty, o.unit || 'EA', '', '',
+    nextRcvSeq_(), '', o.part, o.name, o.serial, o.type, o.qty, o.unit || 'EA', '', '',
     o.cond, '', '', '', parseDate_(todayStr_()), '', '', '', '', '', loc, '', note, SRC_OPEN, ''
   ]);
 }
@@ -1424,10 +1475,10 @@ function submitCount(p) {
         if (a.kind === 'out') {
           appendIss_([nextSeq_(getSheet_(SHEET_ISS)), date, ADJ_DOC, a.lot.seq, a.lot.part, a.lot.name, a.lot.serial, a.qty, a.lot.unit, '', '', tag, by]);
         } else if (a.kind === 'in') {
-          r.newSeq = nextSeq_(getSheet_(SHEET_RCV));
+          r.newSeq = nextRcvSeq_();
           addFoundRcv_({ part: a.lot.part, name: a.lot.name, serial: '', type: a.lot.type, unit: a.lot.unit, qty: a.qty, cond: a.lot.cond }, loc, 'พบเกินจากตรวจนับ ' + docNo + (reason ? ': ' + reason : ''));
         } else {
-          r.newSeq = nextSeq_(getSheet_(SHEET_RCV));
+          r.newSeq = nextRcvSeq_();
           addFoundRcv_({ part: r.part, name: r.name, serial: r.serial, type: r.type, unit: r.unit, qty: a.qty, cond: r.cond }, loc, 'พบเกินจากตรวจนับ ' + docNo + (reason ? ': ' + reason : ''));
         }
       });
@@ -1760,7 +1811,7 @@ function addOpeningStock(p) {
     const sn = str_(p.serial);
     if (sn && qty !== 1) throw new Error('พัสดุที่มี Serial number ต้องจำนวน 1 ต่อ 1 Serial');
     appendRcv_([
-      nextSeq_(getSheet_(SHEET_RCV)), '', str_(p.part), str_(p.name), sn, type, qty, str_(p.unit) || 'EA', '', '',
+      nextRcvSeq_(), '', str_(p.part), str_(p.name), sn, type, qty, str_(p.unit) || 'EA', '', '',
       str_(p.cond), '', '', '', parseDate_(todayStr_()), '', '', str_(p.cardId), '', parseDate_(p.expire), str_(p.location), '', '', SRC_OPEN, ''
     ]);
     log_('ยอดยกมา', '', [str_(p.part), str_(p.name), 'x' + qty, sn ? 'S/N ' + sn : '', str_(p.location)].filter(Boolean).join(' | '), p.by);
@@ -1845,7 +1896,7 @@ function submitReturnToStock(p) {
     const note = 'คืนจากใบเบิก ' + docNo + ' · ' + str_(p.reason) + alNote;
 
     appendRcv_([
-      nextSeq_(getSheet_(SHEET_RCV)), '', str_(rv[IS.PART]), str_(rv[IS.NAME]), sn, type, qty, str_(rv[IS.UNIT]), '', '',
+      nextRcvSeq_(), '', str_(rv[IS.PART]), str_(rv[IS.NAME]), sn, type, qty, str_(rv[IS.UNIT]), '', '',
       cond, '', '', '', parseDate_(todayStr_()), '', '', '', '', lot ? lot.expire : '', loc, '', note, SRC_RET, Number(p.seq)
     ]);
 
@@ -2353,7 +2404,7 @@ function getWarrantyList(days) {
 /* ---------- API: ประวัติ ---------- */
 
 function getHistory(kind, limit) {
-  const name = { req: SHEET_REQ, rcv: SHEET_RCV, iss: SHEET_ISS, ret: SHEET_RET, log: SHEET_LOG }[kind];
+  const name = { req: SHEET_REQ, rcv: SHEET_RCV, rcv2: SHEET_RCV2, iss: SHEET_ISS, ret: SHEET_RET, log: SHEET_LOG }[kind];
   if (!name) throw new Error('ไม่รู้จักชีท');
   const sh = getSheet_(name);
   const last = sh.getLastRow();
@@ -2367,10 +2418,10 @@ function getHistory(kind, limit) {
   const vals = sh.getRange(last - n + 1, 1, n, all.length).getValues();
   // ประวัติรับ: สถานะ "จ่ายให้ช่างแล้ว" เมื่อล็อตนั้นไม่เหลือในคลังและมีการจ่ายให้ช่าง
   const lotMap = {};
-  if (kind === 'rcv') computeLots_().forEach(l => { lotMap[l.seq] = l; });
+  if (kind === 'rcv' || kind === 'rcv2') computeLots_().forEach(l => { lotMap[l.seq] = l; });
   const items = vals.reverse().map(r => {
     let paid = false;
-    if (kind === 'rcv') { const l = lotMap[Number(r[RC.SEQ])]; paid = !!l && l.remain <= 0 && l.issued > 0; }
+    if (kind === 'rcv' || kind === 'rcv2') { const l = lotMap[Number(r[RC.SEQ])]; paid = !!l && l.remain <= 0 && l.issued > 0; }
     else if (kind === 'iss') paid = str_(r[IS.TECH]) !== '';
     return { r: r, paid: paid };
   });
@@ -2397,7 +2448,7 @@ function clearStockData_(opt) {
       backupName = 'สำรองก่อนเคลียร์ ' + Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH:mm');
       ss.copy(backupName);
     }
-    const names = [SHEET_RCV, SHEET_ISS, SHEET_STK];
+    const names = [SHEET_RCV, SHEET_RCV2, SHEET_ISS, SHEET_STK];
     if (opt.clearLoans) names.push(SHEET_LOAN);
     if (opt.clearRequisitions) names.push(SHEET_REQ);
     names.forEach(n => {
