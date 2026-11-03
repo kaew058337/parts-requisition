@@ -2674,7 +2674,7 @@ const IMPREQ_DONE = 'ออกใบเบิกแล้ว';
 function onOpen() {
   try {
     const imp = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_IMPORT);
-    if (imp) fixImportFormats_(imp);
+    if (imp) createImportTemplate();   // อัปเดตโครงชีทเดิม (เติมคอลัมน์ใหม่ เช่น TAIL No.) และตั้งรูปแบบข้อความ
   } catch (e) { /* ไม่ให้ล้ม */ }
   try {
     SpreadsheetApp.getUi().createMenu('ระบบเบิก-จ่าย')
