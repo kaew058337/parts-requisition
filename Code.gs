@@ -2829,7 +2829,8 @@ const IMPREQ_DONE = 'ออกใบเบิกแล้ว';
 function onOpen() {
   try {
     const imp = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_IMPORT);
-    if (imp) createImportTemplate();   // อัปเดตโครงชีทเดิม (เติมคอลัมน์ใหม่ เช่น TAIL No.) และตั้งรูปแบบข้อความ
+    if (imp) createImportTemplate();
+    if (SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_IMPORT_REQ)) createRequisitionImportSheet();   // อัปเดตโครงชีทเดิม (เติมคอลัมน์ใหม่ เช่น TAIL No.) และตั้งรูปแบบข้อความ
   } catch (e) { /* ไม่ให้ล้ม */ }
   try {
     SpreadsheetApp.getUi().createMenu('ระบบเบิก-จ่าย')
@@ -2850,7 +2851,16 @@ function onOpen() {
 function createRequisitionImportSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sh = ss.getSheetByName(SHEET_IMPORT_REQ);
-  if (sh) return sh;
+  if (sh) {
+    // ชีทเดิม (ไม่มีช่องวันที่ติดตั้ง): แทรกคอลัมน์ก่อน ผลตรวจ
+    if (str_(sh.getRange(IMPREQ_FIRST_ROW - 1, 8).getValue()) === 'ผลตรวจ') {
+      sh.insertColumnsBefore(8, 1);
+      HDR_STYLE_(sh.getRange(IMPREQ_FIRST_ROW - 1, 8).setValue('วันที่ติดตั้ง (งาน TCI ต้องกรอก วว/ดด/ปปปป)'));
+      sh.getRange(IMPREQ_FIRST_ROW, 8, 500, 1).setNumberFormat('dd/mm/yyyy');
+      sh.setColumnWidth(8, 170);
+    }
+    return sh;
+  }
   sh = ss.insertSheet(SHEET_IMPORT_REQ);
   const labels = [
     ['ข้อมูลที่ใช้ร่วมกันทุกรายการ (กรอกช่องสีเหลือง)', ''],
@@ -2868,13 +2878,14 @@ function createRequisitionImportSheet() {
   sh.getRange('B5').setNumberFormat('dd/mm/yyyy');
   sh.getRange(9, 1).setValue('รายการพัสดุ (วางจาก Excel ได้ตั้งแต่แถวที่ ' + IMPREQ_FIRST_ROW + ' ลงไป)').setFontWeight('bold');
   const H = ['Part number', 'ชื่อพัสดุ (ว่าง = ดึงจาก Part)', 'ประเภทพัสดุ (LRU / SP / LRU(TCI) / SP(TCI) / สารเคมี)', 'จำนวน', 'หน่วยนับ (ว่าง = EA)',
-    'เครื่อง (เฉพาะแถว ถ้าต่างจากด้านบน)', 'ข้อขัดข้อง (เฉพาะแถว ถ้าต่างจากด้านบน)', 'ผลตรวจ'];
+    'เครื่อง (เฉพาะแถว ถ้าต่างจากด้านบน)', 'ข้อขัดข้อง (เฉพาะแถว ถ้าต่างจากด้านบน)', 'วันที่ติดตั้ง (งาน TCI ต้องกรอก วว/ดด/ปปปป)', 'ผลตรวจ'];
   HDR_STYLE_(sh.getRange(IMPREQ_FIRST_ROW - 1, 1, 1, H.length).setValues([H]));
   sh.setFrozenRows(IMPREQ_FIRST_ROW - 1);
   sh.getRange(IMPREQ_FIRST_ROW, 1, 500, 1).setNumberFormat('@');
   sh.getRange(IMPREQ_FIRST_ROW, 4, 500, 1).setNumberFormat('0.##');
   sh.setColumnWidth(1, 210); sh.setColumnWidth(2, 260); sh.setColumnWidth(3, 150);
-  sh.setColumnWidth(4, 80); sh.setColumnWidth(5, 110); sh.setColumnWidth(6, 150); sh.setColumnWidth(7, 220); sh.setColumnWidth(8, 260);
+  sh.setColumnWidth(4, 80); sh.setColumnWidth(5, 110); sh.setColumnWidth(6, 150); sh.setColumnWidth(7, 220); sh.setColumnWidth(8, 170); sh.setColumnWidth(9, 260);
+  sh.getRange(IMPREQ_FIRST_ROW, 8, 500, 1).setNumberFormat('dd/mm/yyyy');
   try {
     sh.getRange('B2').setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(MACHINE_LIST, true).setAllowInvalid(false).build());
     sh.getRange('B6').setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(['เบิกธรรมดา', 'AOG'], true).setAllowInvalid(false).build());
@@ -2931,7 +2942,14 @@ function importRequisitionRows_(shared, rows, by) {
       if (!machine) return err('ไม่ได้ระบุหมายเลขเครื่อง');
       if (MACHINE_LIST.indexOf(machine) < 0) return err('หมายเลขเครื่อง "' + machine + '" ไม่ถูกต้อง');
       const issue = str_(r[6]) || str_(shared.issue);
-      good.push({ n: n, p: { items: [{ part: part, name: name, qty: qty, unit: str_(r[4]) || (known && known.unit) || 'EA' }],
+      let install = '';
+      if (str_(r[7]) !== '') {
+        const idt = parseImportDate_(r[7]);
+        if (!idt) return err('รูปแบบวันที่ติดตั้งไม่ถูกต้อง (ใช้ วว/ดด/ปปปป)');
+        install = Utilities.formatDate(idt, TZ, 'yyyy-MM-dd');
+      }
+      if (TCI_TYPES.indexOf(type) >= 0 && !install) return err('งาน TCI ต้องระบุวันที่ติดตั้ง');
+      good.push({ n: n, p: { items: [{ part: part, name: name, qty: qty, unit: str_(r[4]) || (known && known.unit) || 'EA', install: install }],
         machine: machine, issue: issue, itemType: type, urgency: urgency === 'AOG' ? 'AOG' : 'เบิกธรรมดา', date: dateIso,
         rank: u ? u.rank : '', fullName: u ? u.fullName : '', position: u ? u.position : '', by: by } });
     });
@@ -2955,20 +2973,20 @@ function importRequisitions() {
   if (last < IMPREQ_FIRST_ROW) { say('ยังไม่มีรายการพัสดุ (เริ่มวางที่แถวที่ ' + IMPREQ_FIRST_ROW + ')'); return { added: 0 }; }
   const sv = sh.getRange(2, 2, 7, 1).getValues().map(r => r[0]);
   const shared = { machine: str_(sv[0]), issue: str_(sv[1]), who: str_(sv[2]), date: sv[3], urgency: str_(sv[4]), type: str_(sv[5]) };
-  const all = sh.getRange(IMPREQ_FIRST_ROW, 1, last - IMPREQ_FIRST_ROW + 1, 8).getValues();
+  const all = sh.getRange(IMPREQ_FIRST_ROW, 1, last - IMPREQ_FIRST_ROW + 1, 9).getValues();
   const rows = [];
-  all.forEach((r, i) => { if (str_(r[7]).indexOf(IMPREQ_DONE) !== 0) rows.push({ n: IMPREQ_FIRST_ROW + i, v: r }); });
+  all.forEach((r, i) => { if (str_(r[8]).indexOf(IMPREQ_DONE) !== 0) rows.push({ n: IMPREQ_FIRST_ROW + i, v: r }); });
   const res = importRequisitionRows_(shared, rows, 'นำเข้าจำนวนมาก');
-  const out = all.map(r => [str_(r[7])]);
+  const out = all.map(r => [str_(r[8])]);
   if (res.errors.length) {
     res.errors.forEach(e => { if (e.row >= IMPREQ_FIRST_ROW) out[e.row - IMPREQ_FIRST_ROW] = ['✗ ' + e.msg]; });
     const top = res.errors.filter(e => e.row < IMPREQ_FIRST_ROW).map(e => '• ' + e.msg);
-    sh.getRange(IMPREQ_FIRST_ROW, 8, out.length, 1).setValues(out);
+    sh.getRange(IMPREQ_FIRST_ROW, 9, out.length, 1).setValues(out);
     say('พบรายการที่ผิด ' + res.errors.length + ' จุด ยังไม่ได้ออกใบเบิกเลย\n' + (top.length ? top.join('\n') + '\n' : '') + 'ดูสาเหตุในคอลัมน์ ผลตรวจ');
     return res;
   }
   res.docs.forEach(d => { out[d.row - IMPREQ_FIRST_ROW] = [IMPREQ_DONE + ' ' + d.docNo]; });
-  sh.getRange(IMPREQ_FIRST_ROW, 8, out.length, 1).setValues(out);
+  sh.getRange(IMPREQ_FIRST_ROW, 9, out.length, 1).setValues(out);
   say(res.added ? 'ออกใบเบิกแล้ว ' + res.added + ' ใบ (' + res.docs[0].docNo + ' ถึง ' + res.docs[res.docs.length - 1].docNo + ')\nพิมพ์ใบได้ที่แท็บ ประวัติ > เบิก' : 'ไม่มีรายการใหม่ให้ออกใบเบิก');
   return res;
 }
