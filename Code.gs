@@ -2531,7 +2531,15 @@ function createImportTemplate() {
       sh.getRange('M2:M').setNumberFormat('@');
     }
   }
+  fixImportFormats_(sh);
   return sh;
+}
+
+/** ตั้งคอลัมน์ Part/serial/เลขใบเบิก/card ID/TAIL ของชีทนำเข้าเป็นข้อความ (ให้พิมพ์เลข 0 นำหน้าได้) */
+function fixImportFormats_(sh) {
+  try {
+    ['A2:A', 'D2:D', 'J2:J', 'L2:L', 'M2:M'].forEach(a => sh.getRange(a).setNumberFormat('@'));
+  } catch (e) { /* ไม่ให้ล้ม */ }
 }
 
 function parseImportDate_(v) {
@@ -2664,6 +2672,10 @@ const IMPREQ_FIRST_ROW = 11;       // แถวแรกของรายกา
 const IMPREQ_DONE = 'ออกใบเบิกแล้ว';
 
 function onOpen() {
+  try {
+    const imp = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_IMPORT);
+    if (imp) fixImportFormats_(imp);
+  } catch (e) { /* ไม่ให้ล้ม */ }
   try {
     SpreadsheetApp.getUi().createMenu('ระบบเบิก-จ่าย')
       .addItem('สร้างชีท นำเข้าใบเบิก', 'createRequisitionImportSheet')
