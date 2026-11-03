@@ -39,7 +39,7 @@ function isLRU_(t) { return String(t || '').indexOf('LRU') === 0; }
 const ITEM_TYPES = ['LRU', 'SP', 'LRU(TCI)', 'SP(TCI)', 'สารเคมี'];   // สารเคมี: ไม่บังคับ Serial เหมือน SP
 
 const HEADERS = {
-  [SHEET_REQ]: ['ลำดับ', 'หมายเลขการเบิก', 'Part number', 'ชื่อ', 'จำนวน', 'หน่วยนับ', 'วันที่เบิก', 'วันที่จ่าย', 'เครื่อง', 'ความเร่งด่วน', 'ข้อขัดข้อง', 'ยศผู้เบิก', 'ชื่อ-สกุลผู้เบิก', 'ตำแหน่งผู้เบิก', 'ประเภทพัสดุ', 'เหตุผลยกเลิก'],
+  [SHEET_REQ]: ['ลำดับ', 'หมายเลขการเบิก', 'Part number', 'ชื่อ', 'จำนวน', 'หน่วยนับ', 'วันที่เบิก', 'วันที่จ่าย', 'เครื่อง', 'ความเร่งด่วน', 'ข้อขัดข้อง', 'ยศผู้เบิก', 'ชื่อ-สกุลผู้เบิก', 'ตำแหน่งผู้เบิก', 'ประเภทพัสดุ', 'เหตุผลยกเลิก', 'วันที่ติดตั้ง (TCI)'],
   [SHEET_RCV]: ['ลำดับรับ', 'เลขเอกสารการเบิก', 'card ID', 'Part number', 'ชื่อพัสดุ', 'serial number', 'ประเภทพัสดุ', 'จำนวน', 'หน่วยนับ', 'ราคา/หน่วย', 'ราคารวม', 'COND', 'วันที่แจ้ง', 'ความเร่งด่วน', 'วันกำหนดส่งพัสดุ', 'วันที่รับ', 'วันที่เกิน', 'TAIL No.', 'TCI', 'หมดอายุ', 'LOCATION', 'ผู้รับ', 'หมายเหตุ', 'แหล่งที่มา', 'อ้างอิง'],
   [SHEET_ISS]: ['ลำดับจ่าย', 'วันที่จ่าย', 'เลขเอกสารการเบิก', 'ลำดับรับ (อ้างอิง)', 'Part number', 'ชื่อพัสดุ', 'serial number', 'จำนวน', 'หน่วยนับ', 'TAIL No.', 'จ่ายให้ช่าง', 'หมายเหตุ', 'ผู้บันทึก'],
   [SHEET_CNT]: ['เลขที่ตรวจนับ', 'วันที่ตรวจนับ', 'LOCATION', 'ลำดับรับ', 'Part number', 'ชื่อพัสดุ', 'serial number', 'ประเภทพัสดุ', 'หน่วยนับ', 'ยอดในระบบ', 'นับได้จริง', 'ผลต่าง', 'ผลการปรับ', 'เหตุผล / หมายเหตุ', 'ผู้ตรวจนับ', 'ผู้ตรวจสอบ / กรรมการ', 'เวลาบันทึก'],
@@ -182,6 +182,12 @@ function getSheet_(name) {
   if (sh && name === SHEET_REQ && sh.getRange(1, 16).getValue() === '') {
     // ชีทเบิกเดิม: เติมหัวคอลัมน์ผู้เบิก ประเภทพัสดุ และเหตุผลยกเลิกท้ายตาราง
     HDR_STYLE_(sh.getRange(1, 12, 1, 5).setValues([HEADERS[SHEET_REQ].slice(11, 16)]));
+  }
+  if (sh && name === SHEET_REQ && sh.getRange(1, 17).getValue() === '') {
+    // ชีทเบิกเดิม: เติมคอลัมน์ วันที่ติดตั้ง (TCI)
+    if (sh.getMaxColumns() < 17) sh.insertColumnsAfter(sh.getMaxColumns(), 17 - sh.getMaxColumns());
+    HDR_STYLE_(sh.getRange(1, 17).setValue(HEADERS[SHEET_REQ][16]));
+    sh.getRange('Q2:Q').setNumberFormat('dd/mm/yyyy');
   }
   if (sh && name === SHEET_LOAN && sh.getRange(1, 20).getValue() === '') {
     // ชีทยืมเดิม: เติมคอลัมน์ จำนวนที่คืนเข้าคลังแล้ว ท้ายตาราง
@@ -810,7 +816,7 @@ function cancelRequisition(p) {
 /* ---------- API: เบิก ---------- */
 
 function submitRequisition(p) {
-  return withLock_(() => submitRequisitionCore_(p));
+  return withLock_(() => submitRequisitionCore_(Object.assign({}, p, { requireInstall: true })));
 }
 
 /** ออกใบเบิก (ไม่ล็อกเอง : ผู้เรียกต้องล็อกไว้แล้ว) */
@@ -822,6 +828,7 @@ function submitRequisitionCore_(p) {
     items.forEach((i, idx) => {
       if (!str_(i.name)) throw new Error('รายการที่ ' + (idx + 1) + ': กรุณากรอกชื่อพัสดุ');
       if (num_(i.qty) <= 0) throw new Error('รายการที่ ' + (idx + 1) + ': จำนวนต้องมากกว่า 0');
+      if (p.requireInstall && TCI_TYPES.indexOf(str_(i.itemType) || str_(p.itemType)) >= 0 && !str_(i.install)) throw new Error('รายการที่ ' + (idx + 1) + ': งาน TCI ต้องระบุวันที่ติดตั้ง');
       if (ITEM_TYPES.indexOf(str_(i.itemType) || str_(p.itemType)) < 0) throw new Error('รายการที่ ' + (idx + 1) + ': กรุณาเลือกประเภทพัสดุ');
     });
 
@@ -841,12 +848,14 @@ function submitRequisitionCore_(p) {
     const rows = items.map((i, k) => {
       const seq = seq0 + k, docNo = pad_(seq, 3) + dd + mm + yy, type = str_(i.itemType) || str_(p.itemType);
       docs.push({ docNo: docNo, part: str_(i.part), name: str_(i.name), qty: num_(i.qty), unit: str_(i.unit) || 'EA', itemType: type });
+      const inst = TCI_TYPES.indexOf(type) >= 0 && str_(i.install) ? parseDate_(i.install) : '';
       return [seq, docNo, str_(i.part), str_(i.name), num_(i.qty), str_(i.unit) || 'EA',
-        date, UNPAID, str_(p.machine), urg, str_(p.issue), str_(p.rank), str_(p.fullName), str_(p.position), type];
+        date, UNPAID, str_(p.machine), urg, str_(p.issue), str_(p.rank), str_(p.fullName), str_(p.position), type, '', inst];
     });
     const start = sh.getLastRow() + 1;
     sh.getRange(start, 2, rows.length, 1).setNumberFormat('@');
     sh.getRange(start, 7, rows.length, 2).setNumberFormat('dd/mm/yyyy');
+    sh.getRange(start, 17, rows.length, 1).setNumberFormat('dd/mm/yyyy');
     sh.getRange(start, 1, rows.length, rows[0].length).setValues(rows);
     docs.forEach(d => log_('เบิก', d.docNo, [d.part, d.name, 'x' + d.qty + ' ' + d.unit, 'เครื่อง ' + str_(p.machine),
       d.itemType, urg, 'ผู้เบิก ' + [str_(p.rank), str_(p.fullName)].filter(Boolean).join(' ')].join(' | '), p.by));
@@ -2502,7 +2511,7 @@ function getDashboard(month) {
   const today = parseDate_(todayStr_());
   const ym = /^\d{4}-\d{2}$/.test(str_(month)) ? str_(month) : todayStr_().substr(0, 7);
   const req = getSheet_(SHEET_REQ), rl = req.getLastRow();
-  const reqRows = rl >= 2 ? req.getRange(2, 1, rl - 1, 15).getValues().filter(isValidReqRow_) : [];
+  const reqRows = rl >= 2 ? req.getRange(2, 1, rl - 1, 17).getValues().filter(isValidReqRow_) : [];
   const got = receivedMap_(), lots = computeLots_();
   const rcvDate = {}, issuedBy = {};
   readRcv_().forEach(r => {
@@ -2513,7 +2522,7 @@ function getDashboard(month) {
   lots.forEach(l => { if (!l.free) { const k = l.doc + '|' + l.part; issuedBy[k] = (issuedBy[k] || 0) + l.issued; } });
 
   const tci = [], sum = { total: 0, done: 0, issued: 0, partial: 0, pending: 0, overdue: 0, aog: 0 };
-  let pend = 0, pendAog = 0, pendOver = 0, monthReq = 0, monthDone = 0;
+  let pend = 0, pendAog = 0, pendOver = 0, monthReq = 0, monthDone = 0, tciLate = 0, tciSoon = 0;
   reqRows.forEach(r => {
     if (isCancelled_(r[7])) return;
     const doc = pad_(r[1], 9), part = str_(r[2]), key = doc + '|' + part;
@@ -2521,20 +2530,29 @@ function getDashboard(month) {
     const due = dueDate_(r[6], r[9]);
     const late = remain > 0 && due instanceof Date && due < today;
     if (remain > 0) { pend++; if (str_(r[9]) === 'AOG') pendAog++; if (late) pendOver++; }
-    const inMonth = r[6] instanceof Date && Utilities.formatDate(r[6], TZ, 'yyyy-MM') === ym;
-    if (inMonth) { monthReq++; if (remain <= 0) monthDone++; }
-    if (!inMonth || TCI_TYPES.indexOf(str_(r[14])) < 0) return;
+    const isTci = TCI_TYPES.indexOf(str_(r[14])) >= 0;
+    const inst = isTci && r[16] instanceof Date ? r[16] : null;       // วันที่ติดตั้งงาน TCI (ของต้องถึงก่อนวันนี้)
+    const daysLeft = inst ? Math.round((inst - today) / 86400000) : null;
+    const instLate = !!inst && remain > 0 && daysLeft < 0;
+    if (inst && remain > 0) { if (instLate) tciLate++; else if (daysLeft <= 7) tciSoon++; }
+    const basis = inst || r[6];                                        // งาน TCI จัดตามเดือนที่ติดตั้ง (ไม่ใช่เดือนที่เบิก)
+    const inMonth = basis instanceof Date && Utilities.formatDate(basis, TZ, 'yyyy-MM') === ym;
+    if (r[6] instanceof Date && Utilities.formatDate(r[6], TZ, 'yyyy-MM') === ym) { monthReq++; if (remain <= 0) monthDone++; }
+    if (!inMonth || !isTci) return;
     const issued = issuedBy[key] || 0;
     const status = remain <= 0 ? (issued >= qty ? 'จ่ายให้ช่างแล้ว' : 'รับแล้ว') : have > 0 ? 'รับบางส่วน' : 'ค้างรับ';
     sum.total++;
     if (remain <= 0) { sum.done++; if (issued >= qty) sum.issued++; } else if (have > 0) sum.partial++; else sum.pending++;
-    if (late) sum.overdue++;
+    const lateAny = inst ? instLate : late;
+    if (lateAny) sum.overdue++;
     if (str_(r[9]) === 'AOG' && remain > 0) sum.aog++;
+    const rcv = rcvDate[key] || null;
     tci.push({ docNo: doc, part: part, name: str_(r[3]), type: str_(r[14]), qty: qty, got: have, remain: remain, unit: str_(r[5]),
-      reqDate: fmtThai_(r[6]), due: fmtThai_(due), recvDate: rcvDate[key] ? fmtThai_(rcvDate[key]) : '', status: status,
-      urgency: str_(r[9]), machine: str_(r[8]), late: late, order: late ? 0 : remain > 0 ? (have > 0 ? 2 : 1) : 3 });
+      reqDate: fmtThai_(r[6]), due: fmtThai_(due), install: inst ? fmtThai_(inst) : '', daysLeft: daysLeft, instLate: instLate,
+      onTime: remain <= 0 && !!inst && !!rcv ? rcv <= inst : null, recvDate: rcv ? fmtThai_(rcv) : '', status: status,
+      urgency: str_(r[9]), machine: str_(r[8]), late: lateAny, order: lateAny ? 0 : remain > 0 ? (have > 0 ? 2 : 1) : 3, sortKey: inst ? inst.getTime() : 9e15 });
   });
-  tci.sort((a, b) => (a.order - b.order) || (a.docNo < b.docNo ? -1 : 1));
+  tci.sort((a, b) => (a.order - b.order) || (a.sortKey - b.sortKey) || (a.docNo < b.docNo ? -1 : 1));
 
   const stockLots = lots.filter(l => l.remain > 0);
   const recvNotIssued = stockLots.filter(l => !l.free);
@@ -2553,7 +2571,7 @@ function getDashboard(month) {
   return {
     month: ym, tci: tci, tciSum: sum, kits: computeKitStatus_(lots).kits,
     alerts: { pending: pend, pendingAog: pendAog, pendingOverdue: pendOver, recvNotIssued: recvNotIssued.length,
-      awaiting: getAwaitingReq().length, warrSoon: warrSoon, loansOverdue: loans.length },
+      awaiting: getAwaitingReq().length, warrSoon: warrSoon, loansOverdue: loans.length, tciLate: tciLate, tciSoon: tciSoon },
     cards: { monthReq: monthReq, monthDone: monthDone, stockLots: stockLots.length, claimsOpen: claimsOpen },
     recent: recent
   };

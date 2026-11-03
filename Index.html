@@ -1127,18 +1127,21 @@
     });
     $('r-submit').textContent = n>1 ? 'บันทึกใบเบิก '+n+' ใบ' : 'บันทึกใบเบิก';
   }
+  function instToggle(d){ var t=/TCI/.test(d.querySelector('.f-type').value); d.querySelector('.f-inst-wrap').style.display=t?'':'none'; if(!t) d.querySelector('.f-inst').value=''; }
   function addItem(){
     itemSeq++;
     var d = document.createElement('div'); d.className='item';
     d.innerHTML =
       '<div class="no"></div><button class="del" type="button" aria-label="ลบรายการ">×</button>'+
       '<label style="margin-top:0">ประเภทพัสดุ</label><select class="f-type">'+TYPE_OPTS+'</select>'+
+      '<div class="f-inst-wrap" style="display:none"><label>วันที่ติดตั้งงาน TCI (พัสดุต้องถึงก่อนวันนี้)</label><input type="date" class="f-inst"></div>'+
       '<label>Part number</label><input class="f-part" list="partlist" autocomplete="off" autocapitalize="characters">'+
       '<div class="meta f-aw" style="display:none;color:#b45309;margin:4px 0 0"></div>'+
       '<label>ชื่อพัสดุ</label><input class="f-name">'+
       '<div class="row2"><div><label>จำนวน</label><input class="f-qty" type="number" inputmode="decimal" min="0" value="1"></div>'+
       '<div><label>หน่วยนับ</label><input class="f-unit" value="EA" placeholder="EA / ชิ้น / ชุด"></div></div>';
     $('r-items').appendChild(d);
+    d.querySelector('.f-type').addEventListener('change', function(){ instToggle(d); });
     var part=d.querySelector('.f-part'), name=d.querySelector('.f-name'), unit=d.querySelector('.f-unit');
     part.addEventListener('change', function(){ autofill(part,name,unit); hintItem(d); });
     part.addEventListener('input', function(){ autofill(part,name,unit); hintItem(d); });
@@ -1148,7 +1151,7 @@
   }
   $('r-add').addEventListener('click', function(){
     var d = addItem(), prev = d.previousElementSibling;
-    if(prev && prev.querySelector('.f-type')) d.querySelector('.f-type').value = prev.querySelector('.f-type').value;
+    if(prev && prev.querySelector('.f-type')){ d.querySelector('.f-type').value = prev.querySelector('.f-type').value; instToggle(d); }
     d.scrollIntoView({block:'center', behavior:'smooth'}); d.querySelector('.f-part').focus({preventScroll:true});
   });
 
@@ -1190,7 +1193,8 @@
     if(!state.by){ askBy(function(){ $('r-submit').click(); }); return; }
     var items = Array.prototype.map.call(document.querySelectorAll('#r-items .item'), function(d){
       return { part:d.querySelector('.f-part').value, name:d.querySelector('.f-name').value,
-               qty:d.querySelector('.f-qty').value, unit:d.querySelector('.f-unit').value, itemType:d.querySelector('.f-type').value };
+               qty:d.querySelector('.f-qty').value, unit:d.querySelector('.f-unit').value, itemType:d.querySelector('.f-type').value,
+               install:d.querySelector('.f-inst').value };
     });
     var entered = items.filter(function(i){ return i.part.trim() || i.name.trim(); });
     if(!entered.length){ toast('กรุณากรอกรายการพัสดุ', true); return; }
@@ -1199,6 +1203,7 @@
       if(!entered[q].itemType){ toast(lab+'กรุณาเลือกประเภทพัสดุ', true); return; }
       if(!entered[q].name.trim()){ toast(lab+'กรุณากรอกชื่อพัสดุ', true); return; }
       if(!(Number(entered[q].qty)>0)){ toast(lab+'จำนวนต้องมากกว่า 0', true); return; }
+      if(/TCI/.test(entered[q].itemType) && !entered[q].install){ toast(lab+'งาน TCI ต้องระบุวันที่ติดตั้ง', true); return; }
     }
     items = entered;
     var payload = {
@@ -1787,7 +1792,7 @@
     show('req');
     var it=document.querySelector('#r-items .item');
     if(it){ it.querySelector('.f-part').value=l.part; it.querySelector('.f-name').value=l.name; it.querySelector('.f-qty').value=l.serial?1:l.qty; it.querySelector('.f-unit').value=l.unit||'EA'; }
-    if(l.type && it) it.querySelector('.f-type').value=l.type;
+    if(l.type && it) it.querySelector('.f-type').value=l.type; instToggle(it);
     toast('บันทึกใบเบิกแล้ว กลับไปที่แท็บ คลัง แล้วกด "จ่าย" ที่ล็อตนี้');
   });
   $('fi-submit').addEventListener('click', function(){
@@ -1960,7 +1965,7 @@
       it.querySelector('.f-part').value=x.part; it.querySelector('.f-name').value=x.name;
       it.querySelector('.f-qty').value=x.out; it.querySelector('.f-unit').value=x.unit||'EA';
     }
-    if(x.type && it) it.querySelector('.f-type').value=x.type;
+    if(x.type && it) it.querySelector('.f-type').value=x.type; instToggle(it);
     $('r-issue').value='เบิกตามพัสดุที่ยืมไปใช้ (ยืมเลขที่ '+x.seq+' · '+x.borrower+')';
     toast('เลือกเครื่องและผู้เบิก แล้วบันทึกใบเบิก จากนั้นไปหน้า รับ เลือก "ของที่ยืมไปใช้"');
   }
@@ -2329,7 +2334,9 @@
   function dbMonthTh(ym){ var p=ym.split('-'); return TH_M[Number(p[1])-1]+' '+(Number(p[0])+543); }
   function dbStat(x){
     var c = x.status==='ค้างรับ' ? (x.late?'bad':'') : x.status==='รับบางส่วน' ? 'warn' : 'ok';
-    return '<span class="chip '+c+'" style="white-space:nowrap;flex:none">'+(x.late?'เลยกำหนด · ':'')+esc(x.status)+'</span>';
+    if(x.remain>0 && x.install && !x.instLate && x.daysLeft<=7) c='warn';
+    var lt = x.instLate ? 'เกินวันติดตั้ง '+(-x.daysLeft)+' วัน · ' : x.late ? 'เลยกำหนด · ' : '';
+    return '<span class="chip '+c+'" style="white-space:nowrap;flex:none">'+lt+esc(x.status)+'</span>';
   }
   function dbOpen(){
     $('db-bg').classList.add('on'); $('db-bg').firstElementChild.scrollTop=0;
@@ -2351,13 +2358,15 @@
         '<div class="bar"><i style="display:block;height:100%;width:'+pct+'%;background:linear-gradient(90deg,#1a56db,#4c8dce);border-radius:99px"></i></div>'+
         '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">'+
         (s.pending?'<span class="chip">ค้างรับ '+s.pending+'</span>':'')+(s.partial?'<span class="chip warn">รับบางส่วน '+s.partial+'</span>':'')+
-        (s.overdue?'<span class="chip bad">เลยกำหนด '+s.overdue+'</span>':'')+(s.aog?'<span class="chip bad">AOG ค้าง '+s.aog+'</span>':'')+
+        (s.overdue?'<span class="chip bad">เกินวันติดตั้ง/กำหนด '+s.overdue+'</span>':'')+(s.aog?'<span class="chip bad">AOG ค้าง '+s.aog+'</span>':'')+
         (s.issued?'<span class="chip ok">จ่ายให้ช่างแล้ว '+s.issued+'</span>':'')+'</div>';
       var tciRows=d.tci.map(function(x){
         return '<div class="meta" style="padding:9px 0;border-top:1px solid var(--line)"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div><b>'+esc(x.part||x.name)+'</b> · '+esc(x.name)+
           '<br><span style="font-size:13px">'+esc(x.docNo)+' · '+esc(x.type)+(x.urgency==='AOG'?' · AOG':'')+(x.machine?' · เครื่อง '+esc(x.machine):'')+'</span></div>'+dbStat(x)+'</div>'+
           '<div style="font-size:13px;margin-top:3px">เบิก '+fmtNum(x.qty)+' '+esc(x.unit)+' · รับแล้ว '+fmtNum(x.got)+(x.remain>0?' · ค้าง '+fmtNum(x.remain):'')+
-          ' · เบิกเมื่อ '+esc(x.reqDate)+(x.remain>0?' · กำหนด '+esc(x.due):(x.recvDate?' · รับเมื่อ '+esc(x.recvDate):''))+'</div></div>';
+          ' · เบิกเมื่อ '+esc(x.reqDate)+(x.remain>0&&!x.install?' · กำหนด '+esc(x.due):'')+(x.remain<=0&&x.recvDate?' · รับเมื่อ '+esc(x.recvDate):'')+'</div>'+
+          (x.install?'<div style="font-size:13px;margin-top:3px;font-weight:600;color:'+(x.instLate?'#b91c1c':(x.remain>0&&x.daysLeft<=7?'#b45309':'inherit'))+'">ติดตั้ง '+esc(x.install)+
+            (x.remain>0?(x.instLate?' · เกินมา '+(-x.daysLeft)+' วัน ของยังไม่มา':x.daysLeft===0?' · วันนี้ ของยังไม่มา':' · อีก '+x.daysLeft+' วัน'):(x.onTime===true?' · ของมาก่อนติดตั้ง ✓':x.onTime===false?' · ของมาหลังวันติดตั้ง':''))+'</div>':'')+'</div>';
       }); var TN=4;
       h+=tciRows.slice(0,TN).join('')+(tciRows.length>TN?'<div id="db-more" style="display:none">'+tciRows.slice(TN).join('')+'</div><button class="btn ghost sm" id="db-tog" style="margin-top:8px;width:100%">▼ ดูทั้งหมด (อีก '+(tciRows.length-TN)+' รายการ)</button>':'')+
       '<button class="btn ghost sm" id="db-copy" style="margin-top:10px">คัดลอกข้อความสรุป</button>';
@@ -2379,6 +2388,8 @@
     var rows=[];
     if(a.pending) rows.push(['rcv','ใบเบิกค้างรับ '+a.pending+(a.pendingAog?' · AOG '+a.pendingAog:'')+(a.pendingOverdue?' · เลยกำหนด '+a.pendingOverdue:''), a.pendingOverdue||a.pendingAog?'bad':'']);
     [1,2].forEach(function(n){ var k=(d.kits||{})[n]; if(k&&k.total&&k.missing.length) rows.push(['kit',k.kit+' ไม่ครบ ขาด '+k.missing.length+' รายการ','bad']); });
+    if(a.tciLate) rows.push(['tci','งาน TCI เกินวันติดตั้งแล้วของยังไม่มา '+a.tciLate+' รายการ','bad']);
+    if(a.tciSoon) rows.push(['tci','งาน TCI ใกล้วันติดตั้ง (ภายใน 7 วัน) ของยังไม่มา '+a.tciSoon+' รายการ','warn']);
     if(a.recvNotIssued) rows.push(['iss','รับแล้วรอจ่ายให้ช่าง '+a.recvNotIssued+' ล็อต','']);
     if(a.awaiting) rows.push(['aw','รับก่อนเบิก รอใบเบิก '+a.awaiting+' รายการ','warn']);
     if(a.warrSoon) rows.push(['warr','LRU ประกันใกล้หมด (ภายใน 60 วัน) '+a.warrSoon,'warn']);
@@ -2398,7 +2409,7 @@
   function dbSummaryText(){
     var d=DB.data, s=d.tciSum, L=['งาน TCI เดือน '+dbMonthTh(d.month),'รับแล้ว '+s.done+'/'+s.total+(s.issued?' (จ่ายให้ช่างแล้ว '+s.issued+')':'')];
     var wait=d.tci.filter(function(x){ return x.remain>0; });
-    if(wait.length){ L.push('ยังไม่ได้รับ '+wait.length+' รายการ:'); wait.forEach(function(x){ L.push('- '+(x.part||x.name)+' '+x.name+' ('+x.docNo+') ค้าง '+fmtNum(x.remain)+(x.late?' เลยกำหนด '+x.due:' กำหนด '+x.due)+(x.urgency==='AOG'?' AOG':'')); }); }
+    if(wait.length){ L.push('ยังไม่ได้รับ '+wait.length+' รายการ:'); wait.forEach(function(x){ L.push('- '+(x.part||x.name)+' '+x.name+' ('+x.docNo+') ค้าง '+fmtNum(x.remain)+(x.install?(x.instLate?' เกินวันติดตั้ง '+x.install:' ติดตั้ง '+x.install):(x.late?' เลยกำหนด '+x.due:' กำหนด '+x.due))+(x.urgency==='AOG'?' AOG':'')); }); }
     else L.push('ได้รับครบทุกรายการ');
     return L.join('\n');
   }
