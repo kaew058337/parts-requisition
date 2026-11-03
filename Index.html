@@ -685,6 +685,20 @@
   </div>
 </div>
 
+<!-- ===== sheet: แก้ไขพัสดุในคลัง ===== -->
+<div class="sheet-bg" id="ed-bg">
+  <div class="sheet">
+    <div class="hd"><b>แก้ไขพัสดุในคลัง</b><button class="x" id="ed-x" aria-label="ปิด">×</button></div>
+    <div class="info" id="ed-info"></div>
+    <label>LOCATION (ที่จัดเก็บ)</label><input id="ed-loc" list="ed-locs" autocomplete="off">
+    <datalist id="ed-locs"></datalist>
+    <label>จำนวนคงเหลือ</label><input id="ed-qty" type="number" inputmode="decimal" min="0" step="any">
+    <label>S/N</label><input id="ed-sn" autocomplete="off" autocapitalize="characters">
+    <div class="meta" style="margin:6px 0" id="ed-note">เมื่อบันทึก ระบบจะแก้ในชีท รับ / จ่าย / ยืมพัสดุ / ใบเบิก / เคลม / คลังพัสดุ ให้ตรงกันทั้งหมด</div>
+    <button class="btn" id="ed-submit">บันทึกการแก้ไข</button>
+  </div>
+</div>
+
 <!-- ===== sheet: ย้ายที่จัดเก็บ ===== -->
 <div class="sheet-bg" id="mv-bg">
   <div class="sheet">
@@ -1630,7 +1644,7 @@
         if(l.cond) bits.push('COND '+esc(l.cond));
         if(l.location) bits.push(esc(l.location));
         if(l.expire) bits.push('หมดอายุ '+esc(l.expire));
-        return '<div class="meta" style="padding:5px 0;border-top:1px solid var(--line)">'+bits.join(' · ')+'<br>'+(l.docNo==='ยอดยกมา'||l.docNo==='คืนเข้าคลัง'||l.docNo==='รับก่อนเบิก'||l.docNo==='ย้ายจากชุด'?esc(l.docNo)+(l.note?' ('+esc(l.note)+')':''):'เลขเบิก '+esc(l.docNo))+' · รับ '+esc(l.received)+'<div style="display:flex;gap:8px;margin-top:6px">'+(l.free?'<button class="btn sm" data-is="'+l.seq+'">จ่าย</button>':(l.issRow?'<button class="btn sm" data-ix="'+l.seq+'">จ่าย</button>':''))+'<button class="btn ghost sm" data-bl="'+l.seq+'">ยืมออก</button><button class="btn ghost sm" data-mv="'+l.seq+'">ย้ายที่เก็บ</button></div>'+(l.linkNote?'<div style="color:var(--bad);margin-top:4px">⚠ '+esc(l.linkNote)+'</div>':'')+'</div>';
+        return '<div class="meta" style="padding:5px 0;border-top:1px solid var(--line)">'+bits.join(' · ')+'<br>'+(l.docNo==='ยอดยกมา'||l.docNo==='คืนเข้าคลัง'||l.docNo==='รับก่อนเบิก'||l.docNo==='ย้ายจากชุด'?esc(l.docNo)+(l.note?' ('+esc(l.note)+')':''):'เลขเบิก '+esc(l.docNo))+' · รับ '+esc(l.received)+'<div style="display:flex;gap:8px;margin-top:6px">'+(l.free?'<button class="btn sm" data-is="'+l.seq+'">จ่าย</button>':(l.issRow?'<button class="btn sm" data-ix="'+l.seq+'">จ่าย</button>':''))+'<button class="btn ghost sm" data-bl="'+l.seq+'">ยืมออก</button><button class="btn ghost sm" data-mv="'+l.seq+'">ย้ายที่เก็บ</button><button class="btn ghost sm" data-ed="'+l.seq+'">แก้ไข</button></div>'+(l.linkNote?'<div style="color:var(--bad);margin-top:4px">⚠ '+esc(l.linkNote)+'</div>':'')+'</div>';
       }).join('');
       return '<div class="card lift" style="padding:14px 16px">'+
         '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><b>'+esc(g.part||'-')+'</b><span class="chip ok">'+fmtNum(g.qty)+' '+esc(g.unit)+'</span></div>'+
@@ -1663,6 +1677,40 @@
     run('moveLocation', [{ seq:l.seq, location:loc, by:state.by }]).then(function(res){
       $('mv-bg').classList.remove('on');
       toast(res.same ? 'ไม่มีการเปลี่ยนแปลง' : 'ย้ายแล้ว → '+res.to);
+      loadStock();
+    }).catch(function(err){ toast(err.message,true); }).then(function(){ busy(b,false); });
+  });
+
+  /* ---------- แก้ไขพัสดุในคลัง (ที่เก็บ / จำนวน / S/N) ---------- */
+  $('k-list').addEventListener('click', function(e){
+    var b=e.target.closest('button[data-ed]'); if(!b) return;
+    var l=state.lotMap && state.lotMap[Number(b.dataset.ed)]; if(!l) return;
+    state.ed=l;
+    $('ed-info').innerHTML='<b>'+esc(l.name)+'</b><br><span class="meta">'+esc(l.part)+' · ลำดับรับ '+l.seq+'</span>';
+    var seen={}, opts='';
+    (state.stk||[]).forEach(function(g){ g.lots.forEach(function(x){ if(x.location && !seen[x.location]){ seen[x.location]=1; opts+='<option value="'+esc(x.location)+'">'; } }); });
+    $('ed-locs').innerHTML=opts;
+    $('ed-loc').value=l.location||'';
+    $('ed-qty').value=l.qty;
+    $('ed-sn').value=l.serial||'';
+    $('ed-qty').disabled=!!l.serial;
+    $('ed-bg').classList.add('on');
+  });
+  $('ed-sn').addEventListener('input', function(){
+    if(this.value.trim()){ $('ed-qty').value=1; $('ed-qty').disabled=true; }
+    else $('ed-qty').disabled=!!(state.ed && state.ed.serial);
+  });
+  $('ed-x').addEventListener('click', function(){ $('ed-bg').classList.remove('on'); });
+  $('ed-bg').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('on'); });
+  $('ed-submit').addEventListener('click', function(){
+    if(!state.by){ askBy(function(){ $('ed-submit').click(); }); return; }
+    var l=state.ed; if(!l) return;
+    var qty=Number($('ed-qty').value);
+    if(!(qty>0)){ toast('จำนวนต้องมากกว่า 0 (ถ้าไม่มีของแล้วให้ใช้ปุ่ม จ่าย)',true); return; }
+    var b=this; busy(b,true);
+    run('editLot', [{ seq:l.seq, location:$('ed-loc').value.trim(), qty:qty, serial:$('ed-sn').value.trim(), by:state.by }]).then(function(res){
+      $('ed-bg').classList.remove('on');
+      toast(res.same ? 'ไม่มีการเปลี่ยนแปลง' : 'แก้ไขแล้ว: '+res.changes.join(', '));
       loadStock();
     }).catch(function(err){ toast(err.message,true); }).then(function(){ busy(b,false); });
   });

@@ -98,6 +98,7 @@ const API_FUNCS_ = {
   getStock: getStock,
   issueFromLot: issueFromLot,
   moveLocation: moveLocation,
+  editLot: editLot,
   returnLoan: returnLoan,
   submitBorrow: submitBorrow,
   submitCount: submitCount,
@@ -280,19 +281,54 @@ function ensureTextCols_(sh, name, force) {
  * นำค่า Part number / Serial ที่แก้ไว้ในชีท "คลังพัสดุ" ไปแก้ที่ชีทต้นทางให้ (รับ, จ่าย, ยืมพัสดุ, ใบเบิก, ชุดพัสดุ, เคลม)
  * ใช้: แก้ช่อง Part / serial ในคลังพัสดุ แล้วกดเมนูนี้ทันที (ก่อนมีการเคลื่อนไหวอื่นที่ทำให้ชีทถูกสร้างใหม่)
  */
+/** แก้ Part/S/N ของล็อตหนึ่งในทุกชีท: รับ / จ่าย / ยืมพัสดุ / ใบเบิก / เคลม (newPart/newSn = null คือไม่แก้) */
+function propagatePartSn_(r, seq, newPart, newSn, issRows, loanRows) {
+  const partCh = newPart !== null, snCh = newSn !== null;
+  const oldPart = str_(r[RC.PART]), oldSn = str_(r[RC.SN]);
+  const setTxt = (sh, row, col, v) => sh.getRange(row, col).setNumberFormat('@').setValue(v);
+  const rrow = r._row, rcv = getSheet_(r._sh), doc = str_(r[RC.DOC]);
+  const iss = getSheet_(SHEET_ISS), loan = getSheet_(SHEET_LOAN);
+  if (partCh) setTxt(rcv, rrow, rcCol_(RC.PART), newPart);
+  if (snCh) setTxt(rcv, rrow, rcCol_(RC.SN), newSn);
+  issRows.forEach((ir, j) => {
+    if (str_(ir[IS.RSEQ]) !== seq) return;
+    if (partCh) setTxt(iss, j + 2, IS.PART + 1, newPart);
+    if (snCh) setTxt(iss, j + 2, IS.SN + 1, newSn);
+  });
+  loanRows.forEach((lr, j) => {
+    if (str_(lr[17]) !== seq) return;
+    if (partCh) setTxt(loan, j + 2, 3, newPart);
+    if (snCh) setTxt(loan, j + 2, 5, newSn);
+  });
+  if (partCh && doc && (str_(r[RC.SRC]) || SRC_REQ) === SRC_REQ) {
+    const req = getSheet_(SHEET_REQ), rl = req.getLastRow();
+    if (rl >= 2) {
+      const rv = req.getRange(2, 1, rl - 1, 3).getValues();
+      const hit = rv.map((x, k) => ({ x, k })).filter(o => pad_(o.x[1], 9) === pad_(doc, 9));
+      const pick = hit.length === 1 ? hit : hit.filter(o => str_(o.x[2]) === oldPart);
+      pick.forEach(o => setTxt(req, o.k + 2, 3, newPart));
+    }
+  }
+  if (snCh && oldSn) {
+    const sh = getSheet_(SHEET_CLAIM);
+    readClaims_().forEach(c => {
+      if (snKey_(c.sn) === snKey_(oldSn)) { setTxt(sh, c.row, 2, newSn); if (partCh) setTxt(sh, c.row, 3, newPart); }
+      if (snKey_(c.newSn) === snKey_(oldSn)) setTxt(sh, c.row, 11, newSn);
+    });
+  }
+}
+
 function applyStockEdits() {
   return withLock_(() => {
     const stk = getSheet_(SHEET_STK), last = stk.getLastRow();
     const out = { applied: [], skipped: [] };
     if (last >= 2) {
       const sRows = stk.getRange(2, 1, last - 1, HEADERS[SHEET_STK].length).getValues();
-      const iss = getSheet_(SHEET_ISS), loan = getSheet_(SHEET_LOAN);
       const rc = readRcv_();
       const rcBySeq = {};
       rc.forEach((r, i) => { rcBySeq[str_(r[RC.SEQ])] = i; });
       const snUsed = {};
       rc.forEach(r => { const k = snKey_(r[RC.SN]); if (k) snUsed[k] = (snUsed[k] || 0) + 1; });
-      const setTxt = (sh, row, col, v) => sh.getRange(row, col).setNumberFormat('@').setValue(v);
       const issRows = readIss_(), loanRows = readLoans_();
       sRows.forEach((sr, i) => {
         const seq = str_(sr[0]);
@@ -309,39 +345,9 @@ function applyStockEdits() {
           out.skipped.push('แถว ' + (i + 2) + ' S/N ' + newSn + ' ซ้ำกับรายการอื่น'); return;
         }
         if (snCh && !newSn && oldSn) { out.skipped.push('แถว ' + (i + 2) + ' ลบ S/N ไม่ได้ (ต้องมีค่า)'); return; }
-        const rrow = r._row, rcv = getSheet_(r._sh), doc = str_(r[RC.DOC]);
-        if (partCh) setTxt(rcv, rrow, rcCol_(RC.PART), newPart);
-        if (snCh) { setTxt(rcv, rrow, rcCol_(RC.SN), newSn); snUsed[snKey_(oldSn)] = 0; if (newSn) snUsed[snKey_(newSn)] = 1; }
-        // จ่าย
-        issRows.forEach((ir, j) => {
-          if (str_(ir[IS.RSEQ]) !== seq) return;
-          if (partCh) setTxt(iss, j + 2, IS.PART + 1, newPart);
-          if (snCh) setTxt(iss, j + 2, IS.SN + 1, newSn);
-        });
-        // ยืมพัสดุ (ลำดับล็อต col 18)
-        loanRows.forEach((lr, j) => {
-          if (str_(lr[17]) !== seq) return;
-          if (partCh) setTxt(loan, j + 2, 3, newPart);
-          if (snCh) setTxt(loan, j + 2, 5, newSn);
-        });
-        // ใบเบิก (ให้ยังจับคู่ รับ↔เบิก ได้)
-        if (partCh && doc && (str_(r[RC.SRC]) || SRC_REQ) === SRC_REQ) {
-          const req = getSheet_(SHEET_REQ), rl = req.getLastRow();
-          if (rl >= 2) {
-            const rv = req.getRange(2, 1, rl - 1, 3).getValues();
-            const hit = rv.map((x, k) => ({ x, k })).filter(o => pad_(o.x[1], 9) === pad_(doc, 9));
-            const pick = hit.length === 1 ? hit : hit.filter(o => str_(o.x[2]) === oldPart);
-            pick.forEach(o => setTxt(req, o.k + 2, 3, newPart));
-          }
-        }
-        // เคลม ที่อ้าง S/N เดิม
-        if (snCh && oldSn) {
-          readClaims_().forEach(c => {
-            const sh = getSheet_(SHEET_CLAIM);
-            if (snKey_(c.sn) === snKey_(oldSn)) { setTxt(sh, c.row, 2, newSn); if (partCh) setTxt(sh, c.row, 3, newPart); }
-            if (snKey_(c.newSn) === snKey_(oldSn)) setTxt(sh, c.row, 11, newSn);
-          });
-        }
+        const doc = str_(r[RC.DOC]);
+        if (snCh) { snUsed[snKey_(oldSn)] = 0; if (newSn) snUsed[snKey_(newSn)] = 1; }
+        propagatePartSn_(r, seq, partCh ? newPart : null, snCh ? newSn : null, issRows, loanRows);
         out.applied.push('ลำดับรับ ' + seq + ': ' + (partCh ? 'Part ' + oldPart + ' → ' + newPart + ' ' : '') + (snCh ? 'S/N ' + (oldSn || '(ว่าง)') + ' → ' + (newSn || '(ว่าง)') : ''));
         log_('แก้ Part/S/N จากคลังพัสดุ', doc, out.applied[out.applied.length - 1], 'เมนูชีท');
       });
@@ -1281,6 +1287,44 @@ function getStock() {
 /* ---------- ย้ายที่จัดเก็บ (LOCATION) ---------- */
 
 /** ย้ายล็อตไปที่จัดเก็บใหม่ : แก้ที่ชีท รับ (ต้นทาง) แล้วสร้างชีท คลังพัสดุ ใหม่ ทุกชีทจึงตรงกัน */
+/** แก้ไขล็อตในคลังจากหน้าเว็บ: ที่เก็บ / จำนวนคงเหลือ / S/N แล้วอัปเดตทุกชีทที่เกี่ยวข้อง */
+function editLot(p) {
+  return withLock_(() => {
+    const seq = Number(p.seq);
+    const lot = computeLots_().filter(l => l.seq === seq)[0];
+    if (!lot || lot.remain <= 0) throw new Error('ไม่พบพัสดุในคลัง (อาจถูกจ่ายไปแล้ว) กรุณารีเฟรช');
+    const rc = readRcv_();
+    const r = rc.filter(x => Number(x[RC.SEQ]) === seq)[0];
+    if (!r) throw new Error('ไม่พบแถวรับของพัสดุนี้');
+    const oldSn = str_(r[RC.SN]), oldLoc = str_(r[RC.LOC]);
+    const newLoc = p.location === undefined ? oldLoc : str_(p.location);
+    const newSn = p.serial === undefined ? oldSn : str_(p.serial);
+    const newRemain = p.qty === undefined || p.qty === '' ? lot.remain : num_(p.qty);
+    if (!(newRemain > 0)) throw new Error('จำนวนต้องมากกว่า 0 (ถ้าไม่มีของแล้วให้ใช้ จ่าย)');
+    if (newSn && newRemain !== 1) throw new Error('พัสดุที่มี S/N ต้องมีจำนวน 1');
+    if (!newSn && oldSn) throw new Error('ลบ S/N ที่มีอยู่แล้วไม่ได้');
+    const snCh = newSn !== oldSn, locCh = newLoc !== oldLoc, qtyCh = newRemain !== lot.remain;
+    if (snCh && newSn && rc.some(x => Number(x[RC.SEQ]) !== seq && snKey_(x[RC.SN]) === snKey_(newSn))) throw new Error('S/N ' + newSn + ' ซ้ำกับรายการอื่น');
+    const changes = [];
+    if (snCh) {
+      propagatePartSn_(r, str_(r[RC.SEQ]), null, newSn, readIss_(), readLoans_());
+      changes.push('S/N ' + (oldSn || '(ว่าง)') + ' → ' + newSn);
+    }
+    if (locCh) {
+      getSheet_(r._sh).getRange(r._row, rcCol_(RC.LOC)).setValue(newLoc);
+      changes.push('ที่เก็บ ' + (oldLoc || '(ว่าง)') + ' → ' + (newLoc || '(ว่าง)'));
+    }
+    if (qtyCh) {
+      getSheet_(r._sh).getRange(r._row, rcCol_(RC.QTY)).setValue(newRemain + lot.issued + lot.loanOut);
+      changes.push('จำนวน ' + lot.remain + ' → ' + newRemain);
+    }
+    if (!changes.length) return { ok: true, same: true, changes: [] };
+    log_('แก้ไขล็อตในคลัง', lot.doc, [lot.part, changes.join(' | ')].filter(Boolean).join(' | '), p.by);
+    rebuildStock_();
+    return { ok: true, changes: changes };
+  });
+}
+
 function moveLocation(p) {
   return withLock_(() => {
     const loc = str_(p.location);
