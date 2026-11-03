@@ -771,6 +771,8 @@
       <div><label>LOCATION</label><input id="o-loc"></div>
       <div><label>วันหมดอายุ</label><input id="o-exp" type="date"></div>
     </div>
+    <div id="o-kit-wrap"><label>เก็บในชุด FLY AWAY KIT (ถ้ามี)</label>
+      <select id="o-kit"><option value="">— ไม่ใช่ (คลังปกติ) —</option><option>FLY AWAY KIT 1</option><option>FLY AWAY KIT 2</option></select></div>
     <div id="o-now-wrap" style="margin-top:10px;padding:10px 12px;border-radius:14px;background:rgba(26,86,219,.07)">
       <label style="display:flex;gap:8px;align-items:center;margin:0;font-weight:600"><input type="checkbox" id="o-now" checked style="width:auto;margin:0"> จ่ายให้ช่างทันที (ยังไม่มีใบเบิก)</label>
       <div id="o-now-f">
@@ -1995,7 +1997,7 @@
   state.oSrc = 'รับก่อนเบิก'; state.aw = [];
   var O_INFO = { 'รับก่อนเบิก':'รับพัสดุเข้าคลังก่อนมีใบเบิก (นับวันรับจริง ประกันเริ่มนับ) จ่ายให้ช่างได้ทันที เมื่อมีใบเบิกแล้วค่อยกด รอใบเบิก → ผูกใบเบิก',
                  'ยอดยกมา':'ใช้บันทึกพัสดุที่มีอยู่แล้วในคลังตั้งแต่ก่อนใช้ระบบ ไม่มีวันที่รับ จึงไม่นับประกัน' };
-  function oNowToggle(){ $('o-now-f').style.display = $('o-now').checked ? '' : 'none'; }
+  function oNowToggle(){ $('o-now-f').style.display = $('o-now').checked ? '' : 'none'; if($('o-now').checked && $('o-now-wrap').style.display!=='none') $('o-kit').value=''; $('o-kit').disabled = $('o-now').checked && $('o-now-wrap').style.display!=='none'; }
   $('o-now').addEventListener('change', oNowToggle);
   function oSrcSet(v){ state.oSrc=v; $('o-info').textContent=O_INFO[v]; $('o-now-wrap').style.display = v==='รับก่อนเบิก' ? '' : 'none'; oNowToggle();
     document.querySelectorAll('#o-src button').forEach(function(b){ b.classList.toggle('on', b.dataset.s===v); }); }
@@ -2059,7 +2061,7 @@
     var btn=$('o-submit'); busy(btn,true);
     run('addOpeningStock', [{
       part:$('o-part').value, name:$('o-name').value, itemType:$('o-type').value, cond:$('o-cond').value,
-      serial:$('o-sn').value, qty:$('o-qty').value, unit:$('o-unit').value, location:$('o-loc').value, expire:$('o-exp').value, source:state.oSrc, issueNow:(state.oSrc==='รับก่อนเบิก' && $('o-now').checked), tech:$('o-tech').value, tail:$('o-tail').value, by:state.by
+      serial:$('o-sn').value, qty:$('o-qty').value, unit:$('o-unit').value, location:$('o-loc').value, expire:$('o-exp').value, source:state.oSrc, issueNow:(state.oSrc==='รับก่อนเบิก' && $('o-now').checked), tech:$('o-tech').value, tail:$('o-tail').value, kit:$('o-kit').value, by:state.by
     }]).then(function(res){
       toast(res && res.issued ? 'รับเข้าและจ่ายให้ช่างแล้ว · รอผูกใบเบิกภายหลัง' : 'เพิ่มเข้าคลังแล้ว · เพิ่มรายการถัดไปได้เลย');
       ['o-part','o-name','o-sn'].forEach(function(id){ $(id).value=''; });

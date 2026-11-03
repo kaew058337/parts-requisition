@@ -16,6 +16,7 @@ const SHEET_LOG = 'บันทึกการใช้งาน';
 const SHEET_LOAN = 'ยืมพัสดุ';
 const SHEET_CNT = 'ตรวจนับ';
 const SHEET_CLAIM = 'เคลม';
+const SHEET_KIT = 'FLY AWAY KIT';       // ชีทแสดง/แก้พัสดุที่ TAIL No. เป็น FLY AWAY KIT 1-2 (ลิงก์กับชีท รับ ด้วยลำดับรับ)
 const SHEET_RCV2 = 'รับคืนเข้าคลัง';   // ประวัติรับ "คืนเข้าคลัง" แยกจากรับปกติ (โครงสร้างเหมือนชีท รับ)
 const WARRANTY_DAYS = 365;        // ประกัน 1 ปี นับจากวันที่รับ (LRU / LRU(TCI)) ; ของที่เคลมกลับมานับใหม่จากวันที่ได้รับกลับ
 const WARRANTY_SOON_DAYS = 60;    // เตือน "ใกล้หมดประกัน" เมื่อเหลือไม่เกินกี่วัน
@@ -47,6 +48,7 @@ const HEADERS = {
   [SHEET_RCVR]: ['ยศ-ชื่อ นามสกุล'],
   [SHEET_LOAN]: ['เลขที่ยืม', 'วันที่ยืม', 'Part number', 'ชื่อพัสดุ', 'serial number', 'ประเภทพัสดุ', 'จำนวน', 'หน่วยนับ', 'จำนวนคงค้าง', 'ผู้ยืม', 'ประเภทผู้ยืม', 'เหตุผล/เครื่อง', 'กำหนดคืน', 'สถานะ', 'วันที่ปิด', 'วิธีปิด', 'เลขเบิกอ้างอิง', 'ลำดับล็อต (อ้างอิง)', 'หมายเหตุ', 'คืนเข้าคลังแล้ว (จำนวน)'],
   [SHEET_LOG]: ['เวลา', 'ผู้ใช้งาน', 'อีเมล', 'การกระทำ', 'เลขเอกสารการเบิก', 'รายละเอียด'],
+  [SHEET_KIT]: ['ลำดับรับ', 'ชุด (TAIL No.)', 'Part number', 'ชื่อพัสดุ', 'serial number', 'ประเภทพัสดุ', 'จำนวน', 'หน่วยนับ', 'คงเหลือในชุด', 'COND', 'LOCATION', 'หมดอายุ', 'วันที่รับ', 'เลขเอกสารการเบิก', 'สถานะ', 'หมายเหตุ'],
   [SHEET_STK]: ['ลำดับรับ', 'เลขเอกสารการเบิก', 'Part number', 'ชื่อพัสดุ', 'serial number', 'ประเภทพัสดุ', 'หน่วยนับ', 'จำนวนรับ', 'จำนวนคงเหลือ', 'COND', 'LOCATION', 'หมดอายุ', 'วันที่รับ', 'สถานะ', 'หมายเหตุ'],
   [SHEET_RET]: ['ลำดับ', 'Part number', 'ชื่อ', 'จำนวน', 'serial number ส่งคืน', 'serial number ที่ใส่', 'ผู้รับ', 'ผู้ส่ง', 'เครื่อง', 'ข้อขัดข้อง', 'หมายเหตุ', 'วันที่บันทึก', 'ที่หนังสือ', 'สภาพพัสดุ']
 };
@@ -241,6 +243,7 @@ TEXT_COLS_[SHEET_RCV] = [3, 4, 6];   // Part, serial (หลังย้าย c
 TEXT_COLS_[SHEET_RCV2] = [3, 4, 6];
 TEXT_COLS_[SHEET_ISS] = [5, 7];
 TEXT_COLS_[SHEET_STK] = [3, 5];
+TEXT_COLS_[SHEET_KIT] = [3, 5];
 TEXT_COLS_[SHEET_LOAN] = [3, 5];
 TEXT_COLS_[SHEET_RET] = [2, 5, 6];
 TEXT_COLS_[SHEET_CNT] = [5, 7];
@@ -957,6 +960,7 @@ function findLot_(seq) {
 function rebuildStock_() {
   const lots = computeLots_().filter(l => l.remain > 0);
   lots.sort((a, b) => (a.free - b.free) || (a.label < b.label ? -1 : a.label > b.label ? 1 : 0) || (a.seq - b.seq));
+  rebuildKit_();
   const stk = getSheet_(SHEET_STK);
   const last = stk.getLastRow();
   const w = HEADERS[SHEET_STK].length;
@@ -1339,10 +1343,133 @@ function moveLocation(p) {
   });
 }
 
+/* ---------- FLY AWAY KIT: พัสดุที่ TAIL No. = FLY AWAY KIT 1 / 2 (ชีทนี้เป็นมุมมองที่ลิงก์กับชีท รับ ด้วยลำดับรับ) ---------- */
+
+/** "fly away kit 1", "FLYAWAYKIT2" -> 'FLY AWAY KIT 1' / 'FLY AWAY KIT 2' ; อื่น ๆ -> '' */
+function kitOf_(tail) {
+  const m = str_(tail).toUpperCase().replace(/[\s_-]+/g, '').match(/^FLYAWAYKIT([12])$/);
+  return m ? 'FLY AWAY KIT ' + m[1] : '';
+}
+
+/** เขียนชีท FLY AWAY KIT ใหม่จากชีท รับ (ทุกแถวที่ TAIL No. เป็นชุด) */
+function rebuildKit_(lots) {
+  const sh = getSheet_(SHEET_KIT), w = HEADERS[SHEET_KIT].length;
+  lots = (lots || computeLots_()).filter(l => kitOf_(l.v[RC.TAIL]));
+  lots.sort((a, b) => {
+    const ka = kitOf_(a.v[RC.TAIL]), kb = kitOf_(b.v[RC.TAIL]);
+    return (ka < kb ? -1 : ka > kb ? 1 : 0) || (a.part < b.part ? -1 : a.part > b.part ? 1 : 0) || (a.serial < b.serial ? -1 : a.serial > b.serial ? 1 : 0) || (a.seq - b.seq);
+  });
+  const last = sh.getLastRow();
+  if (last >= 2) sh.getRange(2, 1, last - 1, w).clearContent();
+  if (!lots.length) return 0;
+  const rows = lots.map(l => [l.seq, kitOf_(l.v[RC.TAIL]), l.part, l.name, l.serial, l.type, l.qty, l.unit, Math.max(l.remain, 0), l.cond, l.loc, l.expire, l.recvDate, l.doc,
+    l.remain > 0 ? 'อยู่ในชุด' + (l.loanOut > 0 ? ' (ยืมออก ' + l.loanOut + ')' : '') : (l.loanOut > 0 ? 'ยืมออก' : 'จ่ายออกแล้ว'), l.note]);
+  sh.getRange(2, 3, rows.length, 1).setNumberFormat('@');
+  sh.getRange(2, 5, rows.length, 1).setNumberFormat('@');
+  sh.getRange(2, 1, rows.length, w).setValues(rows);
+  sh.getRange(2, 12, rows.length, 2).setNumberFormat('dd/mm/yyyy');
+  return rows.length;
+}
+
+/** เมนู: อัปเดตชีท FLY AWAY KIT จากชีท รับ */
+function refreshKitSheet() {
+  return withLock_(() => {
+    const n = rebuildKit_();
+    try { SpreadsheetApp.getUi().alert('อัปเดตชีท ' + SHEET_KIT + ' แล้ว ' + n + ' รายการ'); } catch (e) { /* ไม่มี UI */ }
+    return { rows: n };
+  });
+}
+
+/** แก้ในชีท FLY AWAY KIT -> เขียนกลับชีท รับ (ลำดับรับเดียวกัน) แล้วอัปเดตชีทอื่นให้ตรงกัน ; แถวใหม่ที่ไม่มีลำดับรับ = เพิ่มพัสดุเข้าชุด */
+function kitSheetEdited_(e) {
+  const sh = e.range.getSheet(), w = HEADERS[SHEET_KIT].length;
+  const c1 = e.range.getColumn(), c2 = c1 + e.range.getNumColumns() - 1;
+  const r1 = Math.max(e.range.getRow(), 2), r2 = e.range.getRow() + e.range.getNumRows() - 1;
+  if (r2 < r1) return;
+  const EDIT = { 2: RC.TAIL, 3: RC.PART, 4: RC.NAME, 5: RC.SN, 6: RC.TYPE, 7: RC.QTY, 8: RC.UNIT, 10: RC.COND, 11: RC.LOC, 12: RC.EXP, 16: RC.NOTE };
+  const rc = readRcv_(), bySeq = {};
+  rc.forEach(r => { bySeq[Number(r[RC.SEQ])] = r; });
+  const vals = sh.getRange(r1, 1, r2 - r1 + 1, w).getValues();
+  const issRows = readIss_(), loanRows = readLoans_();
+  const setTxt = (s2, row, col, v) => s2.getRange(row, col).setNumberFormat('@').setValue(v);
+  const bad = [];
+  vals.forEach((v, i) => {
+    const seq = Number(v[0]), row = r1 + i;
+    if (!seq) {
+      // แถวใหม่: เพิ่มเข้าชีท รับ เป็นยอดยกมาของชุด
+      const kit = kitOf_(v[1]), part = str_(v[2]), name = str_(v[3]);
+      if (!part && !name) return;
+      if (!kit) { bad.push('แถว ' + row + ': ช่อง ชุด ต้องเป็น FLY AWAY KIT 1 หรือ 2'); return; }
+      if (!name) { bad.push('แถว ' + row + ': ต้องมีชื่อพัสดุ'); return; }
+      const sn = str_(v[4]), q = num_(v[6]) || 1;
+      if (sn && (q !== 1 || rc.some(r => snKey_(r[RC.SN]) === snKey_(sn)))) { bad.push('แถว ' + row + ': S/N ซ้ำหรือจำนวนไม่ใช่ 1'); return; }
+      const ns = nextRcvSeq_();
+      appendRcv_([ns, '', part, name, sn, str_(v[5]), q, str_(v[7]) || 'EA', '', '', str_(v[9]), '', '', '', parseDate_(todayStr_()), '', kit, '', '',
+        v[11] instanceof Date ? v[11] : '', str_(v[10]), '', str_(v[15]), SRC_OPEN, '']);
+      log_('เพิ่มพัสดุเข้าชุด', '', [part, name, 'x' + q, sn ? 'S/N ' + sn : '', kit].filter(Boolean).join(' | '), 'แก้ในชีท');
+      return;
+    }
+    const r = bySeq[seq];
+    if (!r) return;
+    const rsh = getSheet_(r._sh), rrow = r._row, ch = [];
+    Object.keys(EDIT).forEach(k => {
+      const col = Number(k);
+      if (col < c1 || col > c2) return;
+      const li = EDIT[k], nv = v[col - 1], ov = r[li];
+      if (li === RC.PART) {
+        const np = str_(nv); if (np === str_(ov)) return;
+        if (!np) { bad.push('แถว ' + row + ': Part ว่างไม่ได้'); return; }
+        propagatePartSn_(r, String(seq), np, null, issRows, loanRows); ch.push('Part ' + str_(ov) + ' → ' + np); r[RC.PART] = np;
+      } else if (li === RC.SN) {
+        const ns = str_(nv), os = str_(ov); if (ns === os) return;
+        if (!ns && os) { bad.push('แถว ' + row + ': ลบ S/N ไม่ได้'); return; }
+        if (rc.some(x => Number(x[RC.SEQ]) !== seq && snKey_(x[RC.SN]) === snKey_(ns))) { bad.push('แถว ' + row + ': S/N ' + ns + ' ซ้ำกับรายการอื่น'); return; }
+        propagatePartSn_(r, String(seq), null, ns, issRows, loanRows); ch.push('S/N ' + (os || '(ว่าง)') + ' → ' + ns); r[RC.SN] = ns;
+      } else if (li === RC.QTY) {
+        const nq = num_(nv); if (nq === num_(ov)) return;
+        if (!(nq > 0)) { bad.push('แถว ' + row + ': จำนวนต้องมากกว่า 0'); return; }
+        rsh.getRange(rrow, rcCol_(li)).setValue(nq); ch.push('จำนวน ' + num_(ov) + ' → ' + nq); r[li] = nq;
+      } else if (li === RC.EXP) {
+        const d = nv instanceof Date ? nv : (str_(nv) ? parseImportDate_(nv) : '');
+        if (d === null) { bad.push('แถว ' + row + ': รูปแบบวันหมดอายุไม่ถูกต้อง'); return; }
+        rsh.getRange(rrow, rcCol_(li)).setValue(d); ch.push('หมดอายุ'); r[li] = d;
+      } else if (li === RC.TAIL) {
+        const k2 = kitOf_(nv); if (k2 === kitOf_(ov)) return;
+        rsh.getRange(rrow, rcCol_(li)).setValue(str_(nv)); ch.push('ชุด ' + kitOf_(ov) + ' → ' + (str_(nv) || '(ว่าง = ออกจากชุด)')); r[li] = str_(nv);
+      } else {
+        if (str_(nv) === str_(ov)) return;
+        rsh.getRange(rrow, rcCol_(li)).setValue(str_(nv)); ch.push(HEADERS[SHEET_KIT][col - 1]); r[li] = str_(nv);
+      }
+    });
+    if (ch.length) log_('แก้พัสดุในชีท FLY AWAY KIT', docStr_(r[RC.DOC]), [str_(r[RC.PART]), ch.join(' | ')].join(' | '), 'แก้ในชีท');
+  });
+  rebuildStock_();   // คำนวณคลังพัสดุ + ชีท FLY AWAY KIT ใหม่ให้ตรงกับชีท รับ
+  if (bad.length) { try { SpreadsheetApp.getActiveSpreadsheet().toast(bad.slice(0, 3).join(' / '), 'แก้ไม่สำเร็จ', 8); } catch (x) { /* ignore */ } }
+}
+
 /** เมื่อแก้ LOCATION ในชีท คลังพัสดุ หรือ รับ ด้วยมือ -> แก้อีกชีทให้ตรงกันทันที (simple trigger ทำงานเอง ไม่ต้องตั้งค่า) */
 function onEdit(e) {
   try {
     if (!e || !e.range) return;
+    const nm = e.range.getSheet().getName();
+    if (nm === SHEET_KIT) { kitSheetEdited_(e); return; }
+    syncLoc_(e);
+    if (nm === SHEET_RCV || nm === SHEET_RCV2 || nm === SHEET_STK) {
+      if (nm !== SHEET_STK) {
+        // ช่อง TAIL ที่พิมพ์เป็น fly away kit -> ปรับให้เป็นรูปแบบมาตรฐาน
+        const tc = rcCol_(RC.TAIL), c1 = e.range.getColumn(), c2 = c1 + e.range.getNumColumns() - 1;
+        if (tc >= c1 && tc <= c2) {
+          const sh = e.range.getSheet(), r1 = Math.max(e.range.getRow(), 2), r2 = e.range.getRow() + e.range.getNumRows() - 1;
+          if (r2 >= r1) sh.getRange(r1, tc, r2 - r1 + 1, 1).getValues().forEach((v, i) => { const k = kitOf_(v[0]); if (k && k !== str_(v[0])) sh.getRange(r1 + i, tc).setValue(k); });
+        }
+      }
+      rebuildKit_();
+    }
+  } catch (err) { /* ไม่ขัดจังหวะการแก้ชีท */ }
+}
+
+function syncLoc_(e) {
+  try {
     const sh = e.range.getSheet(), name = sh.getName();
     if (name !== SHEET_STK && name !== SHEET_RCV && name !== SHEET_RCV2) return;
     const col = name === SHEET_STK ? 11 : rcCol_(RC.LOC);
@@ -1561,17 +1688,19 @@ function addOpeningStock(p) {
       const dup = computeLots_().filter(l => l.remain > 0 && snKey_(l.serial) === snKey_(sn))[0];
       if (dup) throw new Error('Serial ' + sn + ' มีอยู่ในคลังแล้ว (' + dup.label + ')');
     }
+    const kit = kitOf_(p.kit);
     const issueNow = source === SRC_PRE && !!p.issueNow;
+    if (kit && issueNow) throw new Error('เลือกอย่างใดอย่างหนึ่ง: เข้าชุด FLY AWAY KIT หรือจ่ายให้ช่างทันที');
     if (issueNow && !str_(p.tech)) throw new Error('กรุณากรอกชื่อช่างที่รับพัสดุ (จ่ายทันที)');
     const newSeq = nextRcvSeq_();
     appendRcv_([
       newSeq, '', str_(p.part), str_(p.name), sn, type, qty, str_(p.unit) || 'EA', '', '',
-      str_(p.cond), '', '', '', parseDate_(todayStr_()), '', '', str_(p.cardId), '', parseDate_(p.expire), str_(p.location), '', str_(p.remark), source, ''
+      str_(p.cond), '', '', '', parseDate_(todayStr_()), '', kit, str_(p.cardId), '', parseDate_(p.expire), str_(p.location), '', str_(p.remark), source, ''
     ]);
     if (issueNow) issueDirectCore_({ lotSeq: newSeq, qty: qty, tech: p.tech, tail: p.tail, payDate: p.payDate || todayStr_(), remark: p.issueRemark, by: p.by });
-    log_(source, '', [str_(p.part), str_(p.name), 'x' + qty, sn ? 'S/N ' + sn : '', str_(p.location)].filter(Boolean).join(' | '), p.by);
+    log_(source, '', [str_(p.part), str_(p.name), 'x' + qty, sn ? 'S/N ' + sn : '', str_(p.location), kit].filter(Boolean).join(' | '), p.by);
     rebuildStock_();
-    return { ok: true, issued: issueNow };
+    return { ok: true, issued: issueNow, kit: kit };
   });
 }
 
@@ -2343,7 +2472,7 @@ function clearStockData_(opt) {
       backupName = 'สำรองก่อนเคลียร์ ' + Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH:mm');
       ss.copy(backupName);
     }
-    const names = [SHEET_RCV, SHEET_RCV2, SHEET_ISS, SHEET_STK];
+    const names = [SHEET_RCV, SHEET_RCV2, SHEET_ISS, SHEET_STK, SHEET_KIT];
     if (opt.clearLoans) names.push(SHEET_LOAN);
     if (opt.clearRequisitions) names.push(SHEET_REQ);
     names.forEach(n => {
@@ -2370,7 +2499,7 @@ function clearStockDataFromEditor() {
 function createImportTemplate() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sh = ss.getSheetByName(SHEET_IMPORT);
-  const H = ['Part number', 'ชื่อพัสดุ', 'ประเภทพัสดุ (LRU / SP / LRU(TCI) / SP(TCI) / สารเคมี)', 'serial number (ถ้ามี)', 'จำนวน', 'หน่วยนับ (ว่าง = EA)', 'COND', 'LOCATION', 'หมดอายุ (วว/ดด/ปปปป)', 'เลขใบเบิก (ถ้ามี)', 'วันที่รับ (ว่าง = วันนี้)', 'card ID', 'ผลตรวจ'];
+  const H = ['Part number', 'ชื่อพัสดุ', 'ประเภทพัสดุ (LRU / SP / LRU(TCI) / SP(TCI) / สารเคมี)', 'serial number (ถ้ามี)', 'จำนวน', 'หน่วยนับ (ว่าง = EA)', 'COND', 'LOCATION', 'หมดอายุ (วว/ดด/ปปปป)', 'เลขใบเบิก (ถ้ามี)', 'วันที่รับ (ว่าง = วันนี้)', 'card ID', 'TAIL No. (FLY AWAY KIT 1 / 2 หรือว่าง)', 'ผลตรวจ'];
   if (!sh) {
     sh = ss.insertSheet(SHEET_IMPORT);
     HDR_STYLE_(sh.getRange(1, 1, 1, H.length).setValues([H]));
@@ -2380,6 +2509,7 @@ function createImportTemplate() {
     sh.getRange('I2:I').setNumberFormat('dd/mm/yyyy');
     sh.getRange('K2:K').setNumberFormat('dd/mm/yyyy');
     sh.getRange('L2:L').setNumberFormat('@');
+    sh.getRange('M2:M').setNumberFormat('@');
   } else {
     if (str_(sh.getRange(1, 10).getValue()) === 'ผลตรวจ') {
       // ชีทแบบเดิม (10 คอลัมน์): แทรกคอลัมน์ เลขใบเบิก / วันที่รับ ก่อน ผลตรวจ
@@ -2393,6 +2523,12 @@ function createImportTemplate() {
       sh.insertColumnsBefore(12, 1);
       HDR_STYLE_(sh.getRange(1, 12, 1, 1).setValues([[H[11]]]));
       sh.getRange('L2:L').setNumberFormat('@');
+    }
+    if (str_(sh.getRange(1, 13).getValue()) === 'ผลตรวจ') {
+      // ชีทแบบ 13 คอลัมน์: แทรกคอลัมน์ TAIL No. ก่อน ผลตรวจ
+      sh.insertColumnsBefore(13, 1);
+      HDR_STYLE_(sh.getRange(1, 13, 1, 1).setValues([[H[12]]]));
+      sh.getRange('M2:M').setNumberFormat('@');
     }
   }
   return sh;
@@ -2453,6 +2589,7 @@ function importOpeningRows_(rows, by) {
         seen[key] = n;
         if (lots.some(l => l.remain > 0 && l.part === part && l.serial.toUpperCase() === sn.toUpperCase())) return err('Serial นี้มีอยู่ในคลังแล้ว');
       }
+      const tailIn = kitOf_(r[12]) || str_(r[12]);
       const exp = parseImportDate_(r[8]);
       if (exp === null) return err('รูปแบบวันหมดอายุไม่ถูกต้อง (ใช้ วว/ดด/ปปปป)');
       const rdate = parseImportDate_(r[10]);
@@ -2468,7 +2605,7 @@ function importOpeningRows_(rows, by) {
           if (dupDoc) return err('Serial ' + sn + ' รับไปแล้วในใบเบิกนี้');
         }
       }
-      good.push({ n: n, rv: rv, v: [part, name, sn, type, qty, unit, str_(r[6]), str_(r[7]), exp, rdate, str_(r[11])] });
+      good.push({ n: n, rv: rv, v: [part, name, sn, type, qty, unit, str_(r[6]), str_(r[7]), exp, rdate, str_(r[11]), tailIn] });
     });
     if (errors.length) return { added: 0, errors: errors };
     if (!good.length) return { added: 0, errors: [], empty: true };
@@ -2480,7 +2617,7 @@ function importOpeningRows_(rows, by) {
       const v = g.v, rv = g.rv;
       return [seq++, rv ? pad_(rv[1], 9) : '', v[0], v[1], v[2], v[3], v[4], v[5], '', '',
         v[6], rv ? rv[6] : '', rv ? str_(rv[9]) : '', rv ? dueDate_(rv[6], rv[9]) : '', v[9] || today, '',
-        rv ? str_(rv[8]) : '', v[10], '', v[8], v[7], '', '', rv ? SRC_REQ : SRC_OPEN, ''];
+        v[11] || (rv ? str_(rv[8]) : ''), v[10], '', v[8], v[7], '', '', rv ? SRC_REQ : SRC_OPEN, ''];
     });
     writeRcvRows_(sh, start, out);
     // ใบเบิก: รับเกิน -> เพิ่มจำนวนเบิก ; รับครบ -> วันที่จ่าย = วันที่รับ
@@ -2503,17 +2640,17 @@ function importOpeningStock() {
   const sh = createImportTemplate();
   const last = sh.getLastRow();
   if (last < 2) throw new Error('ยังไม่มีข้อมูลในชีท ' + SHEET_IMPORT);
-  const all = sh.getRange(2, 1, last - 1, 13).getValues();
+  const all = sh.getRange(2, 1, last - 1, 14).getValues();
   const idx = [], rows = [];
-  all.forEach((r, i) => { if (str_(r[12]) !== 'นำเข้าแล้ว') { idx.push(i); rows.push(r); } });
+  all.forEach((r, i) => { if (str_(r[13]) !== 'นำเข้าแล้ว') { idx.push(i); rows.push(r); } });
   const res = importOpeningRows_(rows, 'นำเข้าจำนวนมาก');
   const msg = all.map(() => null);
   if (res.errors.length) {
     res.errors.forEach(e => { msg[idx[e.row - 2]] = '✗ ' + e.msg; });
   } else {
-    idx.forEach(i => { if (all[i].slice(0, 12).some(x => str_(x) !== '')) msg[i] = 'นำเข้าแล้ว'; });
+    idx.forEach(i => { if (all[i].slice(0, 13).some(x => str_(x) !== '')) msg[i] = 'นำเข้าแล้ว'; });
   }
-  sh.getRange(2, 13, all.length, 1).setValues(all.map((r, i) => [msg[i] === null ? str_(r[12]) : msg[i]]));
+  sh.getRange(2, 14, all.length, 1).setValues(all.map((r, i) => [msg[i] === null ? str_(r[13]) : msg[i]]));
   try { SpreadsheetApp.getUi().alert(res.errors.length ? 'พบแถวที่ผิด ' + res.errors.length + ' แถว ยังไม่ได้นำเข้า (ดูคอลัมน์ ผลตรวจ)' : 'นำเข้าแล้ว ' + res.added + ' รายการ'); } catch (e) { /* ไม่มี UI */ }
   return res;
 }
@@ -2537,6 +2674,7 @@ function onOpen() {
       .addItem('ตรวจ Part/Serial ที่กลายเป็นวันที่', 'findDateParts')
       .addItem('ตรวจแถวใบเบิกที่ข้อมูลไม่ครบ', 'findIncompleteRequisitions')
       .addItem('นำค่าที่แก้ในคลังพัสดุไปแก้ต้นทาง', 'applyStockEdits')
+      .addItem('อัปเดตชีท FLY AWAY KIT', 'refreshKitSheet')
       .addToUi();
   } catch (e) { /* ไม่มี UI */ }
 }
