@@ -2340,8 +2340,22 @@
       '<button class="btn ghost sm" id="db-copy" style="margin-top:10px">คัดลอกข้อความสรุป</button>';
     }
     h+='</div>';
+    h+='<div class="card" style="margin-top:12px"><div class="t"><b>FLY AWAY KIT</b></div>';
+    [1,2].forEach(function(n){
+      var k=(d.kits||{})[n]; if(!k) return;
+      if(!k.total){ h+='<div class="meta" style="margin-top:8px"><b>'+esc(k.kit)+'</b> · ยังไม่ได้ตั้งรายการตายตัว (ชีท รายการชุด FLY AWAY KIT)</div>'; return; }
+      var ok=!k.missing.length;
+      h+='<div style="padding:10px 0;border-top:1px solid var(--line)"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>'+esc(k.kit)+'</b>'+
+        '<span class="chip '+(ok?'ok':'bad')+'">'+(ok?'ครบ ':'ไม่ครบ ')+k.complete+'/'+k.total+'</span></div>'+
+        '<div class="bar" style="margin-top:6px"><i style="display:block;height:100%;width:'+Math.round(k.complete*100/k.total)+'%;background:'+(ok?'#16a34a':'#d97706')+';border-radius:99px"></i></div>'+
+        (k.missing.length?'<div class="meta" style="margin-top:8px;font-size:13px"><b>ขาด '+k.missing.length+' รายการ</b>'+k.missing.map(function(m){ return '<br>• '+esc(m.part)+' '+esc(m.name)+' — ต้องมี '+fmtNum(m.need)+' มี '+fmtNum(m.have); }).join('')+'</div>':'')+
+        (k.loans&&k.loans.length?'<div class="meta" style="margin-top:6px;font-size:13px"><b>ยืมออกอยู่ (รอคืน)</b>'+k.loans.map(function(m){ return '<br>• '+esc(m.part)+' '+esc(m.name)+' x'+fmtNum(m.qty)+' — '+esc(m.who); }).join('')+'</div>':'')+
+        '<div class="meta" style="margin-top:6px;font-size:13px">ใช้ล่าสุด: '+(k.lastUse?esc(k.lastUse):'ยังไม่เคยใช้')+'</div></div>';
+    });
+    h+='</div>';
     var rows=[];
     if(a.pending) rows.push(['rcv','ใบเบิกค้างรับ '+a.pending+(a.pendingAog?' · AOG '+a.pendingAog:'')+(a.pendingOverdue?' · เลยกำหนด '+a.pendingOverdue:''), a.pendingOverdue||a.pendingAog?'bad':'']);
+    [1,2].forEach(function(n){ var k=(d.kits||{})[n]; if(k&&k.total&&k.missing.length) rows.push(['kit',k.kit+' ไม่ครบ ขาด '+k.missing.length+' รายการ','bad']); });
     if(a.recvNotIssued) rows.push(['iss','รับแล้วรอจ่ายให้ช่าง '+a.recvNotIssued+' ล็อต','']);
     if(a.awaiting) rows.push(['aw','รับก่อนเบิก รอใบเบิก '+a.awaiting+' รายการ','warn']);
     if(a.warrSoon) rows.push(['warr','LRU ประกันใกล้หมด (ภายใน 60 วัน) '+a.warrSoon,'warn']);

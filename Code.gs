@@ -17,6 +17,7 @@ const SHEET_LOAN = 'ยืมพัสดุ';
 const SHEET_CNT = 'ตรวจนับ';
 const SHEET_CLAIM = 'เคลม';
 const SHEET_KIT = 'FLY AWAY KIT';       // ชีทแสดง/แก้พัสดุที่ TAIL No. เป็น FLY AWAY KIT 1-2 (ลิงก์กับชีท รับ ด้วยลำดับรับ)
+const SHEET_KITREQ = 'รายการชุด FLY AWAY KIT';   // รายการตายตัวที่แต่ละชุดต้องมี + จำนวน (ผู้ใช้กรอก) ระบบเทียบกับของจริงในชุด
 const SHEET_RCV2 = 'รับคืนเข้าคลัง';   // ประวัติรับ "คืนเข้าคลัง" แยกจากรับปกติ (โครงสร้างเหมือนชีท รับ)
 const WARRANTY_DAYS = 365;        // ประกัน 1 ปี นับจากวันที่รับ (LRU / LRU(TCI)) ; ของที่เคลมกลับมานับใหม่จากวันที่ได้รับกลับ
 const WARRANTY_SOON_DAYS = 60;    // เตือน "ใกล้หมดประกัน" เมื่อเหลือไม่เกินกี่วัน
@@ -49,6 +50,7 @@ const HEADERS = {
   [SHEET_LOAN]: ['เลขที่ยืม', 'วันที่ยืม', 'Part number', 'ชื่อพัสดุ', 'serial number', 'ประเภทพัสดุ', 'จำนวน', 'หน่วยนับ', 'จำนวนคงค้าง', 'ผู้ยืม', 'ประเภทผู้ยืม', 'เหตุผล/เครื่อง', 'กำหนดคืน', 'สถานะ', 'วันที่ปิด', 'วิธีปิด', 'เลขเบิกอ้างอิง', 'ลำดับล็อต (อ้างอิง)', 'หมายเหตุ', 'คืนเข้าคลังแล้ว (จำนวน)'],
   [SHEET_LOG]: ['เวลา', 'ผู้ใช้งาน', 'อีเมล', 'การกระทำ', 'เลขเอกสารการเบิก', 'รายละเอียด'],
   [SHEET_KIT]: ['ลำดับรับ', 'ชุด (TAIL No.)', 'Part number', 'ชื่อพัสดุ', 'serial number', 'ประเภทพัสดุ', 'จำนวน', 'หน่วยนับ', 'คงเหลือในชุด', 'COND', 'LOCATION', 'หมดอายุ', 'วันที่รับ', 'เลขเอกสารการเบิก', 'สถานะ', 'หมายเหตุ'],
+  [SHEET_KITREQ]: ['Part number', 'ชื่อพัสดุ', 'ประเภทพัสดุ', 'ต้องมีใน KIT 1', 'ต้องมีใน KIT 2', 'มีอยู่ KIT 1', 'มีอยู่ KIT 2', 'สถานะ'],
   [SHEET_STK]: ['ลำดับรับ', 'เลขเอกสารการเบิก', 'Part number', 'ชื่อพัสดุ', 'serial number', 'ประเภทพัสดุ', 'หน่วยนับ', 'จำนวนรับ', 'จำนวนคงเหลือ', 'COND', 'LOCATION', 'หมดอายุ', 'วันที่รับ', 'สถานะ', 'หมายเหตุ'],
   [SHEET_RET]: ['ลำดับ', 'Part number', 'ชื่อ', 'จำนวน', 'serial number ส่งคืน', 'serial number ที่ใส่', 'ผู้รับ', 'ผู้ส่ง', 'เครื่อง', 'ข้อขัดข้อง', 'หมายเหตุ', 'วันที่บันทึก', 'ที่หนังสือ', 'สภาพพัสดุ']
 };
@@ -244,6 +246,7 @@ TEXT_COLS_[SHEET_RCV2] = [3, 4, 6];
 TEXT_COLS_[SHEET_ISS] = [5, 7];
 TEXT_COLS_[SHEET_STK] = [3, 5];
 TEXT_COLS_[SHEET_KIT] = [3, 5];
+TEXT_COLS_[SHEET_KITREQ] = [1];
 TEXT_COLS_[SHEET_LOAN] = [3, 5];
 TEXT_COLS_[SHEET_RET] = [2, 5, 6];
 TEXT_COLS_[SHEET_CNT] = [5, 7];
@@ -1373,7 +1376,9 @@ function kitOf_(tail) {
 /** เขียนชีท FLY AWAY KIT ใหม่จากชีท รับ (ทุกแถวที่ TAIL No. เป็นชุด) */
 function rebuildKit_(lots) {
   const sh = getSheet_(SHEET_KIT), w = HEADERS[SHEET_KIT].length;
-  lots = (lots || computeLots_()).filter(l => kitOf_(l.v[RC.TAIL]));
+  lots = lots || computeLots_();
+  try { refreshKitSpecSheet_(lots); } catch (e) { /* ไม่ให้ล้ม */ }
+  lots = lots.filter(l => kitOf_(l.v[RC.TAIL]));
   lots.sort((a, b) => {
     const ka = kitOf_(a.v[RC.TAIL]), kb = kitOf_(b.v[RC.TAIL]);
     return (ka < kb ? -1 : ka > kb ? 1 : 0) || (a.part < b.part ? -1 : a.part > b.part ? 1 : 0) || (a.serial < b.serial ? -1 : a.serial > b.serial ? 1 : 0) || (a.seq - b.seq);
@@ -1388,6 +1393,88 @@ function rebuildKit_(lots) {
   sh.getRange(2, 1, rows.length, w).setValues(rows);
   sh.getRange(2, 12, rows.length, 2).setNumberFormat('dd/mm/yyyy');
   return rows.length;
+}
+
+/** รายการตายตัวของชุด (ชีท รายการชุด FLY AWAY KIT) : [{part, name, type, need:{1:n,2:n}}] */
+function readKitSpec_() {
+  const sh = getSheet_(SHEET_KITREQ), last = sh.getLastRow();
+  if (last < 2) return [];
+  return sh.getRange(2, 1, last - 1, 5).getValues().map((r, i) => ({ row: i + 2, part: str_(r[0]), name: str_(r[1]), type: str_(r[2]), need: { 1: num_(r[3]), 2: num_(r[4]) } }))
+    .filter(x => x.part || x.name);
+}
+
+/** เทียบรายการตายตัวกับของที่อยู่ในชุดจริง (ล็อตที่ยังเหลือ) */
+function computeKitStatus_(lots) {
+  const spec = readKitSpec_();
+  const have = { 1: {}, 2: {} }, out = { 1: {}, 2: {} }, lastUse = { 1: null, 2: null }, holders = { 1: [], 2: [] };
+  const kitOfSeq = {};
+  (lots || computeLots_()).forEach(l => {
+    const k = kitOf_(l.v[RC.TAIL]); if (!k) return;
+    const n = Number(k.slice(-1)), key = l.part.toUpperCase();
+    kitOfSeq[l.seq] = n;
+    if (l.remain > 0) have[n][key] = (have[n][key] || 0) + l.remain;
+  });
+  readIss_().forEach(r => {
+    const n = kitOfSeq[Number(r[IS.RSEQ])]; if (!n) return;
+    const d = r[IS.DATE];
+    if (d instanceof Date && (!lastUse[n] || d > lastUse[n])) lastUse[n] = d;
+  });
+  readLoans_().filter(r => str_(r[13]) === LOAN_OPEN && kitOfSeq[Number(r[17])]).forEach(r => {
+    holders[kitOfSeq[Number(r[17])]].push({ part: str_(r[2]), name: str_(r[3]), qty: num_(r[8]), who: str_(r[9]) });
+  });
+  const res = {};
+  [1, 2].forEach(n => {
+    const items = spec.filter(x => x.need[n] > 0), missing = [];
+    let complete = 0;
+    items.forEach(x => {
+      const h = have[n][x.part.toUpperCase()] || 0;
+      if (h >= x.need[n]) complete++; else missing.push({ part: x.part, name: x.name, need: x.need[n], have: h, short: x.need[n] - h });
+    });
+    res[n] = { kit: 'FLY AWAY KIT ' + n, total: items.length, complete: complete, missing: missing,
+      lastUse: lastUse[n] ? fmtThai_(lastUse[n]) : '', loans: holders[n] };
+  });
+  return { spec: spec, have: have, kits: res };
+}
+
+/** เขียนคอลัมน์ มีอยู่ / สถานะ ในชีท รายการชุด FLY AWAY KIT (คอลัมน์ที่ผู้ใช้กรอกไม่ถูกแตะ) */
+function refreshKitSpecSheet_(lots) {
+  const sh = getSheet_(SHEET_KITREQ), st = computeKitStatus_(lots);
+  if (!st.spec.length) return st;
+  const out = st.spec.map(x => {
+    const k = x.part.toUpperCase(), h1 = st.have[1][k] || 0, h2 = st.have[2][k] || 0;
+    const lack = [];
+    if (x.need[1] > h1) lack.push('KIT 1 ขาด ' + (x.need[1] - h1));
+    if (x.need[2] > h2) lack.push('KIT 2 ขาด ' + (x.need[2] - h2));
+    return [h1, h2, lack.length ? lack.join(' · ') : 'ครบ'];
+  });
+  st.spec.forEach((x, i) => sh.getRange(x.row, 6, 1, 3).setValues([out[i]]));
+  return st;
+}
+
+/** เมนู: สร้างรายการตายตัวเริ่มต้นจากของที่อยู่ในชุดตอนนี้ (ใช้ครั้งแรก แล้วเติมรายการที่ขาดให้ครบ) */
+function seedKitSpec() {
+  return withLock_(() => {
+    const sh = getSheet_(SHEET_KITREQ);
+    if (sh.getLastRow() >= 2) {
+      try { SpreadsheetApp.getUi().alert('ชีท ' + SHEET_KITREQ + ' มีรายการอยู่แล้ว ไม่สร้างทับ'); } catch (e) { /* ไม่มี UI */ }
+      return { seeded: 0 };
+    }
+    const g = {};
+    computeLots_().forEach(l => {
+      const k = kitOf_(l.v[RC.TAIL]); if (!k || l.remain <= 0) return;
+      const key = l.part.toUpperCase(), n = Number(k.slice(-1));
+      const o = g[key] || (g[key] = { part: l.part, name: l.name, type: l.type, 1: 0, 2: 0 });
+      o[n] += l.remain;
+    });
+    const rows = Object.keys(g).sort().map(k => [g[k].part, g[k].name, g[k].type, g[k][1], g[k][2], '', '', '']);
+    if (rows.length) {
+      sh.getRange(2, 1, rows.length, 1).setNumberFormat('@');
+      sh.getRange(2, 1, rows.length, 8).setValues(rows);
+      refreshKitSpecSheet_();
+    }
+    try { SpreadsheetApp.getUi().alert('สร้างรายการเริ่มต้น ' + rows.length + ' รายการจากของที่อยู่ในชุดตอนนี้\nให้เพิ่มรายการที่ยังไม่มี (ให้ครบตามชุดจริง) และแก้ "ต้องมีใน KIT 1 / KIT 2" ให้ถูกต้อง'); } catch (e) { /* ไม่มี UI */ }
+    return { seeded: rows.length };
+  });
 }
 
 /** เมนู: อัปเดตชีท FLY AWAY KIT จากชีท รับ */
@@ -1472,6 +1559,7 @@ function onEdit(e) {
     if (!e || !e.range) return;
     const nm = e.range.getSheet().getName();
     if (nm === SHEET_KIT) { kitSheetEdited_(e); return; }
+    if (nm === SHEET_KITREQ) { refreshKitSpecSheet_(); return; }
     syncLoc_(e);
     if (nm === SHEET_RCV || nm === SHEET_RCV2 || nm === SHEET_STK) {
       if (nm !== SHEET_STK) {
@@ -2433,7 +2521,7 @@ function getDashboard(month) {
     });
   }
   return {
-    month: ym, tci: tci, tciSum: sum,
+    month: ym, tci: tci, tciSum: sum, kits: computeKitStatus_(lots).kits,
     alerts: { pending: pend, pendingAog: pendAog, pendingOverdue: pendOver, recvNotIssued: recvNotIssued.length,
       awaiting: getAwaitingReq().length, warrSoon: warrSoon, loansOverdue: loans.length },
     cards: { monthReq: monthReq, monthDone: monthDone, stockLots: stockLots.length, claimsOpen: claimsOpen },
@@ -2706,6 +2794,7 @@ function onOpen() {
       .addItem('ตรวจแถวใบเบิกที่ข้อมูลไม่ครบ', 'findIncompleteRequisitions')
       .addItem('นำค่าที่แก้ในคลังพัสดุไปแก้ต้นทาง', 'applyStockEdits')
       .addItem('อัปเดตชีท FLY AWAY KIT', 'refreshKitSheet')
+      .addItem('สร้างรายการตายตัวของชุด (จากของที่มีอยู่)', 'seedKitSpec')
       .addToUi();
   } catch (e) { /* ไม่มี UI */ }
 }
