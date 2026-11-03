@@ -71,6 +71,7 @@ const API_FUNCS_ = {
   getBootstrap: getBootstrap,
   addOpeningStock: addOpeningStock,
   getAwaitingReq: getAwaitingReq,
+  getDashboard: getDashboard,
   linkDirectIssue: linkDirectIssue,
   cancelRequisition: cancelRequisition,
   checkSerialAlert: checkSerialAlert,
@@ -2176,6 +2177,76 @@ function getWarrantyList(days) {
     out.push({ serial: i.serial, part: i.part, name: i.name, type: i.type, start: w.start, end: w.end, left: w.left, where: where });
   });
   return out.sort((a, b) => a.left - b.left);
+}
+
+/* ---------- API: Dashboard ---------- */
+
+const TCI_TYPES = ['LRU(TCI)', 'SP(TCI)'];
+
+/**
+ * ข้อมูลหน้า Dashboard
+ * tci = งาน TCI (ประเภท LRU(TCI)/SP(TCI)) ที่เบิกในเดือนนั้น พร้อมสถานะ ได้รับของหรือยัง
+ * alerts = สิ่งที่ต้องลงมือ ; cards = ตัวเลขสรุป ; recent = ความเคลื่อนไหวล่าสุด
+ */
+function getDashboard(month) {
+  const today = parseDate_(todayStr_());
+  const ym = /^\d{4}-\d{2}$/.test(str_(month)) ? str_(month) : todayStr_().substr(0, 7);
+  const req = getSheet_(SHEET_REQ), rl = req.getLastRow();
+  const reqRows = rl >= 2 ? req.getRange(2, 1, rl - 1, 15).getValues().filter(isValidReqRow_) : [];
+  const got = receivedMap_(), lots = computeLots_();
+  const rcvDate = {}, issuedBy = {};
+  readRcv_().forEach(r => {
+    if ((str_(r[RC.SRC]) || SRC_REQ) !== SRC_REQ || !(r[RC.RDATE] instanceof Date)) return;
+    const k = pad_(r[RC.DOC], 9) + '|' + str_(r[RC.PART]);
+    if (!rcvDate[k] || r[RC.RDATE] > rcvDate[k]) rcvDate[k] = r[RC.RDATE];
+  });
+  lots.forEach(l => { if (!l.free) { const k = l.doc + '|' + l.part; issuedBy[k] = (issuedBy[k] || 0) + l.issued; } });
+
+  const tci = [], sum = { total: 0, done: 0, issued: 0, partial: 0, pending: 0, overdue: 0, aog: 0 };
+  let pend = 0, pendAog = 0, pendOver = 0, monthReq = 0, monthDone = 0;
+  reqRows.forEach(r => {
+    if (isCancelled_(r[7])) return;
+    const doc = pad_(r[1], 9), part = str_(r[2]), key = doc + '|' + part;
+    const qty = num_(r[4]), have = got[key] || 0, remain = Math.max(qty - have, 0);
+    const due = dueDate_(r[6], r[9]);
+    const late = remain > 0 && due instanceof Date && due < today;
+    if (remain > 0) { pend++; if (str_(r[9]) === 'AOG') pendAog++; if (late) pendOver++; }
+    const inMonth = r[6] instanceof Date && Utilities.formatDate(r[6], TZ, 'yyyy-MM') === ym;
+    if (inMonth) { monthReq++; if (remain <= 0) monthDone++; }
+    if (!inMonth || TCI_TYPES.indexOf(str_(r[14])) < 0) return;
+    const issued = issuedBy[key] || 0;
+    const status = remain <= 0 ? (issued >= qty ? 'จ่ายให้ช่างแล้ว' : 'รับแล้ว') : have > 0 ? 'รับบางส่วน' : 'ค้างรับ';
+    sum.total++;
+    if (remain <= 0) { sum.done++; if (issued >= qty) sum.issued++; } else if (have > 0) sum.partial++; else sum.pending++;
+    if (late) sum.overdue++;
+    if (str_(r[9]) === 'AOG' && remain > 0) sum.aog++;
+    tci.push({ docNo: doc, part: part, name: str_(r[3]), type: str_(r[14]), qty: qty, got: have, remain: remain, unit: str_(r[5]),
+      reqDate: fmtThai_(r[6]), due: fmtThai_(due), recvDate: rcvDate[key] ? fmtThai_(rcvDate[key]) : '', status: status,
+      urgency: str_(r[9]), machine: str_(r[8]), late: late, order: late ? 0 : remain > 0 ? (have > 0 ? 2 : 1) : 3 });
+  });
+  tci.sort((a, b) => (a.order - b.order) || (a.docNo < b.docNo ? -1 : 1));
+
+  const stockLots = lots.filter(l => l.remain > 0);
+  const recvNotIssued = stockLots.filter(l => !l.free);
+  const loans = readLoans_().filter(r => str_(r[13]) === LOAN_OPEN && r[12] instanceof Date && r[12] < today);
+  let warrSoon = 0;
+  try { warrSoon = getWarrantyList().length; } catch (e) { warrSoon = 0; }
+  const claimsOpen = readClaims_().filter(c => c.status === CLAIM_SENT).length;
+  const recent = [];
+  const lg = getSheet_(SHEET_LOG), ll = lg.getLastRow();
+  if (ll >= 2) {
+    const n = Math.min(8, ll - 1);
+    lg.getRange(ll - n + 1, 1, n, 6).getValues().reverse().forEach(r => {
+      recent.push({ when: fmtCell_(r[0]), by: str_(r[1]), action: str_(r[3]), doc: str_(r[4]), detail: str_(r[5]) });
+    });
+  }
+  return {
+    month: ym, tci: tci, tciSum: sum,
+    alerts: { pending: pend, pendingAog: pendAog, pendingOverdue: pendOver, recvNotIssued: recvNotIssued.length,
+      awaiting: getAwaitingReq().length, warrSoon: warrSoon, loansOverdue: loans.length },
+    cards: { monthReq: monthReq, monthDone: monthDone, stockLots: stockLots.length, claimsOpen: claimsOpen },
+    recent: recent
+  };
 }
 
 /* ---------- API: ประวัติ ---------- */

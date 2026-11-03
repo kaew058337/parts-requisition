@@ -222,7 +222,7 @@
   .tgl:active .tgl-in:checked + .tgl-tr .tgl-plane{transform:translateX(22px) rotate(-9deg) scale(.94)}
   .tgl-tx{flex:1}
   /* ---- ตรวจนับพัสดุ ---- */
-  #ct-bg,#ex-bg,#sn-bg{z-index:55}
+  #ct-bg,#ex-bg,#sn-bg,#db-bg{z-index:55}
   #cm-bg,#cu-bg{z-index:66}
   .chip.blue{background:#dcebff;color:#1a56db}
   .chip.warn{background:#fff0d1;color:#9a5b00}
@@ -234,8 +234,8 @@
   input[type=checkbox]:not(.tgl-in):focus-visible{outline:3px solid rgba(76,141,206,.55);outline-offset:2px}
   input[type=checkbox]:not(.tgl-in):disabled{opacity:.4;cursor:not-allowed}
   #d-bg{z-index:67}
-  #ct-bg .sheet,#sn-bg .sheet{top:0;max-height:none;border-radius:0;max-width:760px;padding-top:calc(16px + env(safe-area-inset-top))}
-  #ct-bg .sheet .hd,#sn-bg .sheet .hd{position:sticky;top:calc(-16px - env(safe-area-inset-top));z-index:2;background:var(--bg);margin:-4px -4px 8px;padding:8px 4px}
+  #ct-bg .sheet,#sn-bg .sheet,#db-bg .sheet{top:0;max-height:none;border-radius:0;max-width:760px;padding-top:calc(16px + env(safe-area-inset-top))}
+  #ct-bg .sheet .hd,#sn-bg .sheet .hd,#db-bg .sheet .hd{position:sticky;top:calc(-16px - env(safe-area-inset-top));z-index:2;background:var(--bg);margin:-4px -4px 8px;padding:8px 4px}
   .ci{background:var(--card);border:1px solid #e6edf7;border-left:5px solid #cbd9ee;border-radius:18px;padding:12px 14px;margin:0 0 10px;box-shadow:var(--shadow);transition:border-color .25s var(--ease),background .25s var(--ease)}
   .ci.ok{border-left-color:var(--ok)}
   .ci.bad{border-left-color:var(--bad);background:#fffaf9}
@@ -366,6 +366,7 @@
 <div class="dr-scrim" id="dr-scrim"></div>
 <aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-label="เมนู" aria-hidden="true">
   <div class="dr-who dr-in" style="--i:0"><div class="dr-av" id="dr-av">?</div><div style="min-width:0"><b id="dr-name">ยังไม่ได้ตั้งชื่อผู้ใช้</b><small>ผู้ใช้งานปัจจุบัน</small></div><button class="dr-x" id="dr-x" aria-label="ปิดเมนู">×</button></div>
+  <button class="dr-it dr-in" id="db-btn" style="--i:1"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>แดชบอร์ด</button>
   <div class="dr-sec dr-in" style="--i:1">งานพิเศษ</div>
   <button class="dr-it dr-in" id="cnt-btn" style="--i:3"><svg viewBox="0 0 24 24"><path d="M9 11l2 2 4-4"/><rect x="4" y="4" width="16" height="16" rx="3"/></svg>ตรวจนับพัสดุ<span class="ex"><svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8M10 6H5a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1v-5"/></svg></span></button>
   <div class="dr-sec dr-in" style="--i:4">ข้อมูล</div>
@@ -837,6 +838,14 @@
     <div class="meta" id="ex-info" style="margin-top:10px"></div>
     <button class="btn" id="ex-xlsx">ดาวน์โหลด Excel (.xlsx)</button>
     <button class="btn ghost" id="ex-pdf" style="margin-top:10px">PDF (พิมพ์ A4 แล้วเลือกบันทึกเป็น PDF)</button>
+  </div>
+</div>
+
+<!-- ===== sheet: Dashboard ===== -->
+<div class="sheet-bg" id="db-bg">
+  <div class="sheet">
+    <div class="hd"><b>แดชบอร์ด</b><button class="x" id="db-x" aria-label="ปิด">×</button></div>
+    <div id="db-body"><div class="empty"><span class="spin"></span></div></div>
   </div>
 </div>
 
@@ -2241,6 +2250,88 @@
     if(m==='w') snLoadWarr();
     $('sn-bg').firstElementChild.scrollTop = 0;
   }
+  /* ---------- แดชบอร์ด (งาน TCI + สิ่งที่ต้องทำ) ---------- */
+  var DB = { month:'', data:null };
+  var TH_M = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+  function dbMonthTh(ym){ var p=ym.split('-'); return TH_M[Number(p[1])-1]+' '+(Number(p[0])+543); }
+  function dbStat(x){
+    var c = x.status==='ค้างรับ' ? (x.late?'bad':'') : x.status==='รับบางส่วน' ? 'warn' : 'ok';
+    return '<span class="chip '+c+'" style="white-space:nowrap;flex:none">'+(x.late?'เลยกำหนด · ':'')+esc(x.status)+'</span>';
+  }
+  function dbOpen(){
+    $('db-bg').classList.add('on'); $('db-bg').firstElementChild.scrollTop=0;
+    $('db-body').innerHTML='<div class="empty"><span class="spin"></span></div>';
+    dbLoad(DB.month);
+  }
+  function dbLoad(m){
+    run('getDashboard',[m||'']).then(function(d){ DB.data=d; DB.month=d.month; dbRender(); })
+      .catch(function(e){ $('db-body').innerHTML='<div class="empty">'+esc(e.message)+'</div>'; });
+  }
+  function dbRender(){
+    var d=DB.data, s=d.tciSum, a=d.alerts, c=d.cards;
+    var pct = s.total ? Math.round(s.done*100/s.total) : 0;
+    var h='<div class="card" style="margin-top:4px"><div class="t" style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>งาน TCI</b>'+
+      '<input type="month" id="db-month" value="'+esc(d.month)+'" style="width:auto;margin:0;padding:6px 10px;font-size:14px;border-radius:12px"></div>';
+    if(!s.total){ h+='<div class="meta" style="margin-top:8px">ไม่มีใบเบิก TCI ของเดือน '+esc(dbMonthTh(d.month))+'</div>'; }
+    else {
+      h+='<div style="display:flex;align-items:baseline;gap:8px;margin-top:6px"><span style="font-size:34px;font-weight:700;color:var(--navy-royal)">'+s.done+'</span><span style="font-size:18px;color:var(--muted)">/ '+s.total+' รับแล้ว</span></div>'+
+        '<div class="bar"><i style="display:block;height:100%;width:'+pct+'%;background:linear-gradient(90deg,#1a56db,#4c8dce);border-radius:99px"></i></div>'+
+        '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">'+
+        (s.pending?'<span class="chip">ค้างรับ '+s.pending+'</span>':'')+(s.partial?'<span class="chip warn">รับบางส่วน '+s.partial+'</span>':'')+
+        (s.overdue?'<span class="chip bad">เลยกำหนด '+s.overdue+'</span>':'')+(s.aog?'<span class="chip bad">AOG ค้าง '+s.aog+'</span>':'')+
+        (s.issued?'<span class="chip ok">จ่ายให้ช่างแล้ว '+s.issued+'</span>':'')+'</div>';
+      h+=d.tci.map(function(x){
+        return '<div class="meta" style="padding:9px 0;border-top:1px solid var(--line)"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div><b>'+esc(x.part||x.name)+'</b> · '+esc(x.name)+
+          '<br><span style="font-size:13px">'+esc(x.docNo)+' · '+esc(x.type)+(x.urgency==='AOG'?' · AOG':'')+(x.machine?' · เครื่อง '+esc(x.machine):'')+'</span></div>'+dbStat(x)+'</div>'+
+          '<div style="font-size:13px;margin-top:3px">เบิก '+fmtNum(x.qty)+' '+esc(x.unit)+' · รับแล้ว '+fmtNum(x.got)+(x.remain>0?' · ค้าง '+fmtNum(x.remain):'')+
+          ' · เบิกเมื่อ '+esc(x.reqDate)+(x.remain>0?' · กำหนด '+esc(x.due):(x.recvDate?' · รับเมื่อ '+esc(x.recvDate):''))+'</div></div>';
+      }).join('')+
+      '<button class="btn ghost sm" id="db-copy" style="margin-top:10px">คัดลอกข้อความสรุป</button>';
+    }
+    h+='</div>';
+    var rows=[];
+    if(a.pending) rows.push(['rcv','ใบเบิกค้างรับ '+a.pending+(a.pendingAog?' · AOG '+a.pendingAog:'')+(a.pendingOverdue?' · เลยกำหนด '+a.pendingOverdue:''), a.pendingOverdue||a.pendingAog?'bad':'']);
+    if(a.recvNotIssued) rows.push(['iss','รับแล้วรอจ่ายให้ช่าง '+a.recvNotIssued+' ล็อต','']);
+    if(a.awaiting) rows.push(['aw','รับก่อนเบิก รอใบเบิก '+a.awaiting+' รายการ','warn']);
+    if(a.warrSoon) rows.push(['warr','LRU ประกันใกล้หมด (ภายใน 60 วัน) '+a.warrSoon,'warn']);
+    if(a.loansOverdue) rows.push(['loan','ยืมเกินกำหนดคืน '+a.loansOverdue+' รายการ','bad']);
+    h+='<div class="card" style="margin-top:12px"><div class="t"><b>ต้องทำ</b></div>'+(rows.length ? rows.map(function(r){
+      return '<button class="dr-go" data-go="'+r[0]+'" style="display:flex;width:100%;justify-content:space-between;align-items:center;gap:8px;border:0;background:none;font:inherit;text-align:left;padding:10px 0;border-top:1px solid var(--line);color:var(--ink);cursor:pointer"><span>'+esc(r[1])+'</span><span class="chip '+r[2]+'">ดู</span></button>';
+    }).join('') : '<div class="meta" style="margin-top:6px">ไม่มีรายการค้าง ✓</div>')+'</div>';
+    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">'+
+      [['ใบเบิกเดือนนี้',c.monthReq+' ใบ','รับครบ '+c.monthDone],['ล็อตในคลัง',c.stockLots,'ที่ยังมีของ'],['ส่งเคลมอยู่',c.claimsOpen,'รายการ'],['ใบเบิกค้างรับ',a.pending,'ทุกประเภท']].map(function(k){
+        return '<div class="card" style="margin:0;padding:12px 14px"><div class="meta" style="margin:0">'+esc(k[0])+'</div><div style="font-size:22px;font-weight:700;color:var(--navy-royal)">'+esc(k[1])+'</div><div class="meta" style="margin:0;font-size:12px">'+esc(k[2])+'</div></div>';
+      }).join('')+'</div>';
+    h+='<div class="card" style="margin-top:12px"><div class="t"><b>ความเคลื่อนไหวล่าสุด</b></div>'+(d.recent.length ? d.recent.map(function(r){
+      return '<div class="meta" style="padding:7px 0;border-top:1px solid var(--line);font-size:13px"><b>'+esc(r.action)+'</b>'+(r.doc?' · '+esc(r.doc):'')+' · '+esc(r.when)+(r.by?' · '+esc(r.by):'')+'<br>'+esc(r.detail)+'</div>';
+    }).join('') : '<div class="meta">ยังไม่มีบันทึก</div>')+'</div>';
+    $('db-body').innerHTML=h;
+  }
+  function dbSummaryText(){
+    var d=DB.data, s=d.tciSum, L=['งาน TCI เดือน '+dbMonthTh(d.month),'รับแล้ว '+s.done+'/'+s.total+(s.issued?' (จ่ายให้ช่างแล้ว '+s.issued+')':'')];
+    var wait=d.tci.filter(function(x){ return x.remain>0; });
+    if(wait.length){ L.push('ยังไม่ได้รับ '+wait.length+' รายการ:'); wait.forEach(function(x){ L.push('- '+(x.part||x.name)+' '+x.name+' ('+x.docNo+') ค้าง '+fmtNum(x.remain)+(x.late?' เลยกำหนด '+x.due:' กำหนด '+x.due)+(x.urgency==='AOG'?' AOG':'')); }); }
+    else L.push('ได้รับครบทุกรายการ');
+    return L.join('\n');
+  }
+  $('db-body').addEventListener('change', function(e){ if(e.target.id==='db-month' && e.target.value){ $('db-body').innerHTML='<div class="empty"><span class="spin"></span></div>'; dbLoad(e.target.value); } });
+  $('db-body').addEventListener('click', function(e){
+    if(e.target.closest('#db-copy')){
+      var t=dbSummaryText();
+      (navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText(t) : Promise.reject()).then(function(){ toast('คัดลอกแล้ว'); })
+        .catch(function(){ var ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); try{ document.execCommand('copy'); toast('คัดลอกแล้ว'); }catch(x){ toast('คัดลอกไม่ได้ ลองกดค้างที่ข้อความ',true); } ta.remove(); });
+      return;
+    }
+    var g=e.target.closest('[data-go]'); if(!g) return;
+    $('db-bg').classList.remove('on');
+    var k=g.dataset.go;
+    if(k==='rcv'||k==='iss') show(k);
+    else if(k==='aw'){ show('stk'); setTimeout(function(){ $('k-aw').click(); }, 150); }
+    else if(k==='warr'){ snOpen(''); snSeg('w'); }
+    else if(k==='loan'){ show('stk'); }
+  });
+  $('db-btn').addEventListener('click', dbOpen);
+  $('db-x').addEventListener('click', function(){ $('db-bg').classList.remove('on'); });
   function snOpen(serial){
     $('w-bg').classList.remove('on');
     $('sn-bg').classList.add('on');
