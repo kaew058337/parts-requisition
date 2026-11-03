@@ -294,8 +294,8 @@
   .pr .tag{text-align:right;height:6mm;line-height:6mm;font-weight:700}
   .pr .bt{display:flex;align-items:flex-start;margin-top:-.45mm}
   .pr .rt{float:right}
-  .pf{width:198mm;font-family:'TH Sarabun PSK','THSarabunPSK','TH SarabunPSK','Sarabun',sans-serif;font-size:16pt;color:#000;line-height:1}
-  .pf.fb{font-size:12.5pt}
+  .pf{width:198mm;font-family:'TH Sarabun PSK','THSarabunPSK','TH SarabunPSK','Sarabun',sans-serif;font-size:20pt;color:#000;line-height:1}
+  .pf.fb{font-size:15.6pt}
   .pf table{width:198mm;border-collapse:collapse;table-layout:fixed;font-size:inherit}
   .pf td{border:.45mm solid #000;padding:0 1.8mm;height:9.5mm;line-height:1;vertical-align:middle;overflow:hidden;word-break:break-word}
   .pf td.t{text-align:center;font-weight:700;height:9mm}
@@ -1278,7 +1278,7 @@
   }
 
   function formHtml(d){
-    var psk = pfDetect(), base = psk?16:12.5, mn = base*0.55;
+    var psk = pfDetect(), base = psk?20:15.6, mn = base*0.55;
     var by = ((d.rank?d.rank+' ':'')+d.fullName+(d.position?'  '+d.position:'')).trim();
     var qtyTxt = (d.qty===0||d.qty)?(d.qty+' '+(d.unit||'EA')):'';
     var H = 7;
@@ -1286,7 +1286,7 @@
     '<div class="pf'+(psk?'':' fb')+'"><table>'+
     '<colgroup><col style="width:27mm"><col style="width:61mm"><col style="width:48mm"><col style="width:62mm"></colgroup>'+
     '<tr><td class="t" colspan="4">รายการเบิกพัสดุ</td></tr>'+
-    '<tr><td colspan="2"><span class="lb" style="width:27mm">หมายเลข บ. :</span>'+cell(d.machine,34,H,base,mn)+'<span class="rt">เลขที่เอกสารผู้เบิก</span></td>'+
+    '<tr><td colspan="2"><span class="lb" style="width:27mm">หมายเลข บ. :</span>'+cell(d.machine,32,H,base,mn)+'<span class="rt" style="font-size:'+(base*0.85)+'pt">เลขที่เอกสารผู้เบิก</span></td>'+
       '<td>'+cell(d.docNo,45,H,base,mn)+'</td>'+
       '<td>สถานภาพพัสดุ :&nbsp;&nbsp;&nbsp;'+cell(urg(d.urgency),30,H,base,mn)+'</td></tr>'+
     '<tr><td colspan="3">เอกสารอ้างอิง</td><td>ประเภทพัสดุ :&nbsp;&nbsp;&nbsp;'+cell(d.itemType,30,H,base,mn)+'</td></tr>'+
