@@ -103,6 +103,7 @@ const API_FUNCS_ = {
   issueFromLot: issueFromLot,
   moveLocation: moveLocation,
   editLot: editLot,
+  moveToKit: moveToKit,
   returnLoan: returnLoan,
   submitBorrow: submitBorrow,
   submitCount: submitCount,
@@ -1301,7 +1302,7 @@ function getStock() {
     g.qty += l.remain;
     g.lots.push({
       seq: l.seq, free: l.free, serial: l.serial, qty: l.remain, docNo: l.label, type: l.type, cond: l.cond,
-      location: l.loc, expire: fmtThai_(l.expire), received: fmtThai_(l.recvDate), note: l.note,
+      location: l.loc, kit: kitOf_(l.v[RC.TAIL]), expire: fmtThai_(l.expire), received: fmtThai_(l.recvDate), note: l.note,
       issRow: l.free ? 0 : l.seq, issSeq: l.free ? 0 : l.seq, linkNote: '',
       machine: l.free ? '' : ((info[l.doc + '|' + l.part] || {}).machine || ''),
       warr: l.serial && isLRU_(l.type) ? (warr_[snKey_(l.serial)] || null) : null
@@ -1313,6 +1314,35 @@ function getStock() {
 /* ---------- ย้ายที่จัดเก็บ (LOCATION) ---------- */
 
 /** ย้ายล็อตไปที่จัดเก็บใหม่ : แก้ที่ชีท รับ (ต้นทาง) แล้วสร้างชีท คลังพัสดุ ใหม่ ทุกชีทจึงตรงกัน */
+/** ย้ายพัสดุในคลังเข้า/ออก FLY AWAY KIT (kit = 'FLY AWAY KIT 1/2' หรือ '' = ออกจากชุดกลับคลังปกติ) ; ย้ายบางส่วนได้ (ไม่มี S/N) โดยแยกแถวใหม่ในชีท รับ */
+function moveToKit(p) {
+  return withLock_(() => {
+    const seq = Number(p.seq), kit = str_(p.kit) ? kitOf_(p.kit) : '';
+    if (str_(p.kit) && !kit) throw new Error('ชุดต้องเป็น FLY AWAY KIT 1 หรือ 2');
+    const lot = computeLots_().filter(l => l.seq === seq)[0];
+    if (!lot || lot.remain <= 0) throw new Error('ไม่พบพัสดุในคลัง (อาจถูกจ่ายไปแล้ว) กรุณารีเฟรช');
+    const cur = kitOf_(lot.v[RC.TAIL]);
+    if (cur === kit) return { ok: true, same: true };
+    if (!kit && !cur) return { ok: true, same: true };
+    const qty = p.qty === undefined || p.qty === '' || p.qty === null ? lot.remain : num_(p.qty);
+    if (!(qty > 0) || qty > lot.remain) throw new Error('จำนวนที่ย้ายไม่ถูกต้อง (เหลือ ' + lot.remain + ')');
+    if (lot.serial && qty !== 1) throw new Error('พัสดุที่มี S/N ย้ายได้ทีละ 1 ชิ้น');
+    const sh = getSheet_(lot.sh || SHEET_RCV);
+    if (qty === lot.remain) {
+      sh.getRange(lot.row, rcCol_(RC.TAIL)).setValue(kit);
+    } else {
+      // แยกบางส่วน: ลดจำนวนแถวเดิม + เพิ่มแถวใหม่ (ลอกข้อมูลเดิม) รวมจำนวนรับเท่าเดิม
+      sh.getRange(lot.row, rcCol_(RC.QTY)).setValue(lot.qty - qty);
+      const nv = lot.v.slice(0, 25);
+      nv[RC.SEQ] = nextRcvSeq_(); nv[RC.QTY] = qty; nv[RC.TAIL] = kit; nv[RC.TOTAL] = ''; nv[RC.OVER] = '';
+      appendRcv_(nv);
+    }
+    log_(kit ? 'ย้ายเข้าชุด' : 'ย้ายออกจากชุด', lot.doc, [lot.part, lot.name, 'x' + qty, lot.serial ? 'S/N ' + lot.serial : '', (cur || 'คลังปกติ') + ' → ' + (kit || 'คลังปกติ')].filter(Boolean).join(' | '), p.by);
+    rebuildStock_();
+    return { ok: true, kit: kit, moved: qty };
+  });
+}
+
 /** แก้ไขล็อตในคลังจากหน้าเว็บ: ที่เก็บ / จำนวนคงเหลือ / S/N แล้วอัปเดตทุกชีทที่เกี่ยวข้อง */
 function editLot(p) {
   return withLock_(() => {
