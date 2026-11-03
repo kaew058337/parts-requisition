@@ -2353,12 +2353,13 @@
         (s.pending?'<span class="chip">ค้างรับ '+s.pending+'</span>':'')+(s.partial?'<span class="chip warn">รับบางส่วน '+s.partial+'</span>':'')+
         (s.overdue?'<span class="chip bad">เลยกำหนด '+s.overdue+'</span>':'')+(s.aog?'<span class="chip bad">AOG ค้าง '+s.aog+'</span>':'')+
         (s.issued?'<span class="chip ok">จ่ายให้ช่างแล้ว '+s.issued+'</span>':'')+'</div>';
-      h+=d.tci.map(function(x){
+      var tciRows=d.tci.map(function(x){
         return '<div class="meta" style="padding:9px 0;border-top:1px solid var(--line)"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div><b>'+esc(x.part||x.name)+'</b> · '+esc(x.name)+
           '<br><span style="font-size:13px">'+esc(x.docNo)+' · '+esc(x.type)+(x.urgency==='AOG'?' · AOG':'')+(x.machine?' · เครื่อง '+esc(x.machine):'')+'</span></div>'+dbStat(x)+'</div>'+
           '<div style="font-size:13px;margin-top:3px">เบิก '+fmtNum(x.qty)+' '+esc(x.unit)+' · รับแล้ว '+fmtNum(x.got)+(x.remain>0?' · ค้าง '+fmtNum(x.remain):'')+
           ' · เบิกเมื่อ '+esc(x.reqDate)+(x.remain>0?' · กำหนด '+esc(x.due):(x.recvDate?' · รับเมื่อ '+esc(x.recvDate):''))+'</div></div>';
-      }).join('')+
+      }); var TN=4;
+      h+=tciRows.slice(0,TN).join('')+(tciRows.length>TN?'<div id="db-more" style="display:none">'+tciRows.slice(TN).join('')+'</div><button class="btn ghost sm" id="db-tog" style="margin-top:8px;width:100%">▼ ดูทั้งหมด (อีก '+(tciRows.length-TN)+' รายการ)</button>':'')+
       '<button class="btn ghost sm" id="db-copy" style="margin-top:10px">คัดลอกข้อความสรุป</button>';
     }
     h+='</div>';
@@ -2403,6 +2404,8 @@
   }
   $('db-body').addEventListener('change', function(e){ if(e.target.id==='db-month' && e.target.value){ $('db-body').innerHTML='<div class="empty"><span class="spin"></span></div>'; dbLoad(e.target.value); } });
   $('db-body').addEventListener('click', function(e){
+    var tg=e.target.closest('#db-tog');
+    if(tg){ var m=$('db-more'), open=m.style.display==='none'; m.style.display=open?'':'none'; tg.textContent=open?'▲ ย่อรายการ':'▼ ดูทั้งหมด (อีก '+m.children.length+' รายการ)'; return; }
     if(e.target.closest('#db-copy')){
       var t=dbSummaryText();
       (navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText(t) : Promise.reject()).then(function(){ toast('คัดลอกแล้ว'); })
