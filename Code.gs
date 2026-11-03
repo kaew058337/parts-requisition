@@ -1179,6 +1179,25 @@ function issueDirect_(p) {
   return withLock_(() => { const res = issueDirectCore_(p); rebuildStock_(); return res; });
 }
 
+/** จ่ายพัสดุที่อยู่ใน FLY AWAY KIT ออกไป -> ออกใบเบิกทดแทนให้ชุดอัตโนมัติ (เครื่อง = ชื่อชุด) ; ล้มเหลวไม่ทำให้การจ่ายย้อนกลับ */
+function autoKitRequisition_(lot, qty, p) {
+  const kit = kitOf_(lot.v[RC.TAIL]);
+  if (!kit) return null;
+  try {
+    const to = [str_(p.tech), str_(p.tail) ? 'เครื่อง ' + str_(p.tail) : ''].filter(Boolean).join(' ');
+    const r = submitRequisitionCore_({
+      machine: kit, urgency: 'เบิกธรรมดา', date: todayStr_(), by: p.by,
+      issue: 'เบิกทดแทน ' + kit + ' (จ่ายออก' + (to ? ' ให้ ' + to : '') + (lot.serial ? ' S/N ' + lot.serial : '') + ')',
+      rank: '', fullName: str_(p.by) || 'ระบบ (เบิกทดแทนชุดอัตโนมัติ)', position: '',
+      items: [{ part: lot.part, name: lot.name, qty: qty, unit: lot.unit || 'EA', itemType: lot.type || 'SP' }]
+    });
+    log_('เบิกทดแทนชุดอัตโนมัติ', r.docNo, [lot.part, lot.name, 'x' + qty, kit].join(' | '), p.by);
+    return { docNo: r.docNo, kit: kit };
+  } catch (e) {
+    return { error: e.message, kit: kit };
+  }
+}
+
 function issueDirectCore_(p) {
   {
     const lot = findLot_(p.lotSeq);
@@ -1193,7 +1212,7 @@ function issueDirectCore_(p) {
       str_(p.tail), str_(p.tech), [str_(p.remark), 'จ่ายตรงจาก' + lot.label].filter(Boolean).join(' | '), str_(p.by)]);
     log_('จ่าย', DIRECT, [lot.part, lot.name, 'x' + qty, lot.serial ? 'S/N ' + lot.serial : '',
       'ช่าง ' + str_(p.tech), str_(p.tail) ? 'TAIL ' + str_(p.tail) : '', '(จ่ายตรงจาก' + lot.label + ' ไม่มีใบเบิก)'].filter(Boolean).join(' | '), p.by);
-    return { closed: false, direct: true, left: lot.remain - qty };
+    return { closed: false, direct: true, left: lot.remain - qty, autoReq: autoKitRequisition_(lot, qty, p) };
   }
 }
 
@@ -1264,7 +1283,7 @@ function issueCore_(p) {
   }
   log_('จ่าย', lot.doc, [lot.part, lot.name, 'x' + qty, lot.serial ? 'S/N ' + lot.serial : '',
     'ช่าง ' + str_(p.tech), tail ? 'TAIL ' + tail : '', closed ? '(จ่ายครบ)' : ''].filter(Boolean).join(' | '), p.by);
-  return { closed: closed };
+  return { closed: closed, autoReq: autoKitRequisition_(lot, qty, p) };
 }
 
 /* ---------- คลังพัสดุ (อ่านจากการคำนวณ) ---------- */

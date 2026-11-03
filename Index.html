@@ -1587,7 +1587,7 @@
       tech:$('x-tech').value, remark:$('x-remark').value, by:state.by }])
     .then(function(res){
       $('x-bg').classList.remove('on');
-      toast(res.closed ? 'จ่ายครบ ปิดใบเบิกแล้ว' : 'บันทึกการจ่ายแล้ว');
+      toast((res.closed ? 'จ่ายครบ ปิดใบเบิกแล้ว' : 'บันทึกการจ่ายแล้ว')+kitReqNote(res), !!(res.autoReq&&res.autoReq.error));
       loadIssue(); if(state.fromStock){ state.fromStock=false; loadStock(); }
     }).catch(function(e){ toast(e.message,true); }).then(function(){ busy(btn,false); });
   });
@@ -1777,7 +1777,7 @@
       payDate:$('fi-pay').value, tail:$('fi-tail').value, tech:$('fi-tech').value, remark:$('fi-remark').value, by:state.by }])
     .then(function(res){
       $('fi-bg').classList.remove('on');
-      toast(res.direct ? 'จ่ายตรงแล้ว (ไม่มีใบเบิก) · ตัดสต็อกเรียบร้อย' : res.closed ? 'จ่ายแล้ว · ปิดใบเบิก '+r.docNo : 'จ่ายแล้ว · ตัดสต็อกเรียบร้อย');
+      toast((res.direct ? 'จ่ายตรงแล้ว (ไม่มีใบเบิก) · ตัดสต็อกเรียบร้อย' : res.closed ? 'จ่ายแล้ว · ปิดใบเบิก '+r.docNo : 'จ่ายแล้ว · ตัดสต็อกเรียบร้อย')+kitReqNote(res), !!(res.autoReq&&res.autoReq.error));
       loadStock(); boot();
     }).catch(function(e){ toast(e.message,true); loadStock(); }).then(function(){ busy(btn,false); });
   });
@@ -1997,6 +1997,7 @@
   state.oSrc = 'รับก่อนเบิก'; state.aw = [];
   var O_INFO = { 'รับก่อนเบิก':'รับพัสดุเข้าคลังก่อนมีใบเบิก (นับวันรับจริง ประกันเริ่มนับ) จ่ายให้ช่างได้ทันที เมื่อมีใบเบิกแล้วค่อยกด รอใบเบิก → ผูกใบเบิก',
                  'ยอดยกมา':'ใช้บันทึกพัสดุที่มีอยู่แล้วในคลังตั้งแต่ก่อนใช้ระบบ ไม่มีวันที่รับ จึงไม่นับประกัน' };
+  function kitReqNote(res){ var a=res&&res.autoReq; if(!a) return ''; return a.error ? ' · ⚠ เบิกทดแทน '+a.kit+' ไม่สำเร็จ: '+a.error+' (ไปเบิกเอง)' : ' · เบิกทดแทน '+a.kit+' อัตโนมัติ เลขที่ '+a.docNo; }
   function oNowToggle(){ $('o-now-f').style.display = $('o-now').checked ? '' : 'none'; if($('o-now').checked && $('o-now-wrap').style.display!=='none') $('o-kit').value=''; $('o-kit').disabled = $('o-now').checked && $('o-now-wrap').style.display!=='none'; }
   $('o-now').addEventListener('change', oNowToggle);
   function oSrcSet(v){ state.oSrc=v; $('o-info').textContent=O_INFO[v]; $('o-now-wrap').style.display = v==='รับก่อนเบิก' ? '' : 'none'; oNowToggle();
