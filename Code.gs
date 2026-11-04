@@ -2851,8 +2851,10 @@ function onOpen() {
       .addSeparator()
       .addItem('ตั้งค่าบอตไลน์', 'lineSetup')
       .addItem('ตรวจ webhook ไลน์ (หารหัสกลุ่ม)', 'lineWebhookCheck')
-      .addItem('ดูตัวอย่างข้อความสรุปไลน์', 'linePreview')
-      .addItem('ทดสอบส่งสรุปไลน์ตอนนี้', 'lineTestNow')
+      .addItem('ดูตัวอย่างข้อความแจ้งด่วนไลน์', 'linePreview')
+      .addItem('ทดสอบส่งแจ้งด่วนไลน์ตอนนี้', 'lineTestNow')
+      .addItem('สร้าง PDF รายงานสัปดาห์ (ไม่ส่งไลน์)', 'weeklyPdfPreview')
+      .addItem('ทดสอบส่งรายงานสัปดาห์เข้าไลน์', 'lineWeeklyTest')
       .addItem('เปิดส่งสรุปไลน์อัตโนมัติ (16:10 วันทำงาน)', 'lineInstallTrigger')
       .addItem('ปิดส่งสรุปไลน์อัตโนมัติ', 'lineRemoveTrigger')
       .addToUi();
@@ -3136,7 +3138,7 @@ function holidaySet_() {
 function isWorkday_(d, hol) { const w = d.getDay(); return w !== 0 && w !== 6 && !(hol || holidaySet_())[dayKey_(d)]; }
 
 /** สร้างข้อความสรุป (ไม่ส่ง) ; today = วันที่ (00:00) ; คืน '' ถ้าไม่มีอะไรจะแจ้ง */
-function buildLineDigest_(today) {
+function buildLineDigest_(today, urgentOnly) {
   const hol = holidaySet_();
   const tomorrow = addDays_(today, 1);
   let target = tomorrow;
@@ -3154,6 +3156,7 @@ function buildLineDigest_(today) {
     const d = r[16];
     if (d < tomorrow || d > target) return;
     const remain = Math.max(num_(r[4]) - (got[pad_(r[1], 9) + '|' + str_(r[2])] || 0), 0);
+    if (urgentOnly && remain <= 0) return;
     inst.push({ d: d, doc: pad_(r[1], 9), part: str_(r[2]), name: str_(r[3]), machine: str_(r[8]), remain: remain });
   });
   if (inst.length) {
@@ -3178,6 +3181,11 @@ function buildLineDigest_(today) {
     cut(aog).forEach(x => L.push('• ' + x.doc + ' ' + (x.part || '') + ' ' + x.name + ' · ค้าง ' + x.remain + (x.due instanceof Date ? (x.due < today ? ' · เลยกำหนด ' + Math.round((today - x.due) / 86400000) + ' วัน' : ' · กำหนด ' + lineDate_(x.due)) : '')));
     more(aog.length).forEach(t => L.push(t));
     L.push('');
+  }
+
+  if (urgentOnly) {
+    if (!L.length) return '';
+    return ('⚠️ แจ้งด่วน ' + lineDay_(today) + '\n' + '────────────\n' + L.join('\n').replace(/\n+$/, '')).slice(0, 4900);
   }
 
   // 3) พัสดุที่รับวันนี้ และมีเอกสารการเบิก
@@ -3232,16 +3240,196 @@ function linePush_(text) {
   return true;
 }
 
-/** ตัวตั้งเวลาเรียกทุกวัน (หลัง 16:00) ; opt.force = ส่งแม้เป็นวันหยุด */
+/* ===== รายงานสรุปประจำสัปดาห์ (PDF A4) ===== */
+const WEEKLY_FOLDER_ = 'รายงานสรุป';
+function mondayOf_(d) { const w = (d.getDay() + 6) % 7; return addDays_(new Date(d.getFullYear(), d.getMonth(), d.getDate()), -w); }
+function asDate_(v) { return v instanceof Date ? v : (str_(v) ? parseImportDate_(v) : null); }
+function inRange_(d, a, b) { return d instanceof Date && dayKey_(d) >= dayKey_(a) && dayKey_(d) <= dayKey_(b); }
+/** วันทำงานสุดท้ายของสัปดาห์ = วันทำงานถัดไปอยู่คนละสัปดาห์ */
+function isLastWorkdayOfWeek_(today, hol) {
+  let n = addDays_(today, 1);
+  while (!isWorkday_(n, hol)) n = addDays_(n, 1);
+  return mondayOf_(n) > mondayOf_(today);
+}
+
+/** ข้อมูลรายงาน : สัปดาห์นี้ = จันทร์-อาทิตย์ของสัปดาห์ที่มี today */
+function buildWeeklyData_(today) {
+  const w1 = mondayOf_(today), w2 = addDays_(w1, 6), n1 = addDays_(w1, 7), n2 = addDays_(w1, 13);
+  const rq = getSheet_(SHEET_REQ), rl = rq.getLastRow();
+  const rows = rl >= 2 ? rq.getRange(2, 1, rl - 1, 17).getValues().filter(isValidReqRow_) : [];
+  const got = receivedMap_();
+  const info = {};
+  rows.forEach(r => { info[pad_(r[1], 9) + '|' + str_(r[2])] = { name: str_(r[3]), machine: str_(r[8]) }; });
+  const D = { today: today, w1: w1, w2: w2, n1: n1, n2: n2 };
+
+  // 1) สถานะ TCI เดือนนี้
+  const dash = getDashboard(dayKey_(today).substr(0, 7));
+  D.tciSum = dash.tciSum;
+  D.tci = dash.tci.map(x => ({ part: x.part, name: x.name, machine: x.machine, install: x.install, qty: x.qty, remain: x.remain, got: x.got,
+    state: x.remain <= 0 ? 'รับครบ' : (x.got > 0 ? 'รับบางส่วน' : 'ค้างรับ'), over: x.instLate ? -x.daysLeft : 0, late: !!x.late, doc: x.docNo }));
+
+  // 2) งาน TCI ที่ติดตั้งสัปดาห์หน้า
+  D.next = [];
+  rows.forEach(r => {
+    if (isCancelled_(r[7]) || TCI_TYPES.indexOf(str_(r[14])) < 0 || !inRange_(r[16], n1, n2)) return;
+    const remain = Math.max(num_(r[4]) - (got[pad_(r[1], 9) + '|' + str_(r[2])] || 0), 0);
+    D.next.push({ d: r[16], part: str_(r[2]), name: str_(r[3]), machine: str_(r[8]), qty: num_(r[4]), remain: remain, doc: pad_(r[1], 9) });
+  });
+  D.next.sort((a, b) => a.d - b.d || a.remain - b.remain);
+
+  // 3) พัสดุที่รับสัปดาห์นี้ (มีใบเบิก)
+  const rm = {};
+  readRcv_().forEach(r => {
+    if (!str_(r[RC.DOC]) || (str_(r[RC.SRC]) || SRC_REQ) !== SRC_REQ) return;
+    const d = asDate_(r[RC.RDATE]);
+    if (!inRange_(d, w1, w2)) return;
+    const doc = pad_(r[RC.DOC], 9), k = doc + '|' + str_(r[RC.PART]), inf = info[k] || {};
+    if (!rm[k]) rm[k] = { d: d, doc: doc, part: str_(r[RC.PART]), name: str_(r[RC.NAME]) || inf.name || '', machine: inf.machine || '', qty: 0 };
+    rm[k].qty += num_(r[RC.QTY]);
+    if (d > rm[k].d) rm[k].d = d;
+  });
+  D.recv = Object.keys(rm).map(k => rm[k]).sort((a, b) => a.d - b.d);
+
+  // 4) รายการเบิกสัปดาห์นี้
+  D.reqs = rows.filter(r => !isCancelled_(r[7]) && inRange_(asDate_(r[6]), w1, w2))
+    .map(r => ({ d: asDate_(r[6]), doc: pad_(r[1], 9), part: str_(r[2]), name: str_(r[3]), qty: num_(r[4]), machine: str_(r[8]), urg: str_(r[9]), type: str_(r[14]) }))
+    .sort((a, b) => a.d - b.d || (a.doc < b.doc ? -1 : 1));
+
+  // 5) การจ่ายสัปดาห์นี้
+  D.iss = readIss_().filter(r => str_(r[0]) !== '' && inRange_(asDate_(r[1]), w1, w2))
+    .map(r => ({ d: asDate_(r[1]), doc: str_(r[2]) ? pad_(r[2], 9) : '-', part: str_(r[4]), name: str_(r[5]), sn: str_(r[6]), qty: num_(r[7]), tail: str_(r[9]), tech: str_(r[10]) }))
+    .sort((a, b) => a.d - b.d);
+  return D;
+}
+
+function weeklyRange_(D) { return D.w1.getDate() + (D.w1.getMonth() !== D.w2.getMonth() ? ' ' + LINE_TH_MON_[D.w1.getMonth()] : '') + ' – ' + lineDate_(D.w2); }
+
+/** สร้าง PDF A4 ผ่าน Google Docs ชั่วคราว -> เก็บใน Drive -> เปิดลิงก์ให้ทุกคนที่มีลิงก์ดูได้ ; คืน {url, name, id} */
+function makeWeeklyPdf_(D) {
+  const NAVY = '#0b2a55', LIGHT = '#eaf1fb';
+  const name = 'รายงานสรุปประจำสัปดาห์ ' + dayKey_(D.w1) + ' ถึง ' + dayKey_(D.w2);
+  const doc = DocumentApp.create(name + ' (ชั่วคราว)'), body = doc.getBody();
+  body.setPageWidth(595.28).setPageHeight(841.89).setMarginTop(42).setMarginBottom(42).setMarginLeft(40).setMarginRight(40);
+  const para = (t, size, bold, color, after) => {
+    const p = body.appendParagraph(t); p.setSpacingBefore(0).setSpacingAfter(after === undefined ? 4 : after);
+    const x = p.editAsText(); x.setFontSize(size).setBold(!!bold).setForegroundColor(color || '#111111'); return p;
+  };
+  const table = (head, data, widths, emptyText) => {
+    if (!data.length) { para(emptyText || '— ไม่มีรายการ —', 11, false, '#666666', 10); return; }
+    const t = body.appendTable([head].concat(data));
+    t.setBorderColor('#9fb3d1').setBorderWidth(0.5);
+    for (let r = 0; r < t.getNumRows(); r++) {
+      const row = t.getRow(r);
+      for (let c = 0; c < row.getNumCells(); c++) {
+        const cell = row.getCell(c);
+        cell.setPaddingTop(3).setPaddingBottom(3).setPaddingLeft(4).setPaddingRight(4);
+        const x = cell.editAsText(); x.setFontSize(10);
+        if (r === 0) { cell.setBackgroundColor(NAVY); x.setBold(true).setForegroundColor('#ffffff'); }
+        else if (r % 2 === 0) cell.setBackgroundColor(LIGHT);
+        if (widths && widths[c]) t.setColumnWidth(c, widths[c]);
+      }
+    }
+    para('', 6, false, '#000000', 6);
+  };
+  const th = d => lineDate_(d);
+
+  para('รายงานสรุปประจำสัปดาห์', 22, true, NAVY, 2);
+  para('ประจำวันที่ ' + weeklyRange_(D) + '   ·   จัดทำ ' + lineDay_(D.today), 11, false, '#444444', 10);
+
+  const s = D.tciSum || {};
+  para('1. สถานะงาน TCI เดือน ' + LINE_TH_MON_[D.today.getMonth()] + ' ' + String((D.today.getFullYear() + 543) % 100), 14, true, NAVY, 3);
+  para('รับแล้ว ' + (s.done || 0) + ' / ' + (s.total || 0) + ' รายการ   ค้างรับ ' + (s.pending || 0) + '   รับบางส่วน ' + (s.partial || 0) + '   เกินวันติดตั้ง ' + (s.overdue || 0), 11, false, '#222222', 5);
+  table(['ที่', 'Part number', 'ชื่อพัสดุ', 'เครื่อง', 'วันติดตั้ง', 'จำนวน', 'สถานะ'],
+    D.tci.map((x, i) => [String(i + 1), x.part, x.name, x.machine, x.install, String(x.qty), x.state + (x.remain > 0 ? ' (ค้าง ' + x.remain + ')' : '') + (x.over ? ' เกิน ' + x.over + ' วัน' : '')]),
+    [24, 100, 150, 52, 62, 38, 100], '— ไม่มีงาน TCI ในเดือนนี้ —');
+
+  para('2. งาน TCI ที่จะติดตั้งสัปดาห์หน้า (' + th(D.n1) + ' – ' + th(D.n2) + ')', 14, true, NAVY, 3);
+  para('ของมาแล้ว ' + D.next.filter(x => x.remain <= 0).length + ' รายการ   ของยังไม่มา ' + D.next.filter(x => x.remain > 0).length + ' รายการ', 11, false, '#222222', 5);
+  table(['วันติดตั้ง', 'Part number', 'ชื่อพัสดุ', 'เครื่อง', 'จำนวน', 'ใบเบิก', 'สถานะของ'],
+    D.next.map(x => [th(x.d), x.part, x.name, x.machine, String(x.qty), x.doc, x.remain > 0 ? 'ยังไม่มา (ค้าง ' + x.remain + ')' : 'ของมาแล้ว']),
+    [62, 100, 130, 50, 36, 62, 86], '— ไม่มีงานติดตั้งสัปดาห์หน้า —');
+
+  para('3. พัสดุที่รับสัปดาห์นี้ (มีใบเบิก)  ' + D.recv.length + ' รายการ', 14, true, NAVY, 5);
+  table(['วันที่รับ', 'Part number', 'ชื่อพัสดุ', 'เครื่อง', 'จำนวน', 'ใบเบิก'],
+    D.recv.map(x => [th(x.d), x.part, x.name, x.machine, String(x.qty), x.doc]), [62, 110, 160, 56, 40, 62]);
+
+  para('4. รายการเบิกสัปดาห์นี้  ' + D.reqs.length + ' รายการ', 14, true, NAVY, 5);
+  table(['วันที่เบิก', 'ใบเบิก', 'Part number', 'ชื่อพัสดุ', 'จำนวน', 'เครื่อง', 'ประเภท'],
+    D.reqs.map(x => [th(x.d), x.doc, x.part, x.name, String(x.qty), x.machine, (x.urg === 'AOG' ? 'AOG · ' : '') + x.type]), [58, 62, 90, 120, 36, 52, 62]);
+
+  para('5. การจ่ายพัสดุสัปดาห์นี้  ' + D.iss.length + ' รายการ', 14, true, NAVY, 5);
+  table(['วันที่จ่าย', 'ใบเบิก', 'Part number', 'ชื่อพัสดุ', 'S/N', 'จำนวน', 'เครื่อง', 'ช่าง'],
+    D.iss.map(x => [th(x.d), x.doc, x.part, x.name, x.sn, String(x.qty), x.tail, x.tech]), [54, 58, 80, 96, 56, 32, 48, 66]);
+
+  body.editAsText().setFontFamily('Sarabun');
+  doc.saveAndClose();
+  const file = DriveApp.getFileById(doc.getId());
+  const pdfBlob = file.getAs('application/pdf').setName(name + '.pdf');
+  const it = DriveApp.getFoldersByName(WEEKLY_FOLDER_);
+  const folder = it.hasNext() ? it.next() : DriveApp.createFolder(WEEKLY_FOLDER_);
+  const pdf = folder.createFile(pdfBlob);
+  pdf.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  file.setTrashed(true);
+  return { url: pdf.getUrl(), name: pdf.getName(), id: pdf.getId() };
+}
+
+/** ข้อความไลน์สั้นของรายงานสัปดาห์ (พร้อมลิงก์ PDF) */
+function weeklyLineText_(D, url) {
+  const s = D.tciSum || {}, miss = D.next.filter(x => x.remain > 0).length;
+  const L = ['📄 รายงานสรุปประจำสัปดาห์ ' + weeklyRange_(D), '────────────',
+    '📊 TCI เดือน ' + LINE_TH_MON_[D.today.getMonth()] + ': รับแล้ว ' + (s.done || 0) + '/' + (s.total || 0) + (s.pending ? ' · ค้างรับ ' + s.pending : '') + (s.overdue ? ' · เกินวันติดตั้ง ' + s.overdue : ''),
+    '🔧 ติดตั้งสัปดาห์หน้า ' + D.next.length + ' รายการ' + (D.next.length ? (miss ? ' · ของยังไม่มา ' + miss : ' · ของมาครบ') : ''),
+    '📦 รับ ' + D.recv.length + ' · เบิก ' + D.reqs.length + ' · จ่าย ' + D.iss.length + ' รายการ', '',
+    'ดูรายงานฉบับเต็ม (PDF): ' + url];
+  return L.join('\n');
+}
+
+/** ส่งรายงานสัปดาห์ ; คืน {sent, url} */
+function sendWeeklyReport_(today, urgentText) {
+  const D = buildWeeklyData_(today);
+  const f = makeWeeklyPdf_(D);
+  let text = weeklyLineText_(D, f.url);
+  if (urgentText) text += '\n\n' + urgentText;
+  linePush_(text.slice(0, 4900));
+  log_('สรุปไลน์', '', 'ส่งรายงานสัปดาห์ (PDF) เข้ากลุ่มแล้ว: ' + f.name, 'ระบบ');
+  return { sent: true, weekly: true, url: f.url };
+}
+
+/** ตัวตั้งเวลาเรียกทุกวัน (หลัง 16:00) : วันทำงานสุดท้ายของสัปดาห์ = ส่งรายงาน PDF ; วันอื่น = ส่งเฉพาะเรื่องด่วน (ถ้ามี)
+ *  opt.force = ส่งแม้เป็นวันหยุด ; opt.weekly = true/false บังคับชนิด */
 function sendLineDigest(opt) {
   const today = parseDate_(todayStr_());
   const force = opt && opt.force === true;
-  if (!force && !isWorkday_(today)) { log_('สรุปไลน์', '', 'ข้าม: วันหยุด', 'ระบบ'); return { sent: false, reason: 'holiday' }; }
-  const text = buildLineDigest_(today);
-  if (!text) { log_('สรุปไลน์', '', 'ข้าม: ไม่มีเรื่องที่ต้องแจ้ง', 'ระบบ'); return { sent: false, reason: 'empty' }; }
-  linePush_(text);
-  log_('สรุปไลน์', '', 'ส่งสรุปประจำวันเข้ากลุ่มแล้ว (' + text.length + ' ตัวอักษร)', 'ระบบ');
-  return { sent: true, length: text.length };
+  const hol = holidaySet_();
+  if (!force && !isWorkday_(today, hol)) { log_('สรุปไลน์', '', 'ข้าม: วันหยุด', 'ระบบ'); return { sent: false, reason: 'holiday' }; }
+  const weekly = opt && opt.weekly !== undefined ? opt.weekly === true : isLastWorkdayOfWeek_(today, hol);
+  const urgent = buildLineDigest_(today, true);
+  if (weekly) {
+    try { return sendWeeklyReport_(today, urgent); }
+    catch (e) {
+      log_('สรุปไลน์', '', 'สร้างรายงาน PDF ไม่สำเร็จ: ' + e.message, 'ระบบ');
+      if (!urgent) throw e;
+    }
+  }
+  if (!urgent) { log_('สรุปไลน์', '', 'ข้าม: ไม่มีเรื่องด่วน', 'ระบบ'); return { sent: false, reason: 'empty' }; }
+  linePush_(urgent);
+  log_('สรุปไลน์', '', 'ส่งแจ้งด่วนเข้ากลุ่มแล้ว (' + urgent.length + ' ตัวอักษร)', 'ระบบ');
+  return { sent: true, length: urgent.length };
+}
+
+/** เมนู: สร้าง PDF รายงานสัปดาห์ตอนนี้ (ไม่ส่งไลน์) แล้วแสดงลิงก์ */
+function weeklyPdfPreview() {
+  const f = makeWeeklyPdf_(buildWeeklyData_(parseDate_(todayStr_())));
+  const ui = lineUi_();
+  if (ui) ui.alert('สร้างรายงานแล้ว (เก็บในโฟลเดอร์ "' + WEEKLY_FOLDER_ + '" ใน Google Drive)\n' + f.url);
+  return f;
+}
+/** เมนู: ส่งรายงานสัปดาห์เข้ากลุ่มตอนนี้ (ทดสอบ) */
+function lineWeeklyTest() {
+  const r = sendLineDigest({ force: true, weekly: true });
+  const ui = lineUi_();
+  if (ui) ui.alert(r.sent ? 'ส่งรายงานเข้ากลุ่มแล้ว' : 'ไม่ได้ส่ง');
+  return r;
 }
 
 /** จุดรับ POST ของเว็บแอป: webhook ของไลน์ (มี events) -> จดรหัสกลุ่ม ; นอกนั้น -> เรียก API ของระบบ */
@@ -3284,17 +3472,17 @@ function lineSetup() {
 
 /** เมนู: ดูตัวอย่างข้อความสรุปวันนี้ (ไม่ส่ง) */
 function linePreview() {
-  const text = buildLineDigest_(parseDate_(todayStr_()));
+  const text = buildLineDigest_(parseDate_(todayStr_()), true);
   const ui = lineUi_();
-  if (ui) ui.alert(text || 'วันนี้ไม่มีเรื่องที่ต้องแจ้ง');
+  if (ui) ui.alert(text || 'วันนี้ไม่มีเรื่องด่วนที่ต้องแจ้ง (รายงานเต็มส่งเป็น PDF ทุกวันศุกร์)');
   return text;
 }
 
 /** เมนู: ส่งสรุปเข้ากลุ่มตอนนี้ (ทดสอบ แม้เป็นวันหยุด) */
 function lineTestNow() {
-  const r = sendLineDigest({ force: true });
+  const r = sendLineDigest({ force: true, weekly: false });
   const ui = lineUi_();
-  if (ui) ui.alert(r.sent ? 'ส่งเข้ากลุ่มแล้ว' : 'ไม่ได้ส่ง: วันนี้ไม่มีเรื่องที่ต้องแจ้ง');
+  if (ui) ui.alert(r.sent ? 'ส่งเข้ากลุ่มแล้ว' : 'ไม่ได้ส่ง: วันนี้ไม่มีเรื่องด่วนที่ต้องแจ้ง');
   return r;
 }
 
@@ -3303,7 +3491,7 @@ function lineInstallTrigger() {
   ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'sendLineDigest').forEach(t => ScriptApp.deleteTrigger(t));
   ScriptApp.newTrigger('sendLineDigest').timeBased().atHour(16).nearMinute(10).everyDays(1).inTimezone('Asia/Bangkok').create();
   const ui = lineUi_();
-  if (ui) ui.alert('เปิดการส่งสรุปไลน์อัตโนมัติแล้ว: ทุกวันราว 16:10 น. (เฉพาะวันทำงาน)\nวันหยุดราชการให้ใส่วันที่ในชีท ' + SHEET_HOL);
+  if (ui) ui.alert('เปิดการส่งอัตโนมัติแล้ว: ทุกวันทำงานราว 16:10 น. (วันศุกร์/วันทำงานสุดท้ายของสัปดาห์ = รายงาน PDF, วันอื่น = แจ้งด่วนเฉพาะเมื่อมีเรื่อง)\nวันหยุดราชการให้ใส่วันที่ในชีท ' + SHEET_HOL);
 }
 
 /** เมนู: ปิดการส่งอัตโนมัติ */
