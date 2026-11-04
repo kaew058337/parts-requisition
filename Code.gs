@@ -3073,6 +3073,26 @@ function buildLineDigest_(today) {
     L.push('');
   }
 
+  // 3) พัสดุที่รับวันนี้ และมีเอกสารการเบิก
+  const info = {};
+  rows.forEach(r => { info[pad_(r[1], 9) + '|' + str_(r[2])] = { name: str_(r[3]), machine: str_(r[8]) }; });
+  const pickM = {}, todayK = dayKey_(today);
+  readRcv_().forEach(r => {
+    if (!str_(r[RC.DOC]) || (str_(r[RC.SRC]) || SRC_REQ) !== SRC_REQ) return;
+    const d = r[RC.RDATE] instanceof Date ? r[RC.RDATE] : (str_(r[RC.RDATE]) ? parseImportDate_(r[RC.RDATE]) : null);
+    if (!(d instanceof Date) || dayKey_(d) !== todayK) return;
+    const doc = pad_(r[RC.DOC], 9), k = doc + '|' + str_(r[RC.PART]), inf = info[k] || {};
+    if (!pickM[k]) pickM[k] = { doc: doc, part: str_(r[RC.PART]), name: str_(r[RC.NAME]) || inf.name || '', machine: inf.machine || '', qty: 0 };
+    pickM[k].qty += num_(r[RC.QTY]);
+  });
+  const pick = Object.keys(pickM).map(k => pickM[k]);
+  if (pick.length) {
+    L.push('📦 พัสดุที่รับวันนี้ (มีใบเบิก) ' + pick.length + ' รายการ');
+    cut(pick).forEach(x => L.push('• ' + (x.part || '-') + ' ' + x.name + (x.machine ? ' · เครื่อง ' + x.machine : '') + ' · จำนวน ' + x.qty + ' (' + x.doc + ')'));
+    more(pick.length).forEach(t => L.push(t));
+    L.push('');
+  }
+
   // 3) สถานะงาน TCI เดือนนี้
   const ym = dayKey_(today).substr(0, 7);
   const dash = getDashboard(ym), s = dash.tciSum;
@@ -3086,8 +3106,7 @@ function buildLineDigest_(today) {
   }
 
   if (!L.length) return '';
-  const url = str_(lineProps_().getProperty('APP_URL'));   // ลิงก์เปิดแอปที่ผู้ใช้ตั้งเอง (ไม่เดาจาก Apps Script เพราะอาจได้ลิงก์ของ deployment อื่น)
-  return ('สรุปประจำวัน ' + lineDay_(today) + '\n' + '────────────\n' + L.join('\n').replace(/\n+$/, '') + (url ? '\n\nเปิดแอป: ' + url : '')).slice(0, 4900);
+  return ('สรุปประจำวัน ' + lineDay_(today) + '\n' + '────────────\n' + L.join('\n').replace(/\n+$/, '')).slice(0, 4900);
 }
 
 function lineProps_() { return PropertiesService.getScriptProperties(); }
@@ -3146,18 +3165,13 @@ function lineUi_() { try { return SpreadsheetApp.getUi(); } catch (e) { return n
 function lineSetup() {
   const ui = lineUi_(); if (!ui) throw new Error('ใช้จากเมนูในชีทเท่านั้น');
   const p = lineProps_();
-  const t = ui.prompt('ตั้งค่าบอตไลน์ (1/3)', 'วาง Channel access token (long-lived) ของบอต\n(เว้นว่าง = ใช้ค่าเดิมที่บันทึกไว้' + (p.getProperty('LINE_TOKEN') ? ' — มีแล้ว' : ' — ยังไม่มี') + ')', ui.ButtonSet.OK_CANCEL);
+  const t = ui.prompt('ตั้งค่าบอตไลน์ (1/2)', 'วาง Channel access token (long-lived) ของบอต\n(เว้นว่าง = ใช้ค่าเดิมที่บันทึกไว้' + (p.getProperty('LINE_TOKEN') ? ' — มีแล้ว' : ' — ยังไม่มี') + ')', ui.ButtonSet.OK_CANCEL);
   if (t.getSelectedButton() !== ui.Button.OK) return;
   if (str_(t.getResponseText())) p.setProperty('LINE_TOKEN', str_(t.getResponseText()));
   const last = p.getProperty('LINE_LAST_GROUP') || '', cur = p.getProperty('LINE_TARGET') || '';
-  const g = ui.prompt('ตั้งค่าบอตไลน์ (2/3)', 'รหัสกลุ่มปลายทาง (groupId ขึ้นต้นด้วย C)\n' + (last ? 'กลุ่มล่าสุดที่บอตเห็น: ' + last + '\n(คัดลอกมาวางด้านล่างได้)\n' : 'ยังไม่เคยเห็นกลุ่มจาก webhook\n' + (p.getProperty('LINE_LAST_POST') ? '(webhook ทำงานแล้ว ล่าสุด: ' + p.getProperty('LINE_LAST_POST').slice(0, 120) + ' — แต่ยังไม่มีข้อความจากกลุ่ม ลองพิมพ์ในกลุ่มอีกครั้ง)\n' : '(ยังไม่เคยมีสัญญาณจากไลน์เข้ามาเลย ตรวจ Webhook URL / Use webhook / การ deploy เวอร์ชันใหม่)\n')) + (cur ? 'ที่ตั้งไว้ตอนนี้: ' + cur + '\n' : '') + '(เว้นว่าง = ใช้ค่าเดิม)', ui.ButtonSet.OK_CANCEL);
+  const g = ui.prompt('ตั้งค่าบอตไลน์ (2/2)', 'รหัสกลุ่มปลายทาง (groupId ขึ้นต้นด้วย C)\n' + (last ? 'กลุ่มล่าสุดที่บอตเห็น: ' + last + '\n(คัดลอกมาวางด้านล่างได้)\n' : 'ยังไม่เคยเห็นกลุ่มจาก webhook\n' + (p.getProperty('LINE_LAST_POST') ? '(webhook ทำงานแล้ว ล่าสุด: ' + p.getProperty('LINE_LAST_POST').slice(0, 120) + ' — แต่ยังไม่มีข้อความจากกลุ่ม ลองพิมพ์ในกลุ่มอีกครั้ง)\n' : '(ยังไม่เคยมีสัญญาณจากไลน์เข้ามาเลย ตรวจ Webhook URL / Use webhook / การ deploy เวอร์ชันใหม่)\n')) + (cur ? 'ที่ตั้งไว้ตอนนี้: ' + cur + '\n' : '') + '(เว้นว่าง = ใช้ค่าเดิม)', ui.ButtonSet.OK_CANCEL);
   if (g.getSelectedButton() !== ui.Button.OK) return;
   if (str_(g.getResponseText())) p.setProperty('LINE_TARGET', str_(g.getResponseText()));
-  const u = ui.prompt('ตั้งค่าบอตไลน์ (3/3)', 'ลิงก์เปิดแอป (URL ที่คุณใช้เปิดแอปจริง ลงท้าย /exec) จะแนบท้ายข้อความสรุป\n' + (p.getProperty('APP_URL') ? 'ที่ตั้งไว้ตอนนี้: ' + p.getProperty('APP_URL') + '\n' : '') + '(เว้นว่าง = ใช้ค่าเดิม ; พิมพ์ - เพื่อไม่แนบลิงก์)', ui.ButtonSet.OK_CANCEL);
-  if (u.getSelectedButton() === ui.Button.OK) {
-    const v = str_(u.getResponseText());
-    if (v === '-') p.deleteProperty('APP_URL'); else if (v) p.setProperty('APP_URL', v);
-  }
   ui.alert('บันทึกแล้ว\nใช้เมนู "ทดสอบส่งสรุปไลน์ตอนนี้" เพื่อลองส่งเข้ากลุ่ม');
 }
 
