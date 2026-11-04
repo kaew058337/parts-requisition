@@ -3086,8 +3086,7 @@ function buildLineDigest_(today) {
   }
 
   if (!L.length) return '';
-  let url = '';
-  try { url = ScriptApp.getService().getUrl(); } catch (e) { url = ''; }
+  const url = str_(lineProps_().getProperty('APP_URL'));   // ลิงก์เปิดแอปที่ผู้ใช้ตั้งเอง (ไม่เดาจาก Apps Script เพราะอาจได้ลิงก์ของ deployment อื่น)
   return ('สรุปประจำวัน ' + lineDay_(today) + '\n' + '────────────\n' + L.join('\n').replace(/\n+$/, '') + (url ? '\n\nเปิดแอป: ' + url : '')).slice(0, 4900);
 }
 
@@ -3147,13 +3146,18 @@ function lineUi_() { try { return SpreadsheetApp.getUi(); } catch (e) { return n
 function lineSetup() {
   const ui = lineUi_(); if (!ui) throw new Error('ใช้จากเมนูในชีทเท่านั้น');
   const p = lineProps_();
-  const t = ui.prompt('ตั้งค่าบอตไลน์ (1/2)', 'วาง Channel access token (long-lived) ของบอต\n(เว้นว่าง = ใช้ค่าเดิมที่บันทึกไว้' + (p.getProperty('LINE_TOKEN') ? ' — มีแล้ว' : ' — ยังไม่มี') + ')', ui.ButtonSet.OK_CANCEL);
+  const t = ui.prompt('ตั้งค่าบอตไลน์ (1/3)', 'วาง Channel access token (long-lived) ของบอต\n(เว้นว่าง = ใช้ค่าเดิมที่บันทึกไว้' + (p.getProperty('LINE_TOKEN') ? ' — มีแล้ว' : ' — ยังไม่มี') + ')', ui.ButtonSet.OK_CANCEL);
   if (t.getSelectedButton() !== ui.Button.OK) return;
   if (str_(t.getResponseText())) p.setProperty('LINE_TOKEN', str_(t.getResponseText()));
   const last = p.getProperty('LINE_LAST_GROUP') || '', cur = p.getProperty('LINE_TARGET') || '';
-  const g = ui.prompt('ตั้งค่าบอตไลน์ (2/2)', 'รหัสกลุ่มปลายทาง (groupId ขึ้นต้นด้วย C)\n' + (last ? 'กลุ่มล่าสุดที่บอตเห็น: ' + last + '\n(คัดลอกมาวางด้านล่างได้)\n' : 'ยังไม่เคยเห็นกลุ่มจาก webhook\n' + (p.getProperty('LINE_LAST_POST') ? '(webhook ทำงานแล้ว ล่าสุด: ' + p.getProperty('LINE_LAST_POST').slice(0, 120) + ' — แต่ยังไม่มีข้อความจากกลุ่ม ลองพิมพ์ในกลุ่มอีกครั้ง)\n' : '(ยังไม่เคยมีสัญญาณจากไลน์เข้ามาเลย ตรวจ Webhook URL / Use webhook / การ deploy เวอร์ชันใหม่)\n')) + (cur ? 'ที่ตั้งไว้ตอนนี้: ' + cur + '\n' : '') + '(เว้นว่าง = ใช้ค่าเดิม)', ui.ButtonSet.OK_CANCEL);
+  const g = ui.prompt('ตั้งค่าบอตไลน์ (2/3)', 'รหัสกลุ่มปลายทาง (groupId ขึ้นต้นด้วย C)\n' + (last ? 'กลุ่มล่าสุดที่บอตเห็น: ' + last + '\n(คัดลอกมาวางด้านล่างได้)\n' : 'ยังไม่เคยเห็นกลุ่มจาก webhook\n' + (p.getProperty('LINE_LAST_POST') ? '(webhook ทำงานแล้ว ล่าสุด: ' + p.getProperty('LINE_LAST_POST').slice(0, 120) + ' — แต่ยังไม่มีข้อความจากกลุ่ม ลองพิมพ์ในกลุ่มอีกครั้ง)\n' : '(ยังไม่เคยมีสัญญาณจากไลน์เข้ามาเลย ตรวจ Webhook URL / Use webhook / การ deploy เวอร์ชันใหม่)\n')) + (cur ? 'ที่ตั้งไว้ตอนนี้: ' + cur + '\n' : '') + '(เว้นว่าง = ใช้ค่าเดิม)', ui.ButtonSet.OK_CANCEL);
   if (g.getSelectedButton() !== ui.Button.OK) return;
   if (str_(g.getResponseText())) p.setProperty('LINE_TARGET', str_(g.getResponseText()));
+  const u = ui.prompt('ตั้งค่าบอตไลน์ (3/3)', 'ลิงก์เปิดแอป (URL ที่คุณใช้เปิดแอปจริง ลงท้าย /exec) จะแนบท้ายข้อความสรุป\n' + (p.getProperty('APP_URL') ? 'ที่ตั้งไว้ตอนนี้: ' + p.getProperty('APP_URL') + '\n' : '') + '(เว้นว่าง = ใช้ค่าเดิม ; พิมพ์ - เพื่อไม่แนบลิงก์)', ui.ButtonSet.OK_CANCEL);
+  if (u.getSelectedButton() === ui.Button.OK) {
+    const v = str_(u.getResponseText());
+    if (v === '-') p.deleteProperty('APP_URL'); else if (v) p.setProperty('APP_URL', v);
+  }
   ui.alert('บันทึกแล้ว\nใช้เมนู "ทดสอบส่งสรุปไลน์ตอนนี้" เพื่อลองส่งเข้ากลุ่ม');
 }
 
