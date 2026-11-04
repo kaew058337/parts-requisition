@@ -18,6 +18,7 @@ const SHEET_CNT = 'ตรวจนับ';
 const SHEET_CLAIM = 'เคลม';
 const SHEET_KIT = 'FLY AWAY KIT';       // ชีทแสดง/แก้พัสดุที่ TAIL No. เป็น FLY AWAY KIT 1-2 (ลิงก์กับชีท รับ ด้วยลำดับรับ)
 const SHEET_KITREQ = 'รายการชุด FLY AWAY KIT';   // รายการตายตัวที่แต่ละชุดต้องมี + จำนวน (ผู้ใช้กรอก) ระบบเทียบกับของจริงในชุด
+const SHEET_HOL = 'วันหยุด';              // วันหยุดราชการที่ไม่ส่งสรุปไลน์ (นอกจากเสาร์-อาทิตย์)
 const SHEET_RCV2 = 'รับคืนเข้าคลัง';   // ประวัติรับ "คืนเข้าคลัง" แยกจากรับปกติ (โครงสร้างเหมือนชีท รับ)
 const WARRANTY_DAYS = 365;        // ประกัน 1 ปี นับจากวันที่รับ (LRU / LRU(TCI)) ; ของที่เคลมกลับมานับใหม่จากวันที่ได้รับกลับ
 const WARRANTY_SOON_DAYS = 60;    // เตือน "ใกล้หมดประกัน" เมื่อเหลือไม่เกินกี่วัน
@@ -51,6 +52,7 @@ const HEADERS = {
   [SHEET_LOG]: ['เวลา', 'ผู้ใช้งาน', 'อีเมล', 'การกระทำ', 'เลขเอกสารการเบิก', 'รายละเอียด'],
   [SHEET_KIT]: ['ลำดับรับ', 'ชุด (TAIL No.)', 'Part number', 'ชื่อพัสดุ', 'serial number', 'ประเภทพัสดุ', 'จำนวน', 'หน่วยนับ', 'คงเหลือในชุด', 'COND', 'LOCATION', 'หมดอายุ', 'วันที่รับ', 'เลขเอกสารการเบิก', 'สถานะ', 'หมายเหตุ'],
   [SHEET_KITREQ]: ['Part number', 'ชื่อพัสดุ', 'ประเภทพัสดุ', 'ต้องมีใน KIT 1', 'ต้องมีใน KIT 2', 'มีอยู่ KIT 1', 'มีอยู่ KIT 2', 'สถานะ'],
+  [SHEET_HOL]: ['วันที่ (วว/ดด/ปปปป)', 'ชื่อวันหยุด'],
   [SHEET_STK]: ['ลำดับรับ', 'เลขเอกสารการเบิก', 'Part number', 'ชื่อพัสดุ', 'serial number', 'ประเภทพัสดุ', 'หน่วยนับ', 'จำนวนรับ', 'จำนวนคงเหลือ', 'COND', 'LOCATION', 'หมดอายุ', 'วันที่รับ', 'สถานะ', 'หมายเหตุ'],
   [SHEET_RET]: ['ลำดับ', 'Part number', 'ชื่อ', 'จำนวน', 'serial number ส่งคืน', 'serial number ที่ใส่', 'ผู้รับ', 'ผู้ส่ง', 'เครื่อง', 'ข้อขัดข้อง', 'หมายเหตุ', 'วันที่บันทึก', 'ที่หนังสือ', 'สภาพพัสดุ']
 };
@@ -2844,6 +2846,12 @@ function onOpen() {
       .addItem('นำค่าที่แก้ในคลังพัสดุไปแก้ต้นทาง', 'applyStockEdits')
       .addItem('อัปเดตชีท FLY AWAY KIT', 'refreshKitSheet')
       .addItem('สร้างรายการตายตัวของชุด (จากของที่มีอยู่)', 'seedKitSpec')
+      .addSeparator()
+      .addItem('ตั้งค่าบอตไลน์', 'lineSetup')
+      .addItem('ดูตัวอย่างข้อความสรุปไลน์', 'linePreview')
+      .addItem('ทดสอบส่งสรุปไลน์ตอนนี้', 'lineTestNow')
+      .addItem('เปิดส่งสรุปไลน์อัตโนมัติ (16:10 วันทำงาน)', 'lineInstallTrigger')
+      .addItem('ปิดส่งสรุปไลน์อัตโนมัติ', 'lineRemoveTrigger')
       .addToUi();
   } catch (e) { /* ไม่มี UI */ }
 }
@@ -2989,4 +2997,202 @@ function importRequisitions() {
   sh.getRange(IMPREQ_FIRST_ROW, 9, out.length, 1).setValues(out);
   say(res.added ? 'ออกใบเบิกแล้ว ' + res.added + ' ใบ (' + res.docs[0].docNo + ' ถึง ' + res.docs[res.docs.length - 1].docNo + ')\nพิมพ์ใบได้ที่แท็บ ประวัติ > เบิก' : 'ไม่มีรายการใหม่ให้ออกใบเบิก');
   return res;
+}
+
+/* ============================================================
+ *  สรุปประจำวันทางไลน์ (บอต LINE Messaging API)
+ *  - ส่ง 1 ข้อความรวม หลัง 16:00 เฉพาะวันทำงาน (ไม่ใช่เสาร์-อาทิตย์/วันที่ลงในชีท วันหยุด)
+ *  - เนื้อหา: งาน TCI ที่จะติดตั้งวันทำงานถัดไป · ใบเบิก AOG ค้างรับ · สถานะงาน TCI เดือนนี้ · พัสดุที่รับแล้วรอผู้เบิกมารับ
+ *  - ตั้งค่า token / groupId ผ่านเมนู (เก็บใน Script Properties ไม่อยู่ในโค้ด)
+ * ============================================================ */
+const LINE_TH_MON_ = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+const LINE_TH_DAY_ = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
+const LINE_MAX_ITEMS_ = 12;
+
+function lineDate_(d) { return d.getDate() + ' ' + LINE_TH_MON_[d.getMonth()] + ' ' + String((d.getFullYear() + 543) % 100); }
+function lineDay_(d) { return 'วัน' + LINE_TH_DAY_[d.getDay()] + 'ที่ ' + lineDate_(d); }
+function dayKey_(d) { return Utilities.formatDate(d, TZ, 'yyyy-MM-dd'); }
+function addDays_(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }
+
+/** วันหยุดที่ผู้ใช้กรอกไว้ในชีท วันหยุด -> {yyyy-MM-dd: true} */
+function holidaySet_() {
+  const sh = getSheet_(SHEET_HOL), last = sh.getLastRow(), set = {};
+  if (last < 2) return set;
+  sh.getRange(2, 1, last - 1, 1).getValues().forEach(r => {
+    const d = r[0] instanceof Date ? r[0] : (str_(r[0]) ? parseImportDate_(r[0]) : null);
+    if (d instanceof Date) set[dayKey_(d)] = true;
+  });
+  return set;
+}
+function isWorkday_(d, hol) { const w = d.getDay(); return w !== 0 && w !== 6 && !(hol || holidaySet_())[dayKey_(d)]; }
+
+/** สร้างข้อความสรุป (ไม่ส่ง) ; today = วันที่ (00:00) ; คืน '' ถ้าไม่มีอะไรจะแจ้ง */
+function buildLineDigest_(today) {
+  const hol = holidaySet_();
+  const tomorrow = addDays_(today, 1);
+  let target = tomorrow;
+  while (!isWorkday_(target, hol)) target = addDays_(target, 1);   // วันทำงานถัดไป (ศุกร์ -> จันทร์)
+  const req = getSheet_(SHEET_REQ), rl = req.getLastRow();
+  const rows = rl >= 2 ? req.getRange(2, 1, rl - 1, 17).getValues().filter(isValidReqRow_) : [];
+  const got = receivedMap_(), lots = computeLots_();
+  const L = [], more = (n) => n > LINE_MAX_ITEMS_ ? ['…และอีก ' + (n - LINE_MAX_ITEMS_) + ' รายการ (ดูในแอป)'] : [];
+  const cut = (arr) => arr.slice(0, LINE_MAX_ITEMS_);
+
+  // 1) งาน TCI ที่จะติดตั้งวันทำงานถัดไป (รวมวันหยุดที่คั่นกลาง)
+  const inst = [];
+  rows.forEach(r => {
+    if (isCancelled_(r[7]) || TCI_TYPES.indexOf(str_(r[14])) < 0 || !(r[16] instanceof Date)) return;
+    const d = r[16];
+    if (d < tomorrow || d > target) return;
+    const remain = Math.max(num_(r[4]) - (got[pad_(r[1], 9) + '|' + str_(r[2])] || 0), 0);
+    inst.push({ d: d, doc: pad_(r[1], 9), part: str_(r[2]), name: str_(r[3]), machine: str_(r[8]), remain: remain });
+  });
+  if (inst.length) {
+    inst.sort((a, b) => a.d - b.d || a.remain - b.remain);
+    const multi = dayKey_(tomorrow) !== dayKey_(target);
+    L.push('🔧 งาน TCI ที่จะติดตั้ง ' + (multi ? 'ภายใน' + lineDay_(target) : (dayKey_(target) === dayKey_(tomorrow) ? 'พรุ่งนี้ (' + lineDate_(target) + ')' : lineDay_(target))) + ' : ' + inst.length + ' รายการ');
+    cut(inst).forEach(x => L.push((x.remain > 0 ? '❌ ของยังไม่มา ' : '✅ ของมาแล้ว ') + (x.part || x.name) + ' ' + x.name + ' (' + x.doc + ')' + (x.machine ? ' เครื่อง ' + x.machine : '') + (multi ? ' · ติดตั้ง ' + lineDate_(x.d) : '') + (x.remain > 0 ? ' · ค้าง ' + x.remain : '')));
+    more(inst.length).forEach(t => L.push(t));
+    L.push('');
+  }
+
+  // 2) ใบเบิก AOG ที่ค้างรับ
+  const aog = [];
+  rows.forEach(r => {
+    if (isCancelled_(r[7]) || isPaid_(r[7]) || str_(r[9]) !== 'AOG') return;
+    const remain = Math.max(num_(r[4]) - (got[pad_(r[1], 9) + '|' + str_(r[2])] || 0), 0);
+    if (remain > 0) aog.push({ doc: pad_(r[1], 9), part: str_(r[2]), name: str_(r[3]), remain: remain, date: r[6], due: dueDate_(r[6], r[9]) });
+  });
+  if (aog.length) {
+    aog.sort((a, b) => (a.due || 0) - (b.due || 0));
+    L.push('🚨 ใบเบิก AOG ค้างรับ ' + aog.length + ' รายการ');
+    cut(aog).forEach(x => L.push('• ' + x.doc + ' ' + (x.part || '') + ' ' + x.name + ' · ค้าง ' + x.remain + (x.due instanceof Date ? (x.due < today ? ' · เลยกำหนด ' + Math.round((today - x.due) / 86400000) + ' วัน' : ' · กำหนด ' + lineDate_(x.due)) : '')));
+    more(aog.length).forEach(t => L.push(t));
+    L.push('');
+  }
+
+  // 3) สถานะงาน TCI เดือนนี้
+  const ym = dayKey_(today).substr(0, 7);
+  const dash = getDashboard(ym), s = dash.tciSum;
+  if (s.total) {
+    L.push('📊 สถานะงาน TCI เดือน ' + LINE_TH_MON_[today.getMonth()] + ' ' + String((today.getFullYear() + 543) % 100) + ' : รับแล้ว ' + s.done + '/' + s.total +
+      (s.partial ? ' · รับบางส่วน ' + s.partial : '') + (s.pending ? ' · ค้างรับ ' + s.pending : '') + (s.overdue ? ' · เกินวันติดตั้ง ' + s.overdue : ''));
+    const late = dash.tci.filter(x => x.late);
+    cut(late).forEach(x => L.push('⚠️ ' + (x.part || x.name) + ' ' + x.name + ' (' + x.docNo + ')' + (x.instLate ? ' · เกินวันติดตั้ง ' + (-x.daysLeft) + ' วัน' : ' · เลยกำหนด') + ' · ค้าง ' + x.remain));
+    more(late.length).forEach(t => L.push(t));
+    L.push('');
+  }
+
+  // 4) พัสดุที่รับตามใบเบิกแล้ว รอผู้เบิกมารับ (ยังไม่จ่ายให้ช่าง)
+  const who = {};
+  rows.forEach(r => { who[pad_(r[1], 9) + '|' + str_(r[2])] = [str_(r[11]), str_(r[12])].filter(Boolean).join(' '); });
+  const wait = lots.filter(l => !l.free && l.remain > 0).map(l => ({ l: l, who: who[l.doc + '|' + l.part] || '(ไม่ระบุผู้เบิก)' }));
+  if (wait.length) {
+    const byWho = {};
+    wait.forEach(w => { (byWho[w.who] = byWho[w.who] || []).push(w.l); });
+    L.push('📦 พัสดุรับแล้ว รอผู้เบิกมารับ ' + wait.length + ' รายการ');
+    let n = 0;
+    Object.keys(byWho).forEach(k => {
+      if (n >= LINE_MAX_ITEMS_) return;
+      const items = byWho[k].map(l => (l.part || l.name) + ' ' + l.name + ' x' + l.remain + (l.recvDate instanceof Date && dayKey_(l.recvDate) === dayKey_(today) ? ' (รับวันนี้)' : ''));
+      L.push('• ' + k + ' : ' + items.join(', '));
+      n++;
+    });
+    more(Object.keys(byWho).length).forEach(t => L.push(t));
+    L.push('');
+  }
+
+  if (!L.length) return '';
+  let url = '';
+  try { url = ScriptApp.getService().getUrl(); } catch (e) { url = ''; }
+  return ('สรุปประจำวัน ' + lineDay_(today) + '\n' + '────────────\n' + L.join('\n').replace(/\n+$/, '') + (url ? '\n\nเปิดแอป: ' + url : '')).slice(0, 4900);
+}
+
+function lineProps_() { return PropertiesService.getScriptProperties(); }
+
+/** ส่งข้อความไปที่กลุ่มไลน์ (LINE Messaging API push) */
+function linePush_(text) {
+  const p = lineProps_(), token = p.getProperty('LINE_TOKEN'), to = p.getProperty('LINE_TARGET');
+  if (!token || !to) throw new Error('ยังไม่ได้ตั้งค่าบอตไลน์ (เมนู ตั้งค่าบอตไลน์)');
+  const res = UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
+    method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+    headers: { Authorization: 'Bearer ' + token },
+    payload: JSON.stringify({ to: to, messages: [{ type: 'text', text: text }] })
+  });
+  const code = res.getResponseCode();
+  if (code !== 200) throw new Error('ส่งไลน์ไม่สำเร็จ (' + code + '): ' + String(res.getContentText()).slice(0, 200));
+  return true;
+}
+
+/** ตัวตั้งเวลาเรียกทุกวัน (หลัง 16:00) ; opt.force = ส่งแม้เป็นวันหยุด */
+function sendLineDigest(opt) {
+  const today = parseDate_(todayStr_());
+  const force = opt && opt.force === true;
+  if (!force && !isWorkday_(today)) { log_('สรุปไลน์', '', 'ข้าม: วันหยุด', 'ระบบ'); return { sent: false, reason: 'holiday' }; }
+  const text = buildLineDigest_(today);
+  if (!text) { log_('สรุปไลน์', '', 'ข้าม: ไม่มีเรื่องที่ต้องแจ้ง', 'ระบบ'); return { sent: false, reason: 'empty' }; }
+  linePush_(text);
+  log_('สรุปไลน์', '', 'ส่งสรุปประจำวันเข้ากลุ่มแล้ว (' + text.length + ' ตัวอักษร)', 'ระบบ');
+  return { sent: true, length: text.length };
+}
+
+/** webhook ของไลน์: ใช้จดรหัสกลุ่ม (groupId) ล่าสุดที่บอตเห็น เพื่อนำไปตั้งค่า ไม่ตอบข้อความใด ๆ */
+function doPost(e) {
+  try {
+    const body = JSON.parse(e.postData.contents);
+    (body.events || []).forEach(ev => {
+      const src = ev.source || {};
+      const id = src.groupId || src.roomId || '';
+      if (id) lineProps_().setProperty('LINE_LAST_GROUP', id);
+    });
+  } catch (err) { /* ไม่ทำอะไร */ }
+  return ContentService.createTextOutput('OK');
+}
+
+function lineUi_() { try { return SpreadsheetApp.getUi(); } catch (e) { return null; } }
+
+/** เมนู: ตั้งค่าบอตไลน์ (token + กลุ่มปลายทาง) */
+function lineSetup() {
+  const ui = lineUi_(); if (!ui) throw new Error('ใช้จากเมนูในชีทเท่านั้น');
+  const p = lineProps_();
+  const t = ui.prompt('ตั้งค่าบอตไลน์ (1/2)', 'วาง Channel access token (long-lived) ของบอต\n(เว้นว่าง = ใช้ค่าเดิมที่บันทึกไว้' + (p.getProperty('LINE_TOKEN') ? ' — มีแล้ว' : ' — ยังไม่มี') + ')', ui.ButtonSet.OK_CANCEL);
+  if (t.getSelectedButton() !== ui.Button.OK) return;
+  if (str_(t.getResponseText())) p.setProperty('LINE_TOKEN', str_(t.getResponseText()));
+  const last = p.getProperty('LINE_LAST_GROUP') || '', cur = p.getProperty('LINE_TARGET') || '';
+  const g = ui.prompt('ตั้งค่าบอตไลน์ (2/2)', 'รหัสกลุ่มปลายทาง (groupId ขึ้นต้นด้วย C)\n' + (last ? 'กลุ่มล่าสุดที่บอตเห็น: ' + last + '\n(คัดลอกมาวางด้านล่างได้)\n' : 'ยังไม่เคยเห็นกลุ่มจาก webhook\n') + (cur ? 'ที่ตั้งไว้ตอนนี้: ' + cur + '\n' : '') + '(เว้นว่าง = ใช้ค่าเดิม)', ui.ButtonSet.OK_CANCEL);
+  if (g.getSelectedButton() !== ui.Button.OK) return;
+  if (str_(g.getResponseText())) p.setProperty('LINE_TARGET', str_(g.getResponseText()));
+  ui.alert('บันทึกแล้ว\nใช้เมนู "ทดสอบส่งสรุปไลน์ตอนนี้" เพื่อลองส่งเข้ากลุ่ม');
+}
+
+/** เมนู: ดูตัวอย่างข้อความสรุปวันนี้ (ไม่ส่ง) */
+function linePreview() {
+  const text = buildLineDigest_(parseDate_(todayStr_()));
+  const ui = lineUi_();
+  if (ui) ui.alert(text || 'วันนี้ไม่มีเรื่องที่ต้องแจ้ง');
+  return text;
+}
+
+/** เมนู: ส่งสรุปเข้ากลุ่มตอนนี้ (ทดสอบ แม้เป็นวันหยุด) */
+function lineTestNow() {
+  const r = sendLineDigest({ force: true });
+  const ui = lineUi_();
+  if (ui) ui.alert(r.sent ? 'ส่งเข้ากลุ่มแล้ว' : 'ไม่ได้ส่ง: วันนี้ไม่มีเรื่องที่ต้องแจ้ง');
+  return r;
+}
+
+/** เมนู: เปิดการส่งอัตโนมัติทุกวันช่วง 16:00-17:00 (ส่งเฉพาะวันทำงาน) */
+function lineInstallTrigger() {
+  ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'sendLineDigest').forEach(t => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger('sendLineDigest').timeBased().atHour(16).nearMinute(10).everyDays(1).inTimezone('Asia/Bangkok').create();
+  const ui = lineUi_();
+  if (ui) ui.alert('เปิดการส่งสรุปไลน์อัตโนมัติแล้ว: ทุกวันราว 16:10 น. (เฉพาะวันทำงาน)\nวันหยุดราชการให้ใส่วันที่ในชีท ' + SHEET_HOL);
+}
+
+/** เมนู: ปิดการส่งอัตโนมัติ */
+function lineRemoveTrigger() {
+  const ts = ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'sendLineDigest');
+  ts.forEach(t => ScriptApp.deleteTrigger(t));
+  const ui = lineUi_();
+  if (ui) ui.alert(ts.length ? 'ปิดการส่งสรุปไลน์อัตโนมัติแล้ว' : 'ยังไม่ได้เปิดการส่งอัตโนมัติ');
 }
