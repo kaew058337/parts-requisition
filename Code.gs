@@ -2838,6 +2838,7 @@ function onOpen() {
   try {
     SpreadsheetApp.getUi().createMenu('ระบบเบิก-จ่าย')
       .addItem('สร้างชีท นำเข้าใบเบิก', 'createRequisitionImportSheet')
+      .addItem('อ่านตาราง Schedule TCI (จากแท็บที่เปิดอยู่)', 'readTciSchedule')
       .addItem('นำเข้าใบเบิก (ออกใบเบิกทุกรายการ)', 'importRequisitions')
       .addSeparator()
       .addItem('นำเข้ายอดยกมา', 'importOpeningStock')
@@ -2905,6 +2906,112 @@ function createRequisitionImportSheet() {
     sh.getRange(IMPREQ_FIRST_ROW, 6, 500, 1).setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(MACHINE_LIST, true).setAllowInvalid(false).build());
   } catch (e) { /* ไม่มี dropdown ก็ใช้งานได้ */ }
   return sh;
+}
+
+/* ===== อ่านตาราง Schedule งาน TCI (ไฟล์ Excel ของหัวหน้า) =====
+ * วิธีใช้: ในชีทนี้เลือก ไฟล์ > นำเข้า > อัปโหลด > "แทรกชีทใหม่" แล้วเปิดแท็บของเดือนนั้น
+ * จากนั้นสั่งเมนู "อ่านตาราง Schedule TCI" ระบบจะเติมรายการลงชีท นำเข้าใบเบิก ให้ตรวจก่อนกดนำเข้า */
+const TH_MON_SHORT_ = { 'มค': 0, 'กพ': 1, 'มีค': 2, 'เมย': 3, 'พค': 4, 'มิย': 5, 'กค': 6, 'สค': 7, 'กย': 8, 'ตค': 9, 'พย': 10, 'ธค': 11 };
+function parseThaiShortDate_(v) {
+  if (v instanceof Date) return v;
+  const t = String(v === null || v === undefined ? '' : v).replace(/[ \s]+/g, ' ').trim();
+  const m = t.match(/^(\d{1,2})\s*([ก-๙\.]+)\s*(\d{2,4})$/);
+  if (!m) return null;
+  const mon = TH_MON_SHORT_[m[2].replace(/\./g, '')];
+  if (mon === undefined) return null;
+  let y = Number(m[3]);
+  if (y < 100) y += 2500;
+  if (y > 2400) y -= 543;
+  return new Date(y, mon, Number(m[1]));
+}
+
+/** vals = ตารางค่า (2 มิติ) ; merges = [{r1,c1,r2,c2}] เริ่มนับ 0 ; คืน {items, skipped, warnings} หรือ {error} */
+function parseTciGrid_(vals, merges, parts) {
+  const norm = x => String(x === null || x === undefined ? '' : x).replace(/[ \s]+/g, ' ').trim();
+  let hr = -1, col = {};
+  for (let r = 0; r < Math.min(vals.length, 15) && hr < 0; r++) {
+    const c = {};
+    vals[r].forEach((x, i) => {
+      const k = norm(x).toLowerCase();
+      if (k === 'no.' || k === 'no') c.no = i;
+      else if (k.indexOf('workname') >= 0) c.job = i;
+      else if (k === 'due date') c.due = i;
+      else if (k === 'name') c.name = i;
+      else if (k === 'p/n') c.pn = i;
+      else if (k === 'ea') c.qty = i;
+      else if (k === 'remark') c.remark = i;
+    });
+    if (c.no !== undefined && c.due !== undefined && c.name !== undefined && c.pn !== undefined && c.qty !== undefined) { hr = r; col = c; }
+  }
+  if (hr < 0) return { error: 'ไม่พบหัวตารางที่คาดไว้ (No. / Due Date / NAME / P/N / EA) ในชีทนี้ — รูปแบบไฟล์อาจเปลี่ยน' };
+  // แผนที่เซลล์ที่ถูกรวม : top = เซลล์บนซ้าย ; ช่องอื่นในช่วงรวมถือว่าไม่มีค่าของตัวเอง
+  const own = vals.map(r => r.map(() => true)), fill = vals.map(r => r.slice());
+  (merges || []).forEach(m => {
+    const v = vals[m.r1] ? vals[m.r1][m.c1] : '';
+    for (let r = m.r1; r <= m.r2; r++) for (let c = m.c1; c <= m.c2; c++) {
+      if (!vals[r]) continue;
+      fill[r][c] = v;
+      if (r !== m.r1 || c !== m.c1) own[r][c] = false;
+    }
+  });
+  const items = [], skipped = [], warnings = [], seenSn = {};
+  let machine = '';
+  for (let r = hr + 1; r < vals.length; r++) {
+    const a = norm(fill[r][col.no]);
+    if (a) machine = a.replace(/\.0+$/, '');
+    const nm = own[r][col.name] ? norm(vals[r][col.name]) : '';
+    const pn = own[r][col.pn] ? norm(vals[r][col.pn]) : '';
+    if (!nm && !pn) continue;
+    const job = norm(fill[r][col.job]), due = fill[r][col.due];
+    const remark = col.remark !== undefined && own[r][col.remark] ? norm(vals[r][col.remark]) : '';
+    const rowNo = r + 1;
+    const label = (nm || pn) + (machine ? ' เครื่อง ' + machine : '');
+    if (!pn || /[ก-๙]/.test(pn)) { skipped.push({ row: rowNo, text: label + ' (ไม่มี P/N)' }); continue; }
+    if (MACHINE_LIST.indexOf(machine) < 0) { skipped.push({ row: rowNo, text: label + ' (เครื่อง "' + machine + '" ไม่อยู่ในรายการ)' }); continue; }
+    const d = parseThaiShortDate_(due);
+    if (!d) { skipped.push({ row: rowNo, text: label + ' (อ่านวันที่ "' + norm(due) + '" ไม่ได้)' }); continue; }
+    const qty = Number(norm(vals[r][col.qty]).replace(/,/g, ''));
+    if (!(qty > 0)) { skipped.push({ row: rowNo, text: label + ' (จำนวนไม่ถูกต้อง)' }); continue; }
+    const sn = (remark.match(/S\/N\s*[:：]?\s*(\S+)/i) || [])[1] || '';
+    const known = parts && parts[pn];
+    const name = (known && known.name) || nm.replace(/\s*\([^)]*[ก-๙][^)]*\)\s*/g, ' ').trim();
+    if (sn) {
+      const k = pn + '|' + sn;
+      if (seenSn[k]) warnings.push('S/N ซ้ำ: ' + pn + ' S/N ' + sn + ' (แถว ' + seenSn[k] + ' และ ' + rowNo + ')');
+      else seenSn[k] = rowNo;
+    }
+    items.push({ row: rowNo, part: pn, name: name, qty: qty, machine: machine, install: d, sn: sn,
+      type: sn ? 'LRU(TCI)' : 'SP(TCI)', issue: [job, sn ? 'S/N ' + sn : ''].filter(Boolean).join(' · ') });
+  }
+  return { items: items, skipped: skipped, warnings: warnings };
+}
+
+function readTciSchedule() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet(), ui = SpreadsheetApp.getUi();
+  const src = ss.getActiveSheet();
+  if ([SHEET_IMPORT_REQ, SHEET_IMPORT, SHEET_REQ, SHEET_RCV, SHEET_RCV2, SHEET_ISS].indexOf(src.getName()) >= 0) {
+    ui.alert('เปิดแท็บของตาราง Schedule (เช่น "พ.ย.69") ที่นำเข้ามาก่อน แล้วสั่งอีกครั้ง'); return;
+  }
+  const rng = src.getDataRange();
+  const merges = rng.getMergedRanges().map(m => ({ r1: m.getRow() - 1, c1: m.getColumn() - 1, r2: m.getLastRow() - 1, c2: m.getLastColumn() - 1 }));
+  const parts = {}; getParts_().forEach(x => { parts[x.part] = x; });
+  const res = parseTciGrid_(rng.getValues(), merges, parts);
+  if (res.error) { ui.alert(res.error); return; }
+  if (!res.items.length) { ui.alert('ไม่พบรายการพัสดุที่อ่านได้' + (res.skipped.length ? '\nข้าม ' + res.skipped.length + ' รายการ:\n' + res.skipped.map(x => '• ' + x.text).join('\n') : '')); return; }
+  const imp = createRequisitionImportSheet();
+  const start = Math.max(IMPREQ_FIRST_ROW, imp.getLastRow() + 1);
+  const out = res.items.map(x => [x.part, x.name, x.type, x.qty, 'EA', x.machine, x.issue, x.install, '']);
+  imp.getRange(start, 1, out.length, 1).setNumberFormat('@');
+  imp.getRange(start, 1, out.length, out[0].length).setValues(out);
+  imp.getRange(start, 8, out.length, 1).setNumberFormat('dd/mm/yyyy');
+  ss.setActiveSheet(imp);
+  imp.getRange(start, 1).activate();
+  const lines = ['อ่านได้ ' + res.items.length + ' รายการ ใส่ในชีท "' + SHEET_IMPORT_REQ + '" แถว ' + start + '–' + (start + out.length - 1) + ' แล้ว',
+    'ประเภท: มี S/N = LRU(TCI), ไม่มี = SP(TCI)', '',
+    'ก่อนกดนำเข้า: กรอกช่อง ผู้เบิก ด้านบน และตรวจรายการ'];
+  if (res.skipped.length) lines.push('', 'ข้าม ' + res.skipped.length + ' รายการ:', res.skipped.slice(0, 15).map(x => '• ' + x.text).join('\n'));
+  if (res.warnings.length) lines.push('', '⚠️ ควรตรวจกับต้นฉบับ:', res.warnings.slice(0, 10).map(x => '• ' + x).join('\n'));
+  ui.alert(lines.join('\n'));
 }
 
 /** ตรวจทั้งชุดแล้วออกใบเบิกทุกรายการ (ใบเบิก 1 ใบ = 1 รายการ แต่ละรายการได้เลขต่อเนื่อง) ถ้ามีแถวผิดจะไม่ออกเลย */
