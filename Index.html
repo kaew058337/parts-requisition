@@ -1652,7 +1652,7 @@
     var total=0, lots=0; rows.forEach(function(g){ total+=g.qty; lots+=g.lots.length; });
     $('k-sum').textContent = rows.length ? rows.length+' Part number · '+lots+' ล็อต · รวม '+fmtNum(total)+' หน่วย' : '';
     if(!rows.length && q && (state.stk||[]).length){
-      $('k-list').innerHTML='<div class="empty">ไม่พบ “'+esc($('k-search').value.trim())+'” ในคลัง<br><button class="btn" id="k-line" style="margin-top:14px;max-width:320px">ส่งหมายเลขนี้ทางไลน์</button><div class="meta" style="margin-top:8px">จะเปิดไลน์ให้เลือกแชตหรือกลุ่มที่จะส่ง</div></div>'; return;
+      $('k-list').innerHTML='<div class="empty">ไม่พบ “'+esc($('k-search').value.trim())+'” ในคลัง<br><button class="btn" id="k-line" style="margin-top:14px;max-width:320px">ส่งหมายเลขนี้ทางไลน์</button><div class="meta" style="margin-top:8px">จะเปิดไลน์ให้เลือกแชตหรือกลุ่มที่จะส่ง (บนคอมพิวเตอร์จะคัดลอกข้อความไว้ให้วางด้วย)</div></div>'; return;
     }
     if(!rows.length){ $('k-list').innerHTML='<div class="empty">'+((state.stk||[]).length?'ไม่พบรายการ':'ยังไม่มีพัสดุในคลัง<br><span class="meta">พัสดุจะเข้าคลังเมื่อบันทึกรับ และออกเมื่อจ่าย</span>')+'</div>'; return; }
     $('k-list').innerHTML = rows.map(function(g){
@@ -1674,11 +1674,18 @@
     }).join('');
   }
   $('k-search').addEventListener('input', renderStock);
+  function copyFallback(t){ try{ var ta=document.createElement('textarea'); ta.value=t; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }catch(e){} }
   $('k-list').addEventListener('click', function(e){
     if(!e.target.closest('#k-line')) return;
     var v=$('k-search').value.trim(); if(!v) return;
     var t='เช็คพัสดุครับ\n'+v;
-    window.open('https://line.me/R/share?text='+encodeURIComponent(t),'_blank');
+    var mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if(mobile){ window.open('https://line.me/R/share?text='+encodeURIComponent(t),'_blank'); return; }
+    /* คอมพิวเตอร์: คัดลอกข้อความไว้ก่อน (เผื่อไลน์ไม่เปิดช่องข้อความให้) แล้วเรียกโปรแกรม LINE ด้วย line:// */
+    var done=function(){ toast('คัดลอกข้อความแล้ว · กำลังเปิดโปรแกรมไลน์ (ถ้าไม่เปิด ให้วางข้อความในไลน์)'); };
+    try{ navigator.clipboard.writeText(t).then(done,function(){ copyFallback(t); done(); }); }catch(err){ copyFallback(t); done(); }
+    var a=document.createElement('a'); a.href='line://msg/text/'+encodeURIComponent(t); a.target='_top'; a.rel='noopener';
+    document.body.appendChild(a); a.click(); setTimeout(function(){ a.remove(); },500);
   });
 
   /* ---------- ย้ายที่จัดเก็บ ---------- */
