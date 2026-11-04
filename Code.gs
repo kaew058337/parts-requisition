@@ -143,7 +143,8 @@ function verifyLine_(tok) {
   return prof;
 }
 
-function doPost(e) {
+/** เรียกฟังก์ชันของระบบผ่าน HTTP (ใช้เมื่อโฮสต์หน้าเว็บนอก Apps Script) */
+function apiPost_(e) {
   let out;
   try {
     const req = JSON.parse((e && e.postData && e.postData.contents) || '{}');
@@ -2848,6 +2849,7 @@ function onOpen() {
       .addItem('สร้างรายการตายตัวของชุด (จากของที่มีอยู่)', 'seedKitSpec')
       .addSeparator()
       .addItem('ตั้งค่าบอตไลน์', 'lineSetup')
+      .addItem('ตรวจ webhook ไลน์ (หารหัสกลุ่ม)', 'lineWebhookCheck')
       .addItem('ดูตัวอย่างข้อความสรุปไลน์', 'linePreview')
       .addItem('ทดสอบส่งสรุปไลน์ตอนนี้', 'lineTestNow')
       .addItem('เปิดส่งสรุปไลน์อัตโนมัติ (16:10 วันทำงาน)', 'lineInstallTrigger')
@@ -3136,10 +3138,19 @@ function sendLineDigest(opt) {
   return { sent: true, length: text.length };
 }
 
-/** webhook ของไลน์: ใช้จดรหัสกลุ่ม (groupId) ล่าสุดที่บอตเห็น เพื่อนำไปตั้งค่า ไม่ตอบข้อความใด ๆ */
+/** จุดรับ POST ของเว็บแอป: webhook ของไลน์ (มี events) -> จดรหัสกลุ่ม ; นอกนั้น -> เรียก API ของระบบ */
 function doPost(e) {
+  let body = null;
+  try { body = JSON.parse((e && e.postData && e.postData.contents) || '{}'); } catch (err) { body = null; }
+  if (body && (Array.isArray(body.events) || body.destination)) return lineWebhook_(e, body);
+  return apiPost_(e);
+}
+
+/** webhook ของไลน์: จดรหัสกลุ่ม (groupId) ล่าสุดที่บอตเห็น เพื่อนำไปตั้งค่า ไม่ตอบข้อความใด ๆ */
+function lineWebhook_(e, body) {
   try {
-    const body = JSON.parse(e.postData.contents);
+    const raw = String((e.postData && e.postData.contents) || '');
+    lineProps_().setProperty('LINE_LAST_POST', Utilities.formatDate(new Date(), TZ, 'dd/MM/yyyy HH:mm:ss') + ' | ' + raw.slice(0, 400));
     (body.events || []).forEach(ev => {
       const src = ev.source || {};
       const id = src.groupId || src.roomId || '';
@@ -3159,7 +3170,7 @@ function lineSetup() {
   if (t.getSelectedButton() !== ui.Button.OK) return;
   if (str_(t.getResponseText())) p.setProperty('LINE_TOKEN', str_(t.getResponseText()));
   const last = p.getProperty('LINE_LAST_GROUP') || '', cur = p.getProperty('LINE_TARGET') || '';
-  const g = ui.prompt('ตั้งค่าบอตไลน์ (2/2)', 'รหัสกลุ่มปลายทาง (groupId ขึ้นต้นด้วย C)\n' + (last ? 'กลุ่มล่าสุดที่บอตเห็น: ' + last + '\n(คัดลอกมาวางด้านล่างได้)\n' : 'ยังไม่เคยเห็นกลุ่มจาก webhook\n') + (cur ? 'ที่ตั้งไว้ตอนนี้: ' + cur + '\n' : '') + '(เว้นว่าง = ใช้ค่าเดิม)', ui.ButtonSet.OK_CANCEL);
+  const g = ui.prompt('ตั้งค่าบอตไลน์ (2/2)', 'รหัสกลุ่มปลายทาง (groupId ขึ้นต้นด้วย C)\n' + (last ? 'กลุ่มล่าสุดที่บอตเห็น: ' + last + '\n(คัดลอกมาวางด้านล่างได้)\n' : 'ยังไม่เคยเห็นกลุ่มจาก webhook\n' + (p.getProperty('LINE_LAST_POST') ? '(webhook ทำงานแล้ว ล่าสุด: ' + p.getProperty('LINE_LAST_POST').slice(0, 120) + ' — แต่ยังไม่มีข้อความจากกลุ่ม ลองพิมพ์ในกลุ่มอีกครั้ง)\n' : '(ยังไม่เคยมีสัญญาณจากไลน์เข้ามาเลย ตรวจ Webhook URL / Use webhook / การ deploy เวอร์ชันใหม่)\n')) + (cur ? 'ที่ตั้งไว้ตอนนี้: ' + cur + '\n' : '') + '(เว้นว่าง = ใช้ค่าเดิม)', ui.ButtonSet.OK_CANCEL);
   if (g.getSelectedButton() !== ui.Button.OK) return;
   if (str_(g.getResponseText())) p.setProperty('LINE_TARGET', str_(g.getResponseText()));
   ui.alert('บันทึกแล้ว\nใช้เมนู "ทดสอบส่งสรุปไลน์ตอนนี้" เพื่อลองส่งเข้ากลุ่ม');
@@ -3195,4 +3206,13 @@ function lineRemoveTrigger() {
   ts.forEach(t => ScriptApp.deleteTrigger(t));
   const ui = lineUi_();
   if (ui) ui.alert(ts.length ? 'ปิดการส่งสรุปไลน์อัตโนมัติแล้ว' : 'ยังไม่ได้เปิดการส่งอัตโนมัติ');
+}
+
+/** เมนู: ตรวจว่า webhook ของไลน์ส่งสัญญาณมาถึงระบบหรือยัง */
+function lineWebhookCheck() {
+  const p = lineProps_(), lp = p.getProperty('LINE_LAST_POST') || '', lg = p.getProperty('LINE_LAST_GROUP') || '';
+  const ui = lineUi_();
+  const msg = (lp ? 'สัญญาณล่าสุดจากไลน์: ' + lp.slice(0, 300) : 'ยังไม่เคยมีสัญญาณจากไลน์เข้ามาเลย') + '\n\n' + (lg ? 'รหัสกลุ่มล่าสุด: ' + lg : 'ยังไม่พบรหัสกลุ่ม');
+  if (ui) ui.alert(msg);
+  return { lastPost: lp, lastGroup: lg };
 }
