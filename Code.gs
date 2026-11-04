@@ -3004,7 +3004,7 @@ function importRequisitions() {
 /* ============================================================
  *  สรุปประจำวันทางไลน์ (บอต LINE Messaging API)
  *  - ส่ง 1 ข้อความรวม หลัง 16:00 เฉพาะวันทำงาน (ไม่ใช่เสาร์-อาทิตย์/วันที่ลงในชีท วันหยุด)
- *  - เนื้อหา: งาน TCI ที่จะติดตั้งวันทำงานถัดไป · ใบเบิก AOG ค้างรับ · สถานะงาน TCI เดือนนี้ · พัสดุที่รับแล้วรอผู้เบิกมารับ
+ *  - เนื้อหา: งาน TCI ที่จะติดตั้งวันทำงานถัดไป · ใบเบิก AOG ค้างรับ · สถานะงาน TCI เดือนนี้
  *  - ตั้งค่า token / groupId ผ่านเมนู (เก็บใน Script Properties ไม่อยู่ในโค้ด)
  * ============================================================ */
 const LINE_TH_MON_ = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
@@ -3082,25 +3082,6 @@ function buildLineDigest_(today) {
     const late = dash.tci.filter(x => x.late);
     cut(late).forEach(x => L.push('⚠️ ' + (x.part || x.name) + ' ' + x.name + ' (' + x.docNo + ')' + (x.instLate ? ' · เกินวันติดตั้ง ' + (-x.daysLeft) + ' วัน' : ' · เลยกำหนด') + ' · ค้าง ' + x.remain));
     more(late.length).forEach(t => L.push(t));
-    L.push('');
-  }
-
-  // 4) พัสดุที่รับตามใบเบิกแล้ว รอผู้เบิกมารับ (ยังไม่จ่ายให้ช่าง)
-  const who = {};
-  rows.forEach(r => { who[pad_(r[1], 9) + '|' + str_(r[2])] = [str_(r[11]), str_(r[12])].filter(Boolean).join(' '); });
-  const wait = lots.filter(l => !l.free && l.remain > 0).map(l => ({ l: l, who: who[l.doc + '|' + l.part] || '(ไม่ระบุผู้เบิก)' }));
-  if (wait.length) {
-    const byWho = {};
-    wait.forEach(w => { (byWho[w.who] = byWho[w.who] || []).push(w.l); });
-    L.push('📦 พัสดุรับแล้ว รอผู้เบิกมารับ ' + wait.length + ' รายการ');
-    let n = 0;
-    Object.keys(byWho).forEach(k => {
-      if (n >= LINE_MAX_ITEMS_) return;
-      const items = byWho[k].map(l => (l.part || l.name) + ' ' + l.name + ' x' + l.remain + (l.recvDate instanceof Date && dayKey_(l.recvDate) === dayKey_(today) ? ' (รับวันนี้)' : ''));
-      L.push('• ' + k + ' : ' + items.join(', '));
-      n++;
-    });
-    more(Object.keys(byWho).length).forEach(t => L.push(t));
     L.push('');
   }
 
