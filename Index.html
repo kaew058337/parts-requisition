@@ -1677,7 +1677,7 @@
   $('k-list').addEventListener('click', function(e){
     if(!e.target.closest('#k-line')) return;
     var v=$('k-search').value.trim(); if(!v) return;
-    var t='ไม่พบพัสดุในคลัง\nหมายเลข: '+v+'\nวันที่ค้นหา: '+new Date().toLocaleDateString('th-TH')+(state.by?'\nแจ้งโดย: '+state.by:'');
+    var t='เช็คพัสดุครับ\n'+v;
     window.open('https://line.me/R/share?text='+encodeURIComponent(t),'_blank');
   });
 
