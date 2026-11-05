@@ -2851,6 +2851,7 @@ function onOpen() {
       .addSeparator()
       .addItem('ตั้งค่าบอตไลน์', 'lineSetup')
       .addItem('ตรวจ webhook ไลน์ (หารหัสกลุ่ม)', 'lineWebhookCheck')
+      .addItem('เปิด/ปิด ตอบกลับเมื่อรับไฟล์ Excel ในกลุ่ม', 'lineToggleFileReply')
       .addItem('ดูตัวอย่างข้อความแจ้งด่วนไลน์', 'linePreview')
       .addItem('ทดสอบส่งแจ้งด่วนไลน์ตอนนี้', 'lineTestNow')
       .addItem('สร้าง PDF รายงานสัปดาห์ (ไม่ส่งไลน์)', 'weeklyPdfPreview')
@@ -3000,12 +3001,7 @@ function readTciSchedule() {
   const res = parseTciGrid_(rng.getValues(), merges, parts);
   if (res.error) { ui.alert(res.error); return; }
   if (!res.items.length) { ui.alert('ไม่พบรายการพัสดุที่อ่านได้' + (res.skipped.length ? '\nข้าม ' + res.skipped.length + ' รายการ:\n' + res.skipped.map(x => '• ' + x.text).join('\n') : '')); return; }
-  const imp = createRequisitionImportSheet();
-  const start = Math.max(IMPREQ_FIRST_ROW, imp.getLastRow() + 1);
-  const out = res.items.map(x => [x.part, x.name, x.type, x.qty, 'EA', x.machine, x.issue, x.install, '']);
-  imp.getRange(start, 1, out.length, 1).setNumberFormat('@');
-  imp.getRange(start, 1, out.length, out[0].length).setValues(out);
-  imp.getRange(start, 8, out.length, 1).setNumberFormat('dd/mm/yyyy');
+  const w = fillImportFromTci_(res.items), imp = w.sheet, start = w.start, out = res.items;
   ss.setActiveSheet(imp);
   imp.getRange(start, 1).activate();
   const lines = ['อ่านได้ ' + res.items.length + ' รายการ ใส่ในชีท "' + SHEET_IMPORT_REQ + '" แถว ' + start + '–' + (start + out.length - 1) + ' แล้ว',
@@ -3014,6 +3010,95 @@ function readTciSchedule() {
   if (res.skipped.length) lines.push('', 'ข้าม ' + res.skipped.length + ' รายการ:', res.skipped.slice(0, 15).map(x => '• ' + x.text).join('\n'));
   if (res.warnings.length) lines.push('', '⚠️ ควรตรวจกับต้นฉบับ:', res.warnings.slice(0, 10).map(x => '• ' + x).join('\n'));
   ui.alert(lines.join('\n'));
+}
+
+/** เติมรายการ TCI ที่อ่านได้ลงท้ายชีท นำเข้าใบเบิก (ยังไม่ออกใบเบิก) ; คืน {sheet, start} */
+function fillImportFromTci_(items) {
+  const imp = createRequisitionImportSheet();
+  const start = Math.max(IMPREQ_FIRST_ROW, imp.getLastRow() + 1);
+  const out = items.map(x => [x.part, x.name, x.type, x.qty, 'EA', x.machine, x.issue, x.install, '']);
+  imp.getRange(start, 1, out.length, 1).setNumberFormat('@');
+  imp.getRange(start, 1, out.length, out[0].length).setValues(out);
+  imp.getRange(start, 8, out.length, 1).setNumberFormat('dd/mm/yyyy');
+  return { sheet: imp, start: start };
+}
+
+/** อ่านทุกแท็บของสเปรดชีตหนึ่งไฟล์ด้วย parseTciGrid_ ; คืน {items, skipped, warnings, tabs, errors} */
+function parseTciWorkbook_(sp) {
+  const parts = {}; getParts_().forEach(x => { parts[x.part] = x; });
+  const all = { items: [], skipped: [], warnings: [], tabs: 0, errors: [] };
+  sp.getSheets().forEach(sh => {
+    const rng = sh.getDataRange();
+    const merges = rng.getMergedRanges().map(m => ({ r1: m.getRow() - 1, c1: m.getColumn() - 1, r2: m.getLastRow() - 1, c2: m.getLastColumn() - 1 }));
+    const r = parseTciGrid_(rng.getValues(), merges, parts);
+    if (r.error) { all.errors.push(sh.getName() + ': ' + r.error); return; }
+    all.tabs++;
+    all.items = all.items.concat(r.items); all.skipped = all.skipped.concat(r.skipped); all.warnings = all.warnings.concat(r.warnings);
+  });
+  return all;
+}
+
+/* ===== รับไฟล์ Excel ที่ส่งในกลุ่มไลน์ (webhook) ===== */
+function lineReply_(replyToken, text) {
+  const token = lineProps_().getProperty('LINE_TOKEN');
+  if (!token || !replyToken) return;
+  UrlFetchApp.fetch('https://api.line.me/v2/bot/message/reply', {
+    method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+    headers: { Authorization: 'Bearer ' + token },
+    payload: JSON.stringify({ replyToken: replyToken, messages: [{ type: 'text', text: String(text).slice(0, 4500) }] })
+  });
+}
+
+/** ดาวน์โหลดไฟล์จากไลน์ -> แปลงเป็น Google Sheet ชั่วคราว -> อ่านตาราง -> เติมชีท นำเข้าใบเบิก ; คืนข้อความสรุป */
+function importLineExcel_(messageId, fileName) {
+  const token = lineProps_().getProperty('LINE_TOKEN');
+  const dl = UrlFetchApp.fetch('https://api-data.line.me/v2/bot/message/' + messageId + '/content', { headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true });
+  if (dl.getResponseCode() !== 200) throw new Error('ดาวน์โหลดไฟล์จากไลน์ไม่ได้ (' + dl.getResponseCode() + ')');
+  const blob = dl.getBlob();
+  if (blob.getBytes().length > 9 * 1024 * 1024) throw new Error('ไฟล์ใหญ่เกิน 9 MB');
+  const boundary = 'tci' + new Date().getTime();
+  const meta = JSON.stringify({ name: 'tci-ชั่วคราว-' + messageId, mimeType: 'application/vnd.google-apps.spreadsheet' });
+  const pre = '--' + boundary + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + meta + '\r\n--' + boundary + '\r\nContent-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\r\n\r\n';
+  const payload = Utilities.newBlob(pre).getBytes().concat(blob.getBytes()).concat(Utilities.newBlob('\r\n--' + boundary + '--').getBytes());
+  const up = UrlFetchApp.fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+    method: 'post', contentType: 'multipart/related; boundary=' + boundary, payload: payload, muteHttpExceptions: true,
+    headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() }
+  });
+  if (up.getResponseCode() !== 200) throw new Error('แปลงไฟล์ Excel ไม่สำเร็จ (' + up.getResponseCode() + ') ' + String(up.getContentText()).slice(0, 150));
+  const id = JSON.parse(up.getContentText()).id;
+  let res;
+  try { res = parseTciWorkbook_(SpreadsheetApp.openById(id)); }
+  finally { try { DriveApp.getFileById(id).setTrashed(true); } catch (e) { /* ไม่เป็นไร */ } }
+  if (!res.tabs) return '❌ อ่านไฟล์ "' + fileName + '" ไม่ได้: รูปแบบตารางไม่ตรงที่คาดไว้\n' + res.errors.slice(0, 2).join('\n');
+  if (!res.items.length) return 'อ่านไฟล์ "' + fileName + '" แล้ว แต่ไม่พบรายการพัสดุ' + (res.skipped.length ? ' (ข้าม ' + res.skipped.length + ' รายการ)' : '');
+  const w = withLock_(() => fillImportFromTci_(res.items));
+  log_('นำเข้า', '', 'อ่าน Schedule TCI จากไลน์ ' + res.items.length + ' รายการ (' + fileName + ')', 'ไลน์');
+  const L = ['✅ อ่านตาราง TCI "' + fileName + '" แล้ว ' + res.items.length + ' รายการ', 'ใส่ในชีท "' + SHEET_IMPORT_REQ + '" แถว ' + w.start + '–' + (w.start + res.items.length - 1) + ' รอตรวจ (ยังไม่ออกใบเบิก)'];
+  if (res.skipped.length) L.push('ข้าม ' + res.skipped.length + ' รายการ: ' + res.skipped.slice(0, 5).map(x => x.text).join(' ; '));
+  if (res.warnings.length) L.push('⚠️ ' + res.warnings.slice(0, 3).join(' ; '));
+  return L.join('\n');
+}
+
+function handleLineFile_(ev) {
+  const p = lineProps_(), src = ev.source || {}, m = ev.message || {};
+  if (!p.getProperty('LINE_TARGET') || (src.groupId || src.roomId) !== p.getProperty('LINE_TARGET')) return;   // รับเฉพาะกลุ่มที่ตั้งไว้
+  const name = str_(m.fileName);
+  if (!/\.xlsx$/i.test(name)) return;                                                                           // อ่านเฉพาะ .xlsx
+  const seen = (p.getProperty('LINE_SEEN') || '').split(',');
+  if (seen.indexOf(m.id) >= 0) return;                                                                          // กันไลน์ส่งซ้ำ
+  p.setProperty('LINE_SEEN', seen.concat([m.id]).slice(-30).join(','));
+  let msg;
+  try { msg = importLineExcel_(m.id, name); }
+  catch (err) { msg = '❌ อ่านไฟล์ "' + name + '" ไม่สำเร็จ: ' + err.message; log_('นำเข้า', '', 'อ่านไฟล์จากไลน์ไม่สำเร็จ: ' + err.message, 'ไลน์'); }
+  if (p.getProperty('LINE_FILE_REPLY') !== '0') lineReply_(ev.replyToken, msg);
+}
+
+/** เมนู: เปิด/ปิดการตอบกลับในกลุ่มเมื่อรับไฟล์ (ตอบกลับไม่นับโควตาข้อความ) */
+function lineToggleFileReply() {
+  const p = lineProps_(), off = p.getProperty('LINE_FILE_REPLY') === '0';
+  p.setProperty('LINE_FILE_REPLY', off ? '1' : '0');
+  const ui = lineUi_();
+  if (ui) ui.alert(off ? 'เปิดการตอบกลับในกลุ่มเมื่อรับไฟล์แล้ว' : 'ปิดการตอบกลับแล้ว (ยังอ่านไฟล์เข้าชีทตามปกติ ดูผลในชีท นำเข้าใบเบิก)');
 }
 
 /** ตรวจทั้งชุดแล้วออกใบเบิกทุกรายการ (ใบเบิก 1 ใบ = 1 รายการ แต่ละรายการได้เลขต่อเนื่อง) ถ้ามีแถวผิดจะไม่ออกเลย */
@@ -3449,6 +3534,7 @@ function lineWebhook_(e, body) {
       const src = ev.source || {};
       const id = src.groupId || src.roomId || '';
       if (id) lineProps_().setProperty('LINE_LAST_GROUP', id);
+      if (ev.type === 'message' && ev.message && ev.message.type === 'file') { try { handleLineFile_(ev); } catch (e2) { /* ไม่ให้ webhook ล้ม */ } }
     });
   } catch (err) { /* ไม่ทำอะไร */ }
   return ContentService.createTextOutput('OK');
