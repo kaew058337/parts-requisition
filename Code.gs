@@ -3079,18 +3079,22 @@ function importLineExcel_(messageId, fileName) {
   return L.join('\n');
 }
 
+function lineFileLog_(t) { try { lineProps_().setProperty('LINE_LAST_FILE', Utilities.formatDate(new Date(), TZ, 'dd/MM HH:mm:ss') + ' | ' + t); } catch (e) { /* ไม่ทำอะไร */ } }
+
 function handleLineFile_(ev) {
   const p = lineProps_(), src = ev.source || {}, m = ev.message || {};
-  if (!p.getProperty('LINE_TARGET') || (src.groupId || src.roomId) !== p.getProperty('LINE_TARGET')) return;   // รับเฉพาะกลุ่มที่ตั้งไว้
-  const name = str_(m.fileName);
-  if (!/\.xlsx$/i.test(name)) return;                                                                           // อ่านเฉพาะ .xlsx
+  const name = str_(m.fileName), gid = src.groupId || src.roomId || '';
+  lineFileLog_('ได้รับไฟล์ "' + name + '" จาก ' + (gid || 'แชทส่วนตัว'));
+  if (!p.getProperty('LINE_TARGET')) return lineFileLog_('ข้าม: ยังไม่ได้ตั้งรหัสกลุ่ม (เมนู ตั้งค่าบอตไลน์)');
+  if (gid !== p.getProperty('LINE_TARGET')) return lineFileLog_('ข้าม: ไฟล์มาจากกลุ่ม ' + gid + ' แต่ตั้งไว้เป็น ' + p.getProperty('LINE_TARGET'));
+  if (!/\.xlsx$/i.test(name)) return lineFileLog_('ข้าม: "' + name + '" ไม่ใช่ไฟล์ .xlsx (อ่านเฉพาะ .xlsx)');
   const seen = (p.getProperty('LINE_SEEN') || '').split(',');
-  if (seen.indexOf(m.id) >= 0) return;                                                                          // กันไลน์ส่งซ้ำ
+  if (seen.indexOf(m.id) >= 0) return lineFileLog_('ข้าม: ไฟล์นี้อ่านไปแล้ว');
   p.setProperty('LINE_SEEN', seen.concat([m.id]).slice(-30).join(','));
   let msg;
-  try { msg = importLineExcel_(m.id, name); }
-  catch (err) { msg = '❌ อ่านไฟล์ "' + name + '" ไม่สำเร็จ: ' + err.message; log_('นำเข้า', '', 'อ่านไฟล์จากไลน์ไม่สำเร็จ: ' + err.message, 'ไลน์'); }
-  if (p.getProperty('LINE_FILE_REPLY') !== '0') lineReply_(ev.replyToken, msg);
+  try { msg = importLineExcel_(m.id, name); lineFileLog_('สำเร็จ: ' + msg.split('\n')[0]); }
+  catch (err) { msg = '❌ อ่านไฟล์ "' + name + '" ไม่สำเร็จ: ' + err.message; lineFileLog_('ผิดพลาด: ' + err.message); log_('นำเข้า', '', 'อ่านไฟล์จากไลน์ไม่สำเร็จ: ' + err.message, 'ไลน์'); }
+  if (p.getProperty('LINE_FILE_REPLY') !== '0') { try { lineReply_(ev.replyToken, msg); } catch (e) { lineFileLog_('ตอบกลับไม่ได้: ' + e.message); } }
 }
 
 /** เมนู: เปิด/ปิดการตอบกลับในกลุ่มเมื่อรับไฟล์ (ตอบกลับไม่นับโควตาข้อความ) */
@@ -3534,7 +3538,7 @@ function lineWebhook_(e, body) {
       const src = ev.source || {};
       const id = src.groupId || src.roomId || '';
       if (id) lineProps_().setProperty('LINE_LAST_GROUP', id);
-      if (ev.type === 'message' && ev.message && ev.message.type === 'file') { try { handleLineFile_(ev); } catch (e2) { /* ไม่ให้ webhook ล้ม */ } }
+      if (ev.type === 'message' && ev.message && ev.message.type === 'file') { try { handleLineFile_(ev); } catch (e2) { lineFileLog_('พัง: ' + e2.message); } }
     });
   } catch (err) { /* ไม่ทำอะไร */ }
   return ContentService.createTextOutput('OK');
@@ -3592,7 +3596,7 @@ function lineRemoveTrigger() {
 function lineWebhookCheck() {
   const p = lineProps_(), lp = p.getProperty('LINE_LAST_POST') || '', lg = p.getProperty('LINE_LAST_GROUP') || '';
   const ui = lineUi_();
-  const msg = (lp ? 'สัญญาณล่าสุดจากไลน์: ' + lp.slice(0, 300) : 'ยังไม่เคยมีสัญญาณจากไลน์เข้ามาเลย') + '\n\n' + (lg ? 'รหัสกลุ่มล่าสุด: ' + lg : 'ยังไม่พบรหัสกลุ่ม');
+  const msg = (lp ? 'สัญญาณล่าสุดจากไลน์: ' + lp.slice(0, 300) : 'ยังไม่เคยมีสัญญาณจากไลน์เข้ามาเลย') + '\n\n' + (lg ? 'รหัสกลุ่มล่าสุด: ' + lg : 'ยังไม่พบรหัสกลุ่ม') + '\n\nไฟล์ล่าสุดที่บอตเห็น: ' + (p.getProperty('LINE_LAST_FILE') || 'ยังไม่เคยเห็นไฟล์') + '\nกลุ่มที่ตั้งไว้: ' + (p.getProperty('LINE_TARGET') || '(ยังไม่ตั้ง)');
   if (ui) ui.alert(msg);
   return { lastPost: lp, lastGroup: lg };
 }
