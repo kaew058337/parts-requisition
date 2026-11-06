@@ -362,6 +362,22 @@
 <style id="pg">@page{size:A5 landscape;margin:6mm}</style>
 </head>
 <body>
+<div id="splash" role="status" aria-label="กำลังเปิดระบบ">
+<style>
+#splash{position:fixed;inset:0;z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:radial-gradient(circle at 50% 38%,#ffffff 0,#e6eefa 55%,#cddcf1 100%);transition:opacity .55s ease,visibility .55s;cursor:pointer}
+#splash.out{opacity:0;visibility:hidden}
+#splash .sl{width:76px;height:auto;margin-bottom:10px;opacity:0;animation:spIn .7s .05s ease forwards}
+#splash .sw{position:relative;width:min(70vw,300px);height:min(42vw,180px);background:url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjAgNzIiPgo8ZyBmaWxsPSIjMGIyYTU1Ij4KPHBhdGggZD0iTTEwOCAzNkMxMDggMjUgOTQgMjAgNzQgMjFDNTIgMjIgMzIgMzAgMTggMzdDMzIgNDQgNTIgNTEgNzQgNTFDOTQgNTEgMTA4IDQ3IDEwOCAzNloiLz4KPHBhdGggZD0iTTIxIDM2QzE0IDMzIDggMjggMyAyMUMxMiAyMiAyMSAyNiAyNiAzM1oiLz4KPHBhdGggZD0iTTIxIDM4QzE0IDQxIDggNDYgMyA1M0MxMiA1MiAyMSA0OCAyNiA0MVoiLz4KPHBhdGggZD0iTTYyIDIyQzYyIDEyIDU4IDYgNTUgMUM2OCA1IDc3IDEyIDgxIDIyWiIvPgo8cGF0aCBkPSJNODQgNDZDODQgNTYgODAgNjMgNzMgNjdDODYgNjUgOTUgNTcgOTUgNDZaIi8+CjwvZz4KPGNsaXBQYXRoIGlkPSJjIj48cGF0aCBkPSJNMTA4IDM2QzEwOCAyNSA5NCAyMCA3NCAyMUM1MiAyMiAzMiAzMCAxOCAzN0MzMiA0NCA1MiA1MSA3NCA1MUM5NCA1MSAxMDggNDcgMTA4IDM2WiIvPjwvY2xpcFBhdGg+PHBhdGggY2xpcC1wYXRoPSJ1cmwoI2MpIiBkPSJNMTEwIDQwQzk4IDQ1IDgyIDQ1IDY4IDQ0QzU2IDQzIDQ0IDQxIDMwIDM4TDMwIDYwTDExMCA2MFoiIGZpbGw9IiNmZmYiLz4KPGVsbGlwc2UgY3g9Ijk0IiBjeT0iMjkiIHJ4PSI4IiByeT0iMi44IiB0cmFuc2Zvcm09InJvdGF0ZSgtMTQgOTQgMjkpIiBmaWxsPSIjZmZmIi8+CjxlbGxpcHNlIGN4PSI1MCIgY3k9IjI4IiByeD0iMTAiIHJ5PSIyLjgiIHRyYW5zZm9ybT0icm90YXRlKDEyIDUwIDI4KSIgZmlsbD0iI2M5ZDNlMCIvPgo8L3N2Zz4K) center/contain no-repeat;animation:orcaLoop 2.6s cubic-bezier(.45,.05,.35,1) infinite;filter:drop-shadow(0 10px 14px rgba(11,42,85,.22))}
+#splash .st{margin-top:18px;font-size:22px;font-weight:700;color:#0b2a55;letter-spacing:.2px;opacity:0;animation:spIn .7s .25s ease forwards}
+#splash .ss{font-size:14px;color:#5d6f8a;opacity:0;animation:spIn .7s .45s ease forwards}
+#splash .ss::after{content:'';display:inline-block;width:1.2em;text-align:left;animation:spDots 1.2s steps(4) infinite}
+@keyframes spIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes spDots{0%{content:''}25%{content:'.'}50%{content:'..'}75%,100%{content:'...'}}
+@media (prefers-reduced-motion:reduce){#splash .sw{animation:orcaBob 2.4s ease-in-out infinite}}
+</style>
+<img class="sl" alt="" id="sp-logo"><div class="sw"></div>
+<div class="st">ระบบเบิก · จ่าย · ส่งคืน</div><div class="ss">กำลังเตรียมข้อมูล</div>
+</div>
 <div class="amb" aria-hidden="true"><i></i><i></i><i></i></div>
 <header>
   <button class="hmb bk" id="back-btn" aria-label="กลับ"><svg viewBox="0 0 24 24" style="fill:none;stroke:#fff;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round"><path d="M15 6l-6 6 6 6"/></svg></button>
@@ -3006,6 +3022,19 @@
     if(dx>dr.offsetWidth*0.28){ dr.style.transform=''; set(false); } else { dr.style.transform=''; }
   }
   dr.addEventListener('touchend', end); dr.addEventListener('touchcancel', end);
+})();
+</script>
+<script>
+(function(){
+  try{ var lg=document.querySelector('header .logo'); if(lg) document.getElementById('sp-logo').src=lg.src; }catch(e){}
+  var sp=document.getElementById('splash'); if(!sp) return;
+  var t0=Date.now(), done=false;
+  function hide(){ if(done) return; done=true; sp.classList.add('out'); setTimeout(function(){ if(sp.parentNode) sp.parentNode.removeChild(sp); }, 700); }
+  sp.addEventListener('click', hide);
+  var iv=setInterval(function(){
+    var age=Date.now()-t0, loaded=!document.querySelector('#k-list .spin');
+    if((loaded && age>1800) || age>6000){ clearInterval(iv); hide(); }
+  }, 150);
 })();
 </script>
 </body>
