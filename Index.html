@@ -205,6 +205,12 @@
   #toast.err{background:rgba(217,45,32,.95);border-color:rgba(255,255,255,.35)}
   .spin{display:inline-block;width:18px;height:18px;border:2px solid #cbd9ee;border-top-color:var(--blue);border-radius:50%;animation:s .7s linear infinite;vertical-align:middle}
   @keyframes s{to{transform:rotate(360deg)}}
+  /* ตัวโหลดข้อมูล: วาฬออร์ก้าว่ายหมุนวน (วาดเอง) */
+  .empty .spin{display:block;width:auto;height:auto;border:0;border-radius:0;animation:none;margin:6px auto 0;text-align:center}
+  .empty .spin::before{content:'';display:block;width:84px;height:50px;margin:0 auto;background:url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjAgNzIiPgo8ZyBmaWxsPSIjMGIyYTU1Ij4KPHBhdGggZD0iTTEwOCAzNkMxMDggMjUgOTQgMjAgNzQgMjFDNTIgMjIgMzIgMzAgMTggMzdDMzIgNDQgNTIgNTEgNzQgNTFDOTQgNTEgMTA4IDQ3IDEwOCAzNloiLz4KPHBhdGggZD0iTTIxIDM2QzE0IDMzIDggMjggMyAyMUMxMiAyMiAyMSAyNiAyNiAzM1oiLz4KPHBhdGggZD0iTTIxIDM4QzE0IDQxIDggNDYgMyA1M0MxMiA1MiAyMSA0OCAyNiA0MVoiLz4KPHBhdGggZD0iTTYyIDIyQzYyIDEyIDU4IDYgNTUgMUM2OCA1IDc3IDEyIDgxIDIyWiIvPgo8cGF0aCBkPSJNODQgNDZDODQgNTYgODAgNjMgNzMgNjdDODYgNjUgOTUgNTcgOTUgNDZaIi8+CjwvZz4KPGNsaXBQYXRoIGlkPSJjIj48cGF0aCBkPSJNMTA4IDM2QzEwOCAyNSA5NCAyMCA3NCAyMUM1MiAyMiAzMiAzMCAxOCAzN0MzMiA0NCA1MiA1MSA3NCA1MUM5NCA1MSAxMDggNDcgMTA4IDM2WiIvPjwvY2xpcFBhdGg+PHBhdGggY2xpcC1wYXRoPSJ1cmwoI2MpIiBkPSJNMTEwIDQwQzk4IDQ1IDgyIDQ1IDY4IDQ0QzU2IDQzIDQ0IDQxIDMwIDM4TDMwIDYwTDExMCA2MFoiIGZpbGw9IiNmZmYiLz4KPGVsbGlwc2UgY3g9Ijk0IiBjeT0iMjkiIHJ4PSI4IiByeT0iMi44IiB0cmFuc2Zvcm09InJvdGF0ZSgtMTQgOTQgMjkpIiBmaWxsPSIjZmZmIi8+CjxlbGxpcHNlIGN4PSI1MCIgY3k9IjI4IiByeD0iMTAiIHJ5PSIyLjgiIHRyYW5zZm9ybT0icm90YXRlKDEyIDUwIDI4KSIgZmlsbD0iI2M5ZDNlMCIvPgo8L3N2Zz4K) center/contain no-repeat;animation:orcaLoop 2.2s cubic-bezier(.45,.05,.35,1) infinite;filter:drop-shadow(0 6px 8px rgba(10,35,66,.18))}
+  .empty .spin::after{content:'กำลังโหลด…';display:block;margin-top:8px;font-size:13px;color:var(--muted)}
+  @keyframes orcaLoop{0%{transform:translateY(0) rotate(0)}45%{transform:translateY(-8px) rotate(-8deg)}75%{transform:translateY(0) rotate(352deg)}100%{transform:translateY(0) rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.empty .spin::before{animation:orcaBob 2.4s ease-in-out infinite}@keyframes orcaBob{50%{transform:translateY(-5px)}}}
   .doc-ok{text-align:center;padding:12px 0}
   .doc-ok .big{font-size:32px;font-weight:700;letter-spacing:1.5px;color:var(--navy-royal);font-variant-numeric:tabular-nums}
   @media (prefers-reduced-motion:reduce){
