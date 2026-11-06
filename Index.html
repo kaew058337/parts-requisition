@@ -1403,6 +1403,7 @@
     run('getPendingReceive').then(function(rows){ state.rcv=rows; renderRcv(); })
       .catch(function(e){ $('c-list').innerHTML='<div class="empty">'+esc(e.message)+'</div>'; });
   }
+  function taiLine(t){ if(!t) return ''; var c=t.level==='bad'?'#b91c1c':(t.level==='warn'?'#b45309':'#0f5f3f'); return '<div class="meta" style="margin-top:3px;color:'+c+';font-weight:600">🚚 TAI: '+esc(t.label)+(t.supplier?' · '+esc(t.supplier):'')+(t.asof?' <span style="font-weight:400;opacity:.75">(ข้อมูล '+esc(t.asof)+(t.stale?' · เก่า':'')+')</span>':'')+'</div>'; }
   function renderRcv(){
     var q = $('c-search').value.trim().toLowerCase();
     var rows = state.rcv.filter(function(r){
@@ -1415,7 +1416,7 @@
         '<div class="t"><span class="doc">'+esc(r.docNo)+'</span><span class="chip '+esc(r.urgency)+'">'+esc(urg(r.urgency))+'</span></div>'+
         '<div class="nm">'+esc(r.name)+'</div>'+
         '<div class="meta">'+esc(r.part)+' · ค้างรับ '+fmtNum(r.remain)+' / '+fmtNum(r.qty)+' '+esc(r.unit)+'</div>'+
-        '<div class="meta">เบิก '+esc(r.date)+(r.machine?' · เครื่อง '+esc(r.machine):'')+'</div>'+
+        '<div class="meta">เบิก '+esc(r.date)+(r.machine?' · เครื่อง '+esc(r.machine):'')+'</div>'+taiLine(r.tai)+
         (r.received>0?'<div class="bar"><i style="width:'+pct+'%"></i></div>':'')+
       '</div>';
     }).join('');
@@ -2384,7 +2385,7 @@
           '<br><span style="font-size:13px">'+esc(x.docNo)+' · '+esc(x.type)+(x.urgency==='AOG'?' · AOG':'')+(x.machine?' · เครื่อง '+esc(x.machine):'')+'</span></div>'+dbStat(x)+'</div>'+
           '<div style="font-size:13px;margin-top:3px">เบิก '+fmtNum(x.qty)+' '+esc(x.unit)+' · รับแล้ว '+fmtNum(x.got)+(x.remain>0?' · ค้าง '+fmtNum(x.remain):'')+
           ' · เบิกเมื่อ '+esc(x.reqDate)+(x.remain>0&&!x.install?' · กำหนด '+esc(x.due):'')+(x.remain<=0&&x.recvDate?' · รับเมื่อ '+esc(x.recvDate):'')+'</div>'+
-          (x.install?'<div style="font-size:13px;margin-top:3px;font-weight:600;color:'+(x.instLate?'#b91c1c':(x.remain>0&&x.daysLeft<=7?'#b45309':'inherit'))+'">ติดตั้ง '+esc(x.install)+
+          taiLine(x.tai)+(x.install?'<div style="font-size:13px;margin-top:3px;font-weight:600;color:'+(x.instLate?'#b91c1c':(x.remain>0&&x.daysLeft<=7?'#b45309':'inherit'))+'">ติดตั้ง '+esc(x.install)+
             (x.remain>0?(x.instLate?' · เกินมา '+(-x.daysLeft)+' วัน ของยังไม่มา':x.daysLeft===0?' · วันนี้ ของยังไม่มา':' · อีก '+x.daysLeft+' วัน'):(x.onTime===true?' · ของมาก่อนติดตั้ง ✓':x.onTime===false?' · ของมาหลังวันติดตั้ง':''))+'</div>':'')+'</div>';
       }); var TN=4;
       h+=tciRows.slice(0,TN).join('')+(tciRows.length>TN?'<div id="db-more" style="display:none">'+tciRows.slice(TN).join('')+'</div><button class="btn ghost sm" id="db-tog" style="margin-top:8px;width:100%">▼ ดูทั้งหมด (อีก '+(tciRows.length-TN)+' รายการ)</button>':'')+

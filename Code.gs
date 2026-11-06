@@ -40,7 +40,7 @@ function isLRU_(t) { return String(t || '').indexOf('LRU') === 0; }
 const ITEM_TYPES = ['LRU', 'SP', 'LRU(TCI)', 'SP(TCI)', 'สารเคมี'];   // สารเคมี: ไม่บังคับ Serial เหมือน SP
 
 const HEADERS = {
-  [SHEET_REQ]: ['ลำดับ', 'หมายเลขการเบิก', 'Part number', 'ชื่อ', 'จำนวน', 'หน่วยนับ', 'วันที่เบิก', 'วันที่จ่าย', 'เครื่อง', 'ความเร่งด่วน', 'ข้อขัดข้อง', 'ยศผู้เบิก', 'ชื่อ-สกุลผู้เบิก', 'ตำแหน่งผู้เบิก', 'ประเภทพัสดุ', 'เหตุผลยกเลิก', 'วันที่ติดตั้ง (TCI)'],
+  [SHEET_REQ]: ['ลำดับ', 'หมายเลขการเบิก', 'Part number', 'ชื่อ', 'จำนวน', 'หน่วยนับ', 'วันที่เบิก', 'วันที่จ่าย', 'เครื่อง', 'ความเร่งด่วน', 'ข้อขัดข้อง', 'ยศผู้เบิก', 'ชื่อ-สกุลผู้เบิก', 'ตำแหน่งผู้เบิก', 'ประเภทพัสดุ', 'เหตุผลยกเลิก', 'วันที่ติดตั้ง (TCI)', 'สถานะ TAI', 'หมายเหตุ TAI', 'P.O. TAI', 'ผู้จัดหา TAI', 'กำหนดส่ง/วันนำจ่าย TAI', 'ข้อมูล TAI ณ วันที่'],
   [SHEET_RCV]: ['ลำดับรับ', 'เลขเอกสารการเบิก', 'card ID', 'Part number', 'ชื่อพัสดุ', 'serial number', 'ประเภทพัสดุ', 'จำนวน', 'หน่วยนับ', 'ราคา/หน่วย', 'ราคารวม', 'COND', 'วันที่แจ้ง', 'ความเร่งด่วน', 'วันกำหนดส่งพัสดุ', 'วันที่รับ', 'วันที่เกิน', 'TAIL No.', 'TCI', 'หมดอายุ', 'LOCATION', 'ผู้รับ', 'หมายเหตุ', 'แหล่งที่มา', 'อ้างอิง'],
   [SHEET_ISS]: ['ลำดับจ่าย', 'วันที่จ่าย', 'เลขเอกสารการเบิก', 'ลำดับรับ (อ้างอิง)', 'Part number', 'ชื่อพัสดุ', 'serial number', 'จำนวน', 'หน่วยนับ', 'TAIL No.', 'จ่ายให้ช่าง', 'หมายเหตุ', 'ผู้บันทึก'],
   [SHEET_CNT]: ['เลขที่ตรวจนับ', 'วันที่ตรวจนับ', 'LOCATION', 'ลำดับรับ', 'Part number', 'ชื่อพัสดุ', 'serial number', 'ประเภทพัสดุ', 'หน่วยนับ', 'ยอดในระบบ', 'นับได้จริง', 'ผลต่าง', 'ผลการปรับ', 'เหตุผล / หมายเหตุ', 'ผู้ตรวจนับ', 'ผู้ตรวจสอบ / กรรมการ', 'เวลาบันทึก'],
@@ -191,6 +191,12 @@ function getSheet_(name) {
     if (sh.getMaxColumns() < 17) sh.insertColumnsAfter(sh.getMaxColumns(), 17 - sh.getMaxColumns());
     HDR_STYLE_(sh.getRange(1, 17).setValue(HEADERS[SHEET_REQ][16]));
     sh.getRange('Q2:Q').setNumberFormat('dd/mm/yyyy');
+  }
+  if (sh && name === SHEET_REQ && sh.getRange(1, 18).getValue() === '') {
+    // ชีทเบิกเดิม: เติมคอลัมน์ข้อมูลความคืบหน้าจาก TAI (R-W)
+    if (sh.getMaxColumns() < 23) sh.insertColumnsAfter(sh.getMaxColumns(), 23 - sh.getMaxColumns());
+    HDR_STYLE_(sh.getRange(1, 18, 1, 6).setValues([HEADERS[SHEET_REQ].slice(17, 23)]));
+    sh.getRange('V2:W').setNumberFormat('dd/mm/yyyy');
   }
   if (sh && name === SHEET_LOAN && sh.getRange(1, 20).getValue() === '') {
     // ชีทยืมเดิม: เติมคอลัมน์ จำนวนที่คืนเข้าคลังแล้ว ท้ายตาราง
@@ -1025,7 +1031,8 @@ function getPendingReceive() {
   if (last < 2) return [];
   const got = receivedMap_();
   const out = [];
-  req.getRange(2, 1, last - 1, 15).getValues().forEach((r, i) => {
+  const today = parseDate_(todayStr_());
+  req.getRange(2, 1, last - 1, 23).getValues().forEach((r, i) => {
     if (!isValidReqRow_(r)) return;                     // แถวข้อมูลไม่ครบ (ไม่มีหมายเลขการเบิก)
     if (isPaid_(r[7]) || isCancelled_(r[7])) return; // รับครบแล้ว / ยกเลิก
     const docNo = pad_(r[1], 9);
@@ -1038,7 +1045,7 @@ function getPendingReceive() {
       qty: num_(r[4]), unit: str_(r[5]), date: fmtThai_(r[6]),
       machine: str_(r[8]), urgency: str_(r[9]), issue: str_(r[10]),
       due: fmtThai_(dueDate_(r[6], r[9])), type: str_(r[14]),
-      received: done, remain: remain
+      received: done, remain: remain, tai: taiOf_(r, today, r[16] instanceof Date ? r[16] : null)
     });
   });
   return out.reverse();
@@ -1184,6 +1191,7 @@ function submitReceive(p) {
       issued = issueCore_({ seq: seq, docNo: p.docNo, tech: p.tech, tail: p.tail, remark: p.issueRemark, payDate: p.payDate || todayStr_(), by: p.by });
     }
     rebuildStock_();
+    try { if (remain <= 0) sweepTai_(); } catch (e) { /* ข้อมูล TAI ไม่ใช่ส่วนสำคัญ */ }
     return { remain: remain, increasedTo: increasedTo, issued: !!issued, closed: remain <= 0, rcvSeq: seq };
   });
 }
@@ -2514,7 +2522,7 @@ function getDashboard(month) {
   const today = parseDate_(todayStr_());
   const ym = /^\d{4}-\d{2}$/.test(str_(month)) ? str_(month) : todayStr_().substr(0, 7);
   const req = getSheet_(SHEET_REQ), rl = req.getLastRow();
-  const reqRows = rl >= 2 ? req.getRange(2, 1, rl - 1, 17).getValues().filter(isValidReqRow_) : [];
+  const reqRows = rl >= 2 ? req.getRange(2, 1, rl - 1, 23).getValues().filter(isValidReqRow_) : [];
   const got = receivedMap_(), lots = computeLots_();
   const rcvDate = {}, issuedBy = {};
   readRcv_().forEach(r => {
@@ -2553,7 +2561,7 @@ function getDashboard(month) {
     tci.push({ docNo: doc, part: part, name: str_(r[3]), type: str_(r[14]), qty: qty, got: have, remain: remain, unit: str_(r[5]),
       reqDate: fmtThai_(r[6]), due: fmtThai_(due), install: inst ? fmtThai_(inst) : '', daysLeft: daysLeft, instLate: instLate,
       onTime: remain <= 0 && !!inst && !!rcv ? rcv <= inst : null, recvDate: rcv ? fmtThai_(rcv) : '', status: status,
-      urgency: str_(r[9]), machine: str_(r[8]), late: lateAny, order: lateAny ? 0 : remain > 0 ? (have > 0 ? 2 : 1) : 3, sortKey: inst ? inst.getTime() : 9e15 });
+      urgency: str_(r[9]), machine: str_(r[8]), late: lateAny, tai: remain > 0 ? taiOf_(r, today, inst) : null, order: lateAny ? 0 : remain > 0 ? (have > 0 ? 2 : 1) : 3, sortKey: inst ? inst.getTime() : 9e15 });
   });
   tci.sort((a, b) => (a.order - b.order) || (a.sortKey - b.sortKey) || (a.docNo < b.docNo ? -1 : 1));
 
@@ -2839,6 +2847,7 @@ function onOpen() {
     SpreadsheetApp.getUi().createMenu('ระบบเบิก-จ่าย')
       .addItem('สร้างชีท นำเข้าใบเบิก', 'createRequisitionImportSheet')
       .addItem('อ่านตาราง Schedule TCI (จากแท็บที่เปิดอยู่)', 'readTciSchedule')
+      .addItem('อ่านความคืบหน้า TAI (แท็บ พัสดุค้างจ่าย)', 'readTaiProgress')
       .addItem('นำเข้าใบเบิก (ออกใบเบิกทุกรายการ)', 'importRequisitions')
       .addSeparator()
       .addItem('นำเข้ายอดยกมา', 'importOpeningStock')
@@ -3012,6 +3021,159 @@ function readTciSchedule() {
   ui.alert(lines.join('\n'));
 }
 
+/* ===== ความคืบหน้าพัสดุจาก TAI (ไฟล์ Excel รายสัปดาห์ แท็บ "พัสดุค้างจ่าย") =====
+ * จับคู่ด้วย "เลขที่เอกสารผู้เบิก" (9 หลัก) เท่านั้น ; แถวที่ไม่มีเลข/ไม่ตรงกับใบเบิกของเรา ไม่ทำอะไร
+ * เขียนลงชีท เบิก คอลัมน์ R-W ; เมื่อรับครบ/ยกเลิก/จ่ายแล้ว ลบข้อมูล TAI ของแถวนั้นทิ้ง */
+const TAI_STALE_DAYS_ = 10;
+function taiNorm_(x) { return String(x === null || x === undefined ? '' : x).replace(/[ \s]+/g, ' ').trim(); }
+
+/** จัดกลุ่มสถานะจากข้อความหมายเหตุ + P.O. + วันกำหนดส่ง ; คืน {stage, date} */
+function classifyTai_(remark, po, ship) {
+  const t = taiNorm_(remark);
+  const dm = t.match(/นำจ่าย\s*คลังฝูง\s*(\d{1,2}\s*[ก-๙\.]+\s*\d{2,4})/);
+  if (dm) return { stage: /ขาด/.test(t) ? 'นำจ่ายบางส่วน' : 'นำจ่ายคลังฝูงแล้ว', date: parseThaiShortDate_(dm[1]) };
+  if (/สืบราคา/.test(t) && /ซ่อม/.test(t)) return { stage: 'สืบราคา/แจ้งซ่อม', date: null };
+  if (/ซ่อม/.test(t)) return { stage: 'อยู่ระหว่างซ่อม', date: null };
+  if (/สืบราคา|เทียบราคา/.test(t)) return { stage: 'สืบราคา', date: null };
+  if (/รออนุมัติ\s*PO/i.test(t)) return { stage: 'รออนุมัติ PO', date: null };
+  let d = parseThaiShortDate_(ship);
+  if (!d) { const sm = t.match(/ship\s*due[^0-9]*(\d{1,2}\s*[ก-๙\.]+\s*\d{2,4})/i); if (sm) d = parseThaiShortDate_(sm[1]); }
+  if (d || taiNorm_(po)) return { stage: 'สั่งซื้อแล้ว', date: d };
+  return { stage: 'รอจัดหา', date: null };
+}
+
+/** vals = ตาราง 2 มิติ ; คืน {rows, noDoc} หรือ null ถ้าไม่ใช่แท็บ "พัสดุค้างจ่าย" */
+function parseTaiGrid_(vals) {
+  let hr = -1, c = {};
+  for (let r = 0; r < Math.min(vals.length, 10) && hr < 0; r++) {
+    const k = {};
+    vals[r].forEach((x, i) => {
+      const t = taiNorm_(x).toLowerCase();
+      if (t === 'เลขที่เอกสารผู้เบิก') k.doc = i;
+      else if (t === 'part no.') k.pn = i;
+      else if (t === 'part name') k.name = i;
+      else if (t === 'qty') k.qty = i;
+      else if (t === 'p.o. no.') k.po = i;
+      else if (t.indexOf('ship due') === 0) k.ship = i;
+      else if (t.indexOf('mro supplier') === 0) k.sup = i;
+      else if (t === 'remarks') k.rem = i;
+    });
+    if (k.doc !== undefined && k.pn !== undefined && k.rem !== undefined) { hr = r; c = k; }
+  }
+  if (hr < 0) return null;
+  const get = (row, i) => i === undefined ? '' : row[i];
+  const out = [], res = { rows: out, noDoc: 0 };
+  for (let r = hr + 1; r < vals.length; r++) {
+    const row = vals[r];
+    const doc = taiNorm_(get(row, c.doc)), part = taiNorm_(get(row, c.pn));
+    if (!doc && !part) continue;
+    if (!/^\d{1,9}$/.test(doc)) { if (taiNorm_(get(row, c.name))) res.noDoc++; continue; }
+    const cl = classifyTai_(get(row, c.rem), get(row, c.po), get(row, c.ship));
+    out.push({ doc: pad_(doc, 9), part: part, name: taiNorm_(get(row, c.name)), po: taiNorm_(get(row, c.po)), supplier: taiNorm_(get(row, c.sup)),
+      note: taiNorm_(get(row, c.rem)), stage: cl.stage, date: cl.date });
+  }
+  return res;
+}
+
+/** ข้อมูล TAI ของแถวใบเบิก (r = แถวอ่านจากชีท เบิก ≥ 23 คอลัมน์) สำหรับแสดงผล ; null ถ้าไม่มี */
+function taiOf_(r, today, inst) {
+  const stage = str_(r[17]);
+  if (!stage) return null;
+  const date = r[21] instanceof Date ? r[21] : null, asof = r[22] instanceof Date ? r[22] : null;
+  const days = d => Math.round((today - d) / 86400000);
+  let label = stage, level = '';
+  if (stage === 'นำจ่ายคลังฝูงแล้ว' || stage === 'นำจ่ายบางส่วน') {
+    label = stage + (date ? ' ' + lineDate_(date) : '');
+    level = stage === 'นำจ่ายคลังฝูงแล้ว' ? 'bad' : 'warn';
+    label += stage === 'นำจ่ายคลังฝูงแล้ว' ? ' · แต่ยังไม่รับในระบบ' : '';
+  } else if (stage === 'สั่งซื้อแล้ว') {
+    if (date && date < today) { label = 'เลยกำหนดส่ง ' + days(date) + ' วัน (กำหนด ' + lineDate_(date) + ')'; level = 'bad'; }
+    else label = 'สั่งซื้อแล้ว' + (date ? ' · คาดส่ง ' + lineDate_(date) : '');
+    if (date && inst instanceof Date && date > inst) { label += ' · ช้ากว่าวันติดตั้ง'; level = 'bad'; }
+  }
+  const stale = !!asof && days(asof) > TAI_STALE_DAYS_;
+  if (stale && !level) level = 'warn';
+  return { stage: stage, label: label, level: level, note: str_(r[18]), po: str_(r[19]), supplier: str_(r[20]),
+    asof: asof ? lineDate_(asof) : '', stale: stale };
+}
+
+/** ลบข้อมูล TAI ของใบเบิกที่รับครบ/ยกเลิก/จ่ายแล้ว ; คืนจำนวนแถวที่ล้าง (เรียกในล็อกเดียวกับผู้เรียก) */
+function sweepTai_() {
+  const sh = getSheet_(SHEET_REQ), last = sh.getLastRow();
+  if (last < 2) return 0;
+  const vals = sh.getRange(2, 1, last - 1, 23).getValues(), got = receivedMap_();
+  let n = 0;
+  vals.forEach((r, i) => {
+    if (!r[17] && !r[18] && !r[19] && !r[20] && !r[21] && !r[22]) return;
+    const done = isCancelled_(r[7]) || isPaid_(r[7]) || num_(r[4]) - (got[pad_(r[1], 9) + '|' + str_(r[2])] || 0) <= 0;
+    if (done) { sh.getRange(i + 2, 18, 1, 6).clearContent(); n++; }
+  });
+  return n;
+}
+
+/** นำข้อมูล TAI ที่อ่านได้ไปใส่ชีท เบิก ; คืนสรุป */
+function applyTai_(rows, asof) {
+  return withLock_(() => {
+    const sh = getSheet_(SHEET_REQ), last = sh.getLastRow();
+    const vals = last >= 2 ? sh.getRange(2, 1, last - 1, 23).getValues() : [];
+    const got = receivedMap_(), byDoc = {};
+    vals.forEach((r, i) => { if (isValidReqRow_(r)) byDoc[pad_(r[1], 9)] = i; });
+    const sum = { matched: 0, unmatched: 0, finished: 0, changed: [], delivered: [], missing: [] };
+    const inFile = {};
+    rows.forEach(x => {
+      const i = byDoc[x.doc];
+      if (i === undefined) { sum.unmatched++; return; }       // ไม่มีใบเบิกนี้ในระบบเรา : ไม่ทำอะไร
+      inFile[x.doc] = true;
+      const r = vals[i];
+      const remain = num_(r[4]) - (got[x.doc + '|' + str_(r[2])] || 0);
+      if (isCancelled_(r[7]) || isPaid_(r[7]) || remain <= 0) { sum.finished++; return; }
+      sum.matched++;
+      if (str_(r[17]) && str_(r[17]) !== x.stage) sum.changed.push(x.doc + ': ' + str_(r[17]) + ' → ' + x.stage);
+      if (x.stage === 'นำจ่ายคลังฝูงแล้ว') sum.delivered.push(x.doc + ' ' + (x.part || x.name));
+      sh.getRange(i + 2, 18, 1, 6).setValues([[x.stage, x.note, x.po, x.supplier, x.date || '', asof]]);
+      sh.getRange(i + 2, 22, 1, 2).setNumberFormat('dd/mm/yyyy');
+    });
+    vals.forEach((r, i) => {
+      if (!str_(r[17]) || !isValidReqRow_(r)) return;
+      const doc = pad_(r[1], 9);
+      if (!inFile[doc] && !(isCancelled_(r[7]) || isPaid_(r[7]) || num_(r[4]) - (got[doc + '|' + str_(r[2])] || 0) <= 0)) sum.missing.push(doc);
+    });
+    sweepTai_();
+    return sum;
+  });
+}
+
+function taiSummaryText_(sum, noDoc, label) {
+  const L = ['✅ อ่านความคืบหน้า TAI' + (label ? ' "' + label + '"' : '') + ' แล้ว', 'ตรงกับใบเบิกที่ยังค้างรับ ' + sum.matched + ' รายการ'];
+  if (sum.finished) L.push('รับครบแล้ว/ปิดไปแล้ว ' + sum.finished + ' รายการ (ไม่ต้องแสดง)');
+  L.push('ไม่ตรงกับใบเบิกในระบบ ' + sum.unmatched + ' รายการ' + (noDoc ? ' · ไม่มีเลขใบเบิก ' + noDoc + ' รายการ' : '') + ' (ข้าม)');
+  if (sum.changed.length) L.push('สถานะเปลี่ยน ' + sum.changed.length + ' รายการ: ' + sum.changed.slice(0, 5).join(' ; '));
+  if (sum.delivered.length) L.push('⚠️ TAI แจ้งนำจ่ายคลังฝูงแล้ว แต่ในระบบยังไม่รับ ' + sum.delivered.length + ' รายการ: ' + sum.delivered.slice(0, 5).join(' ; '));
+  if (sum.missing.length) L.push('⚠️ หายจากไฟล์ใหม่ แต่ในระบบยังค้างรับ ' + sum.missing.length + ' รายการ: ' + sum.missing.slice(0, 5).join(' ; '));
+  return L.join('\n');
+}
+
+/** เมนู: อ่านความคืบหน้า TAI จากแท็บที่เปิดอยู่ */
+function readTaiProgress() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet(), ui = SpreadsheetApp.getUi();
+  const src = ss.getActiveSheet();
+  const parsed = parseTaiGrid_(src.getDataRange().getValues());
+  if (!parsed) { ui.alert('แท็บนี้ไม่ใช่ตาราง "พัสดุค้างจ่าย" ของ TAI (ไม่พบหัวตาราง เลขที่เอกสารผู้เบิก / PART NO. / REMARKS)\\nเปิดแท็บ พัสดุค้างจ่าย ที่นำเข้ามาก่อน แล้วสั่งอีกครั้ง'); return; }
+  const sum = applyTai_(parsed.rows, parseDate_(todayStr_()));
+  log_('นำเข้า', '', 'อ่านความคืบหน้า TAI: ตรงกัน ' + sum.matched + ' ไม่ตรง ' + sum.unmatched, 'ระบบ');
+  ui.alert(taiSummaryText_(sum, parsed.noDoc, src.getName()));
+}
+
+/** ไฟล์จากไลน์: ถ้าไฟล์มีแท็บ "พัสดุค้างจ่าย" ของ TAI คืนข้อความสรุป ไม่งั้นคืน null (ให้ไปอ่านเป็นตาราง Schedule) */
+function taiFromWorkbook_(sp, fileName) {
+  let found = null;
+  sp.getSheets().forEach(sh => { if (!found) { const p = parseTaiGrid_(sh.getDataRange().getValues()); if (p) found = p; } });
+  if (!found) return null;
+  const sum = applyTai_(found.rows, parseDate_(todayStr_()));
+  log_('นำเข้า', '', 'อ่านความคืบหน้า TAI จากไลน์: ตรงกัน ' + sum.matched + ' ไม่ตรง ' + sum.unmatched, 'ไลน์');
+  return taiSummaryText_(sum, found.noDoc, fileName);
+}
+
 /** เติมรายการ TCI ที่อ่านได้ลงท้ายชีท นำเข้าใบเบิก (ยังไม่ออกใบเบิก) ; คืน {sheet, start} */
 function fillImportFromTci_(items) {
   const imp = createRequisitionImportSheet();
@@ -3066,9 +3228,10 @@ function importLineExcel_(messageId, fileName) {
   });
   if (up.getResponseCode() !== 200) throw new Error('แปลงไฟล์ Excel ไม่สำเร็จ (' + up.getResponseCode() + ') ' + String(up.getContentText()).slice(0, 150));
   const id = JSON.parse(up.getContentText()).id;
-  let res;
-  try { res = parseTciWorkbook_(SpreadsheetApp.openById(id)); }
+  let res, taiMsg = null;
+  try { const sp = SpreadsheetApp.openById(id); taiMsg = taiFromWorkbook_(sp, fileName); if (taiMsg === null) res = parseTciWorkbook_(sp); }
   finally { try { DriveApp.getFileById(id).setTrashed(true); } catch (e) { /* ไม่เป็นไร */ } }
+  if (taiMsg !== null) return taiMsg;
   if (!res.tabs) return '❌ อ่านไฟล์ "' + fileName + '" ไม่ได้: รูปแบบตารางไม่ตรงที่คาดไว้\n' + res.errors.slice(0, 2).join('\n');
   if (!res.items.length) return 'อ่านไฟล์ "' + fileName + '" แล้ว แต่ไม่พบรายการพัสดุ' + (res.skipped.length ? ' (ข้าม ' + res.skipped.length + ' รายการ)' : '');
   const w = withLock_(() => fillImportFromTci_(res.items));
@@ -3233,7 +3396,7 @@ function buildLineDigest_(today, urgentOnly) {
   let target = tomorrow;
   while (!isWorkday_(target, hol)) target = addDays_(target, 1);   // วันทำงานถัดไป (ศุกร์ -> จันทร์)
   const req = getSheet_(SHEET_REQ), rl = req.getLastRow();
-  const rows = rl >= 2 ? req.getRange(2, 1, rl - 1, 17).getValues().filter(isValidReqRow_) : [];
+  const rows = rl >= 2 ? req.getRange(2, 1, rl - 1, 23).getValues().filter(isValidReqRow_) : [];
   const got = receivedMap_(), lots = computeLots_();
   const L = [], more = (n) => n > LINE_MAX_ITEMS_ ? ['…และอีก ' + (n - LINE_MAX_ITEMS_) + ' รายการ (ดูในแอป)'] : [];
   const cut = (arr) => arr.slice(0, LINE_MAX_ITEMS_);
@@ -3246,13 +3409,14 @@ function buildLineDigest_(today, urgentOnly) {
     if (d < tomorrow || d > target) return;
     const remain = Math.max(num_(r[4]) - (got[pad_(r[1], 9) + '|' + str_(r[2])] || 0), 0);
     if (urgentOnly && remain <= 0) return;
-    inst.push({ d: d, doc: pad_(r[1], 9), part: str_(r[2]), name: str_(r[3]), machine: str_(r[8]), remain: remain });
+    const tx = remain > 0 ? taiOf_(r, today, d) : null;
+    inst.push({ d: d, doc: pad_(r[1], 9), part: str_(r[2]), name: str_(r[3]), machine: str_(r[8]), remain: remain, tai: tx ? tx.label : '' });
   });
   if (inst.length) {
     inst.sort((a, b) => a.d - b.d || a.remain - b.remain);
     const multi = dayKey_(tomorrow) !== dayKey_(target);
     L.push('🔧 งาน TCI ที่จะติดตั้ง ' + (multi ? 'ภายใน' + lineDay_(target) : (dayKey_(target) === dayKey_(tomorrow) ? 'พรุ่งนี้ (' + lineDate_(target) + ')' : lineDay_(target))) + ' : ' + inst.length + ' รายการ');
-    cut(inst).forEach(x => L.push((x.remain > 0 ? '❌ ของยังไม่มา ' : '✅ ของมาแล้ว ') + (x.part || x.name) + ' ' + x.name + ' (' + x.doc + ')' + (x.machine ? ' เครื่อง ' + x.machine : '') + (multi ? ' · ติดตั้ง ' + lineDate_(x.d) : '') + (x.remain > 0 ? ' · ค้าง ' + x.remain : '')));
+    cut(inst).forEach(x => L.push((x.remain > 0 ? '❌ ของยังไม่มา ' : '✅ ของมาแล้ว ') + (x.part || x.name) + ' ' + x.name + ' (' + x.doc + ')' + (x.machine ? ' เครื่อง ' + x.machine : '') + (multi ? ' · ติดตั้ง ' + lineDate_(x.d) : '') + (x.remain > 0 ? ' · ค้าง ' + x.remain : '') + (x.tai ? ' · TAI: ' + x.tai : '')));
     more(inst.length).forEach(t => L.push(t));
     L.push('');
   }
@@ -3262,12 +3426,12 @@ function buildLineDigest_(today, urgentOnly) {
   rows.forEach(r => {
     if (isCancelled_(r[7]) || isPaid_(r[7]) || str_(r[9]) !== 'AOG') return;
     const remain = Math.max(num_(r[4]) - (got[pad_(r[1], 9) + '|' + str_(r[2])] || 0), 0);
-    if (remain > 0) aog.push({ doc: pad_(r[1], 9), part: str_(r[2]), name: str_(r[3]), remain: remain, date: r[6], due: dueDate_(r[6], r[9]) });
+    if (remain > 0) { const tx = taiOf_(r, today, null); aog.push({ doc: pad_(r[1], 9), part: str_(r[2]), name: str_(r[3]), remain: remain, date: r[6], due: dueDate_(r[6], r[9]), tai: tx ? tx.label : '' }); }
   });
   if (aog.length) {
     aog.sort((a, b) => (a.due || 0) - (b.due || 0));
     L.push('🚨 ใบเบิก AOG ค้างรับ ' + aog.length + ' รายการ');
-    cut(aog).forEach(x => L.push('• ' + x.doc + ' ' + (x.part || '') + ' ' + x.name + ' · ค้าง ' + x.remain + (x.due instanceof Date ? (x.due < today ? ' · เลยกำหนด ' + Math.round((today - x.due) / 86400000) + ' วัน' : ' · กำหนด ' + lineDate_(x.due)) : '')));
+    cut(aog).forEach(x => L.push('• ' + x.doc + ' ' + (x.part || '') + ' ' + x.name + ' · ค้าง ' + x.remain + (x.due instanceof Date ? (x.due < today ? ' · เลยกำหนด ' + Math.round((today - x.due) / 86400000) + ' วัน' : ' · กำหนด ' + lineDate_(x.due)) : '') + (x.tai ? ' · TAI: ' + x.tai : '')));
     more(aog.length).forEach(t => L.push(t));
     L.push('');
   }
@@ -3345,7 +3509,7 @@ function isLastWorkdayOfWeek_(today, hol) {
 function buildWeeklyData_(today) {
   const w1 = mondayOf_(today), w2 = addDays_(w1, 6), n1 = addDays_(w1, 7), n2 = addDays_(w1, 13);
   const rq = getSheet_(SHEET_REQ), rl = rq.getLastRow();
-  const rows = rl >= 2 ? rq.getRange(2, 1, rl - 1, 17).getValues().filter(isValidReqRow_) : [];
+  const rows = rl >= 2 ? rq.getRange(2, 1, rl - 1, 23).getValues().filter(isValidReqRow_) : [];
   const got = receivedMap_();
   const info = {};
   rows.forEach(r => { info[pad_(r[1], 9) + '|' + str_(r[2])] = { name: str_(r[3]), machine: str_(r[8]) }; });
@@ -3355,14 +3519,15 @@ function buildWeeklyData_(today) {
   const dash = getDashboard(dayKey_(today).substr(0, 7));
   D.tciSum = dash.tciSum;
   D.tci = dash.tci.map(x => ({ part: x.part, name: x.name, machine: x.machine, install: x.install, qty: x.qty, remain: x.remain, got: x.got,
-    state: x.remain <= 0 ? 'รับครบ' : (x.got > 0 ? 'รับบางส่วน' : 'ค้างรับ'), over: x.instLate ? -x.daysLeft : 0, late: !!x.late, doc: x.docNo }));
+    state: x.remain <= 0 ? 'รับครบ' : (x.got > 0 ? 'รับบางส่วน' : 'ค้างรับ'), over: x.instLate ? -x.daysLeft : 0, late: !!x.late, doc: x.docNo, tai: x.tai ? x.tai.label : '' }));
 
   // 2) งาน TCI ที่ติดตั้งสัปดาห์หน้า
   D.next = [];
   rows.forEach(r => {
     if (isCancelled_(r[7]) || TCI_TYPES.indexOf(str_(r[14])) < 0 || !inRange_(r[16], n1, n2)) return;
     const remain = Math.max(num_(r[4]) - (got[pad_(r[1], 9) + '|' + str_(r[2])] || 0), 0);
-    D.next.push({ d: r[16], part: str_(r[2]), name: str_(r[3]), machine: str_(r[8]), qty: num_(r[4]), remain: remain, doc: pad_(r[1], 9) });
+    const tx = remain > 0 ? taiOf_(r, today, r[16]) : null;
+    D.next.push({ d: r[16], part: str_(r[2]), name: str_(r[3]), machine: str_(r[8]), qty: num_(r[4]), remain: remain, doc: pad_(r[1], 9), tai: tx ? tx.label : '' });
   });
   D.next.sort((a, b) => a.d - b.d || a.remain - b.remain);
 
@@ -3428,15 +3593,15 @@ function makeWeeklyPdf_(D) {
   const s = D.tciSum || {};
   para('1. สถานะงาน TCI เดือน ' + LINE_TH_MON_[D.today.getMonth()] + ' ' + String((D.today.getFullYear() + 543) % 100), 14, true, NAVY, 3);
   para('รับแล้ว ' + (s.done || 0) + ' / ' + (s.total || 0) + ' รายการ   ค้างรับ ' + (s.pending || 0) + '   รับบางส่วน ' + (s.partial || 0) + '   เกินวันติดตั้ง ' + (s.overdue || 0), 11, false, '#222222', 5);
-  table(['ที่', 'Part number', 'ชื่อพัสดุ', 'เครื่อง', 'วันติดตั้ง', 'จำนวน', 'สถานะ'],
-    D.tci.map((x, i) => [String(i + 1), x.part, x.name, x.machine, x.install, String(x.qty), x.state + (x.remain > 0 ? ' (ค้าง ' + x.remain + ')' : '') + (x.over ? ' เกิน ' + x.over + ' วัน' : '')]),
-    [24, 100, 150, 52, 62, 38, 100], '— ไม่มีงาน TCI ในเดือนนี้ —');
+  table(['ที่', 'Part number', 'ชื่อพัสดุ', 'เครื่อง', 'ติดตั้ง', 'จำนวน', 'สถานะ', 'ความคืบหน้า TAI'],
+    D.tci.map((x, i) => [String(i + 1), x.part, x.name, x.machine, x.install, String(x.qty), x.state + (x.remain > 0 ? ' (ค้าง ' + x.remain + ')' : '') + (x.over ? ' เกิน ' + x.over + ' วัน' : ''), x.tai || '-']),
+    [20, 80, 100, 40, 52, 30, 80, 113], '— ไม่มีงาน TCI ในเดือนนี้ —');
 
   para('2. งาน TCI ที่จะติดตั้งสัปดาห์หน้า (' + th(D.n1) + ' – ' + th(D.n2) + ')', 14, true, NAVY, 3);
   para('ของมาแล้ว ' + D.next.filter(x => x.remain <= 0).length + ' รายการ   ของยังไม่มา ' + D.next.filter(x => x.remain > 0).length + ' รายการ', 11, false, '#222222', 5);
-  table(['วันติดตั้ง', 'Part number', 'ชื่อพัสดุ', 'เครื่อง', 'จำนวน', 'ใบเบิก', 'สถานะของ'],
-    D.next.map(x => [th(x.d), x.part, x.name, x.machine, String(x.qty), x.doc, x.remain > 0 ? 'ยังไม่มา (ค้าง ' + x.remain + ')' : 'ของมาแล้ว']),
-    [62, 100, 130, 50, 36, 62, 86], '— ไม่มีงานติดตั้งสัปดาห์หน้า —');
+  table(['วันติดตั้ง', 'Part number', 'ชื่อพัสดุ', 'เครื่อง', 'จำนวน', 'ใบเบิก', 'สถานะของ', 'ความคืบหน้า TAI'],
+    D.next.map(x => [th(x.d), x.part, x.name, x.machine, String(x.qty), x.doc, x.remain > 0 ? 'ยังไม่มา (ค้าง ' + x.remain + ')' : 'ของมาแล้ว', x.tai || '-']),
+    [50, 76, 92, 38, 28, 54, 62, 115], '— ไม่มีงานติดตั้งสัปดาห์หน้า —');
 
   para('3. พัสดุที่รับสัปดาห์นี้ (มีใบเบิก)  ' + D.recv.length + ' รายการ', 14, true, NAVY, 5);
   table(['วันที่รับ', 'Part number', 'ชื่อพัสดุ', 'เครื่อง', 'จำนวน', 'ใบเบิก'],
