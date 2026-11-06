@@ -763,7 +763,7 @@
 <div class="sheet-bg" id="o-bg">
   <div class="sheet">
     <div class="hd"><b>เพิ่มพัสดุเข้าคลัง</b><button class="x" id="o-x" aria-label="ปิด">×</button></div>
-    <div class="seg" id="o-src" style="margin-bottom:8px"><button data-s="รับก่อนเบิก" class="on" style="flex:1">รับก่อนเบิก</button><button data-s="ยอดยกมา" style="flex:1">ยอดยกมา</button></div>
+    <div class="seg" id="o-src" style="margin-bottom:8px"><button data-s="ยอดยกมา" class="on" style="flex:1">ยอดยกมา</button><button data-s="รับก่อนเบิก" style="flex:1">รับก่อนเบิก</button></div>
     <div class="info" id="o-info"></div>
     <label>Part number</label><input id="o-part" list="partlist" autocomplete="off" autocapitalize="characters">
     <label>ชื่อพัสดุ</label><input id="o-name">
@@ -2041,7 +2041,7 @@
   });
 
   /* ---------- รับก่อนเบิก / ยอดยกมา ---------- */
-  state.oSrc = 'รับก่อนเบิก'; state.aw = [];
+  state.oSrc = 'ยอดยกมา'; state.aw = [];
   var O_INFO = { 'รับก่อนเบิก':'รับพัสดุเข้าคลังก่อนมีใบเบิก (นับวันรับจริง ประกันเริ่มนับ) จ่ายให้ช่างได้ทันที เมื่อมีใบเบิกแล้วค่อยกด รอใบเบิก → ผูกใบเบิก',
                  'ยอดยกมา':'ใช้บันทึกพัสดุที่มีอยู่แล้วในคลังตั้งแต่ก่อนใช้ระบบ ไม่มีวันที่รับ จึงไม่นับประกัน' };
   function kitReqNote(res){ var a=res&&res.autoReq; if(!a) return ''; return a.error ? ' · ⚠ เบิกทดแทน '+a.kit+' ไม่สำเร็จ: '+a.error+' (ไปเบิกเอง)' : ' · เบิกทดแทน '+a.kit+' อัตโนมัติ เลขที่ '+a.docNo; }
