@@ -2867,6 +2867,11 @@ function onOpen() {
       .addItem('ทดสอบส่งรายงานสัปดาห์เข้าไลน์', 'lineWeeklyTest')
       .addItem('เปิดส่งสรุปไลน์อัตโนมัติ (16:10 วันทำงาน)', 'lineInstallTrigger')
       .addItem('ปิดส่งสรุปไลน์อัตโนมัติ', 'lineRemoveTrigger')
+      .addSeparator()
+      .addItem('สำรองข้อมูลตอนนี้', 'backupMenuNow')
+      .addItem('เปิดสำรองอัตโนมัติทุกวัน', 'backupInstallTrigger')
+      .addItem('ปิดสำรองอัตโนมัติ', 'backupRemoveTrigger')
+      .addItem('ดูรายการสำรอง', 'backupList')
       .addToUi();
   } catch (e) { /* ไม่มี UI */ }
 }
@@ -3755,6 +3760,89 @@ function lineRemoveTrigger() {
   ts.forEach(t => ScriptApp.deleteTrigger(t));
   const ui = lineUi_();
   if (ui) ui.alert(ts.length ? 'ปิดการส่งสรุปไลน์อัตโนมัติแล้ว' : 'ยังไม่ได้เปิดการส่งอัตโนมัติ');
+}
+
+/* ===== สำรองข้อมูลอัตโนมัติ (สำเนาทั้งไฟล์สเปรดชีตเก็บใน Google Drive) =====
+ * ทุกวันราว 02:00 น. ; เก็บทุกฉบับย้อนหลัง 14 วัน แล้วเก็บเฉพาะของวันอาทิตย์ย้อนหลัง 12 สัปดาห์ ; ที่เหลือย้ายลงถังขยะ */
+const BACKUP_FOLDER_ = 'สำรองข้อมูล ระบบเบิก-จ่าย';
+const BACKUP_PREFIX_ = 'สำรอง ';
+const BACKUP_DAILY_DAYS_ = 14, BACKUP_WEEKLY_DAYS_ = 84;
+
+function backupFolder_() {
+  const it = DriveApp.getFoldersByName(BACKUP_FOLDER_);
+  return it.hasNext() ? it.next() : DriveApp.createFolder(BACKUP_FOLDER_);
+}
+
+/** สำเนาไฟล์สเปรดชีตนี้ลงโฟลเดอร์สำรอง แล้วล้างฉบับเก่าตามกติกา ; คืน {name, url, removed} */
+function backupNow_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const folder = backupFolder_();
+  const stamp = Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH.mm');
+  const copy = DriveApp.getFileById(ss.getId()).makeCopy(BACKUP_PREFIX_ + ss.getName() + ' ' + stamp, folder);
+  return { name: copy.getName(), url: copy.getUrl(), removed: pruneBackups_(folder) };
+}
+
+/** ล้างสำรองเก่า : ภายใน 14 วันเก็บหมด ; เกินนั้นเก็บเฉพาะวันอาทิตย์ไม่เกิน 84 วัน ; ย้ายลงถังขยะ (กู้คืนได้ 30 วัน) */
+function pruneBackups_(folder) {
+  const now = new Date().getTime(), DAY = 86400000;
+  let n = 0;
+  const it = folder.getFiles();
+  while (it.hasNext()) {
+    const f = it.next();
+    if (f.getName().indexOf(BACKUP_PREFIX_) !== 0) continue;
+    const created = f.getDateCreated(), age = (now - created.getTime()) / DAY;
+    if (age <= BACKUP_DAILY_DAYS_) continue;
+    const sunday = Utilities.formatDate(created, TZ, 'u') === '7';
+    if (sunday && age <= BACKUP_WEEKLY_DAYS_) continue;
+    f.setTrashed(true); n++;
+  }
+  return n;
+}
+
+/** ตัวตั้งเวลา : สำรองทุกวัน ; ถ้าพังให้แจ้งเข้าไลน์ (ถ้าตั้งบอตไว้) */
+function autoBackup() {
+  try {
+    const r = backupNow_();
+    log_('สำรองข้อมูล', '', 'สำรองแล้ว: ' + r.name + (r.removed ? ' (ล้างของเก่า ' + r.removed + ' ฉบับ)' : ''), 'ระบบ');
+    return r;
+  } catch (e) {
+    log_('สำรองข้อมูล', '', 'สำรองไม่สำเร็จ: ' + e.message, 'ระบบ');
+    try { if (lineProps_().getProperty('LINE_TOKEN') && lineProps_().getProperty('LINE_TARGET')) linePush_('⚠️ สำรองข้อมูลอัตโนมัติไม่สำเร็จ: ' + e.message); } catch (e2) { /* ไม่ทำอะไร */ }
+    throw e;
+  }
+}
+
+/** เมนู: สำรองข้อมูลตอนนี้ */
+function backupMenuNow() {
+  const r = backupNow_(), ui = lineUi_();
+  log_('สำรองข้อมูล', '', 'สำรองด้วยมือ: ' + r.name, 'ผู้ใช้');
+  if (ui) ui.alert('สำรองแล้ว\n' + r.name + '\nเก็บในโฟลเดอร์ "' + BACKUP_FOLDER_ + '" ใน Google Drive\n' + r.url);
+}
+
+/** เมนู: เปิดสำรองอัตโนมัติทุกวัน ~02:00 (และสำรองทันทีหนึ่งฉบับ) */
+function backupInstallTrigger() {
+  ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'autoBackup').forEach(t => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger('autoBackup').timeBased().atHour(2).nearMinute(10).everyDays(1).inTimezone('Asia/Bangkok').create();
+  const r = backupNow_(), ui = lineUi_();
+  if (ui) ui.alert('เปิดสำรองอัตโนมัติแล้ว: ทุกวันราว 02:00 น.\nสำรองฉบับแรกให้แล้ว: ' + r.name + '\nเก็บในโฟลเดอร์ "' + BACKUP_FOLDER_ + '" ใน Google Drive\nเก็บทุกฉบับ 14 วัน แล้วเก็บเฉพาะวันอาทิตย์ 12 สัปดาห์');
+}
+
+/** เมนู: ปิดสำรองอัตโนมัติ */
+function backupRemoveTrigger() {
+  const ts = ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'autoBackup');
+  ts.forEach(t => ScriptApp.deleteTrigger(t));
+  const ui = lineUi_();
+  if (ui) ui.alert(ts.length ? 'ปิดสำรองอัตโนมัติแล้ว (ฉบับที่สำรองไว้ยังอยู่ใน Drive)' : 'ยังไม่ได้เปิดสำรองอัตโนมัติ');
+}
+
+/** เมนู: ดูรายการสำรองล่าสุด */
+function backupList() {
+  const folder = backupFolder_(), it = folder.getFiles(), arr = [];
+  while (it.hasNext()) { const f = it.next(); if (f.getName().indexOf(BACKUP_PREFIX_) === 0) arr.push(f); }
+  arr.sort((a, b) => b.getDateCreated() - a.getDateCreated());
+  const on = ScriptApp.getProjectTriggers().some(t => t.getHandlerFunction() === 'autoBackup');
+  const ui = lineUi_();
+  if (ui) ui.alert('สำรองอัตโนมัติ: ' + (on ? 'เปิดอยู่ (ทุกวันราว 02:00)' : 'ยังไม่เปิด') + '\nมีสำรองอยู่ ' + arr.length + ' ฉบับ' + (arr.length ? '\nล่าสุด:\n' + arr.slice(0, 7).map(f => '• ' + f.getName()).join('\n') : '') + '\n\nโฟลเดอร์: ' + folder.getUrl());
 }
 
 /** เมนู: ตรวจว่า webhook ของไลน์ส่งสัญญาณมาถึงระบบหรือยัง */
