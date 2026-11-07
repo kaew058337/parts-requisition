@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#071B35">
 <title>ระบบเบิก-จ่าย-ส่งคืน</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&family=Cormorant+Garamond:wght@600;700&display=swap" rel="stylesheet">
 <style>
   :root{
     --navy-deep:#071B35; --navy-mid:#0A2342; --navy-royal:#123B65; --blue:#4C8DCE; --ice:#A9D5FF;
@@ -359,6 +359,26 @@
     .btn.danger:hover{box-shadow:0 16px 34px rgba(220,60,72,.42),inset 0 1px 0 rgba(255,255,255,.8)}
   }
   @media (prefers-reduced-motion:reduce){.btn,.btn::before,.btn:hover,.btn:hover::before{animation:none!important}}
+</style>
+<style id="lux">
+/* ===== ธีมทองแชมเปญ ===== */
+:root{--gold:#d4b36a;--gold-d:#9a7425;--bg:#F5F4F0;--line:#e6dfce;--serif:'Cormorant Garamond','Sarabun',Georgia,serif}
+header{position:sticky}
+header::after{content:'';position:absolute;left:16px;right:16px;bottom:0;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+header h1{font-family:var(--serif);font-size:22px;letter-spacing:.4px}
+header .sub{color:var(--gold);letter-spacing:.4px}
+main h2{font-family:var(--serif);font-size:21px;font-weight:700;display:flex;align-items:center;gap:10px}
+main h2::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--gold),transparent)}
+.sec{color:var(--gold-d)}
+main .card,main .pcard{position:relative;border-color:var(--line);box-shadow:0 1px 0 #fff inset,0 6px 18px rgba(10,35,66,.06)}
+main .card::after,main .pcard::after{content:'';position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;opacity:.55;background:linear-gradient(135deg,var(--gold),transparent 45%,transparent 60%,var(--gold));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+nav{border-top-color:rgba(212,179,106,.35)}
+nav button.on{color:var(--gold)}
+nav button.on svg{filter:drop-shadow(0 0 7px rgba(212,179,106,.8))}
+nav button.on::before{background:var(--gold);box-shadow:0 0 12px 2px rgba(212,179,106,.7)}
+.btn{border-color:rgba(212,179,106,.85)}
+.btn::before{background:linear-gradient(100deg,transparent 30%,rgba(212,179,106,.6) 50%,transparent 70%)}
+.btn.ghost{border-color:rgba(212,179,106,.6)}
 </style>
 <style id="pg">@page{size:A5 landscape;margin:6mm}</style>
 </head>
