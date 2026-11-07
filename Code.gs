@@ -101,6 +101,7 @@ const API_FUNCS_ = {
   getPendingReceive: getPendingReceive,
   getReconcile: getReconcile,
   getReturnable: getReturnable,
+  getIssuedSerials: getIssuedSerials,
   getStock: getStock,
   issueFromLot: issueFromLot,
   moveLocation: moveLocation,
@@ -1979,6 +1980,23 @@ function getReturnable() {
     });
   });
   return out.reverse();
+}
+
+/** จ่ายล่าสุดของ Part number นี้ที่มี S/N (ใช้ช่วยกรอก "Serial ที่ใส่" ตอนบันทึกส่งคืน) */
+function getIssuedSerials(part) {
+  const pn = str_(part).toUpperCase();
+  if (!pn) return [];
+  const out = [];
+  const rows = readIss_();
+  for (let i = rows.length - 1; i >= 0 && out.length < 8; i--) {
+    const r = rows[i];
+    if (str_(r[IS.PART]).toUpperCase() !== pn || !str_(r[IS.SN])) continue;
+    out.push({
+      serial: str_(r[IS.SN]), machine: str_(r[IS.TAIL]), tech: str_(r[IS.TECH]),
+      docNo: docStr_(r[IS.DOC]), date: fmtThai_(r[IS.DATE]), qty: num_(r[IS.QTY])
+    });
+  }
+  return out;
 }
 
 function submitReturnToStock(p) {

@@ -501,6 +501,7 @@ nav button.on::before{background:var(--gold);box-shadow:0 0 12px 2px rgba(212,17
         <div><label>Serial ส่งคืน</label><textarea id="t-sn-ret" rows="3" placeholder="หลาย S/N: ขึ้นบรรทัดใหม่ หรือคั่นด้วย ,"></textarea></div>
         <div><label>Serial ที่ใส่</label><textarea id="t-sn-in" rows="3" placeholder="จับคู่ตามบรรทัด"></textarea></div>
       </div>
+      <div id="t-issued" style="display:none"></div>
       <div class="meta" id="t-sn-hint"></div>
       <div id="t-warn"></div>
       <div class="row2">
@@ -2103,6 +2104,31 @@ nav button.on::before{background:var(--gold);box-shadow:0 0 12px 2px rgba(212,17
   $('w-x').addEventListener('click', function(){ $('w-bg').classList.remove('on'); });
   $('w-ok').addEventListener('click', function(){ $('w-bg').classList.remove('on'); });
   $('w-bg').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('on'); });
+
+  /* ช่วยเลือก Serial ที่ใส่ จากรายการจ่ายล่าสุดของ P/N นี้ */
+  var issTimer=null, issPart='';
+  function loadIssuedChips(){
+    var part=($('t-part').value||'').trim(), box=$('t-issued');
+    if(!part){ box.style.display='none'; box.innerHTML=''; issPart=''; return; }
+    if(part.toUpperCase()===issPart) return; issPart=part.toUpperCase();
+    run('getIssuedSerials',[part]).then(function(rows){
+      if(($('t-part').value||'').trim().toUpperCase()!==issPart) return;
+      if(!rows||!rows.length){ box.style.display='none'; box.innerHTML=''; return; }
+      box.style.display='';
+      box.innerHTML='<div class="meta" style="margin:8px 0 4px">จ่ายล่าสุด · แตะเพื่อใส่ใน "Serial ที่ใส่"</div><div style="display:flex;flex-wrap:wrap;gap:6px">'+
+        rows.map(function(x,i){ return '<button type="button" class="chip" data-i="'+i+'" style="border:1px solid var(--line);cursor:pointer;font:inherit;font-size:12.5px;padding:5px 11px">'+esc(x.serial)+' · '+esc(x.machine||x.tech||'-')+' · '+esc(x.date)+'</button>'; }).join('')+'</div>';
+      box._rows=rows;
+    }).catch(function(){});
+  }
+  $('t-issued').addEventListener('click', function(e){
+    var b=e.target.closest('button[data-i]'); if(!b) return;
+    var x=this._rows[Number(b.dataset.i)], el=$('t-sn-in');
+    var cur=snList(el.value);
+    if(cur.indexOf(x.serial)<0){ cur.push(x.serial); el.value=cur.join('\n'); }
+    var m=$('t-machine'); if(x.machine && !m.value){ m.value=x.machine; }
+    if(typeof draftSave==='function') draftSave();
+  });
+  ['input','change'].forEach(function(ev){ $('t-part').addEventListener(ev, function(){ clearTimeout(issTimer); issTimer=setTimeout(loadIssuedChips,350); }); });
   $('t-sn-ret').addEventListener('input', snCount);
   $('t-sn-ret').addEventListener('change', function(){
     snCount(); $('t-warn').innerHTML='';
@@ -2212,7 +2238,7 @@ nav button.on::before{background:var(--gold);box-shadow:0 0 12px 2px rgba(212,17
       $('t-warn').innerHTML='';
       ['t-part','t-name','t-machine','t-sn-ret','t-sn-in','t-sender','t-issue','t-remark','t-docno','t-cond'].forEach(function(id){ $(id).value=''; });
       $('t-receiver').value='แพรว TAI'; suggestNo();
-      $('t-qty').disabled=false; $('t-qty').value=1; $('t-sn-hint').textContent='';
+      $('t-qty').disabled=false; $('t-qty').value=1; $('t-sn-hint').textContent=''; $('t-issued').style.display='none'; $('t-issued').innerHTML=''; issPart='';
       boot();
     }).catch(function(e){ toast(e.message,true); }).then(function(){ busy(btn,false); });
   });
