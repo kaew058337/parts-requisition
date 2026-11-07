@@ -1092,7 +1092,9 @@ nav button.on::before{background:var(--gold);box-shadow:0 0 12px 2px rgba(212,17
 
   /* ---------- nav ---------- */
   var titles = { req:'เบิกพัสดุ', rcv:'รับพัสดุ', iss:'จ่ายพัสดุ', stk:'คลังพัสดุ', ret:'ส่งคืนพัสดุ', his:'ประวัติ' };
+  var scrollMem = {};
   function show(v){
+    if(state.view) scrollMem[state.view] = window.pageYOffset;
     if(v!=='his') state.lastMain = v;
     state.view = v;
     $('back-btn').classList.toggle('on', v==='his');
@@ -1100,7 +1102,7 @@ nav button.on::before{background:var(--gold);box-shadow:0 0 12px 2px rgba(212,17
     ['req','rcv','iss','stk','ret','his'].forEach(function(k){ $('v-'+k).classList.toggle('on', k===v); });
     document.querySelectorAll('nav button').forEach(function(b){ b.classList.toggle('on', b.dataset.v===v); });
     $('title').textContent = titles[v];
-    window.scrollTo(0,0);
+    window.scrollTo(0, scrollMem[v]||0);
     if(v==='rcv') loadRcv();
     if(v==='iss') loadIssue();
     if(v==='stk'){ if(state.stkMode==='loan') loadLoans(); else loadStock(); }
@@ -1129,6 +1131,7 @@ nav button.on::before{background:var(--gold);box-shadow:0 0 12px 2px rgba(212,17
         var o=document.createElement('option'); o.value=p.part; o.label=p.name; dl.appendChild(o);
       });
       buildUsers(d.users||[]);
+      if(!state.draftDone){ state.draftDone=true; draftRestore(); }
       state.recon = d.recon||0;
       setOverdue(d.loansOverdue||0);
       if(d.synced) state.syncNotes=d.changes;
@@ -1262,10 +1265,49 @@ nav button.on::before{background:var(--gold);box-shadow:0 0 12px 2px rgba(212,17
       $('d-printall').textContent = 'พิมพ์ทั้งหมด '+docs.length+' ใบ (A5)';
       $('d-bg').classList.add('on');
       $('r-machine').value=''; $('r-issue').value=''; $('r-urg').value='เบิกธรรมดา';
-      $('r-items').innerHTML=''; addItem();
+      $('r-items').innerHTML=''; addItem(); draftClear();
       boot();
     }).catch(function(e){ toast(e.message,true); }).then(function(){ busy(btn,false); });
   });
+
+
+  /* ---------- จำข้อมูลที่กรอกค้างในฟอร์มเบิก (กันหายเมื่อสลับแอป/หน้าโหลดใหม่) ---------- */
+  var DRAFT_KEY='reqDraft1';
+  function draftSave(){
+    try{
+      var o={date:$('r-date').value,urg:$('r-urg').value,mc:$('r-machine').value,issue:$('r-issue').value,who:$('r-who').value,
+        rank:$('r-rank').value,full:$('r-fullname').value,pos:$('r-position').value,
+        items:Array.prototype.map.call(document.querySelectorAll('#r-items .item'),function(d){
+          return {t:d.querySelector('.f-type').value,i:d.querySelector('.f-inst').value,p:d.querySelector('.f-part').value,n:d.querySelector('.f-name').value,q:d.querySelector('.f-qty').value,u:d.querySelector('.f-unit').value};
+        })};
+      var has=o.issue||o.mc||o.items.some(function(x){return x.p||x.n;});
+      if(has) localStorage.setItem(DRAFT_KEY,JSON.stringify(o)); else localStorage.removeItem(DRAFT_KEY);
+    }catch(e){}
+  }
+  function draftClear(){ try{ localStorage.removeItem(DRAFT_KEY); }catch(e){} }
+  function draftRestore(){
+    try{
+      var raw=localStorage.getItem(DRAFT_KEY); if(!raw) return;
+      var o=JSON.parse(raw); if(!o||!o.items||!o.items.length) return;
+      if(document.querySelector('#r-items .item .f-part') && Array.prototype.some.call(document.querySelectorAll('#r-items .f-part'),function(x){return x.value;})) return;
+      if(o.date) $('r-date').value=o.date; $('r-urg').value=o.urg||$('r-urg').value; if(o.mc) $('r-machine').value=o.mc; $('r-issue').value=o.issue||'';
+      if(o.who){ $('r-who').value=o.who; $('r-who').dispatchEvent(new Event('change')); }
+      $('r-rank').value=o.rank||''; $('r-fullname').value=o.full||''; $('r-position').value=o.pos||'';
+      $('r-items').innerHTML='';
+      o.items.forEach(function(x){
+        addItem(); var d=$('r-items').lastElementChild;
+        d.querySelector('.f-type').value=x.t; d.querySelector('.f-type').dispatchEvent(new Event('change'));
+        d.querySelector('.f-inst').value=x.i||''; d.querySelector('.f-part').value=x.p||''; d.querySelector('.f-name').value=x.n||'';
+        d.querySelector('.f-qty').value=x.q||'1'; d.querySelector('.f-unit').value=x.u||'EA';
+        try{ hintItem(d); }catch(e){}
+      });
+      toast('กู้ข้อมูลใบเบิกที่ค้างไว้คืนแล้ว');
+    }catch(e){}
+  }
+  (function(){ var v=document.getElementById('v-req'); if(!v) return;
+    v.addEventListener('input',draftSave); v.addEventListener('change',draftSave);
+    v.addEventListener('click',function(){ setTimeout(draftSave,0); });
+  })();
 
   /* ---------- พิมพ์ใบเบิก A5 ---------- */
   /* เลือกขนาดตัวอักษร (pt) ให้ข้อความพอดีกับช่อง กว้าง x สูง (มม.) */
