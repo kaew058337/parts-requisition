@@ -11,7 +11,7 @@
 <style>
   :root{
     --navy-deep:#071B35; --navy-mid:#0A2342; --navy-royal:#123B65; --blue:#4C8DCE; --ice:#A9D5FF;
-    --bg:#F4F7FB; --card:#fff; --ink:#0A2342; --muted:#5d6f8a; --line:#dde6f2;
+    --bg:#F4F7FB; --card:#fff; --ink:#0A2342; --muted:#46587a; --line:#dde6f2;
     --pri:#123B65; --pri-d:#0A2342; --ok:#0e8a4f; --warn:#d97706; --bad:#d92d20;
     --r:20px; --ease:cubic-bezier(.4,0,.2,1); --spring:cubic-bezier(.34,1.3,.5,1);
     --shadow:0 8px 28px rgba(7,27,53,.07); --shadow-up:0 14px 34px rgba(7,27,53,.13);
@@ -30,7 +30,7 @@
   @keyframes orb3{to{transform:translate3d(90px,-80px,0)}}
   /* ---- หัวหน้า (กระจกฝ้าบนพื้นกรมท่า) ---- */
   header{position:sticky;top:0;z-index:20;color:#fff;padding:calc(8px + env(safe-area-inset-top)) 16px 16px;display:flex;align-items:center;gap:10px;
-    background:linear-gradient(180deg,rgba(7,27,53,.96),rgba(10,35,66,.88))}
+    background:linear-gradient(180deg,#071B35,#0a2342)}
   header .logo{height:36px;width:auto;flex:none;filter:drop-shadow(0 2px 6px rgba(0,0,0,.35))}
   header h1{font-size:20px;margin:0;font-weight:700;flex:1;line-height:1.15;letter-spacing:.2px;
     background:linear-gradient(100deg,#fff 0%,#fff 38%,var(--ice) 50%,#fff 62%,#fff 100%);background-size:250% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;animation:sweep 3s var(--ease) 1s 1 both}
@@ -105,8 +105,8 @@
   @keyframes fadeUp{from{opacity:0;transform:translate3d(0,14px,0)}to{opacity:1;transform:none}}
   /* ---- แถบเมนูล่าง (กระจกกรมท่า) ---- */
   nav{position:fixed;left:0;right:0;bottom:0;z-index:30;display:grid;grid-template-columns:repeat(4,1fr);padding:6px 6px calc(6px + env(safe-area-inset-bottom));max-width:720px;margin:0 auto;
-    background:rgba(10,35,66,.97);border-top:1px solid rgba(169,213,255,.22);border-radius:24px 24px 0 0;box-shadow:0 -10px 30px rgba(0,0,0,.3)}
-  nav button{position:relative;background:none;border:0;padding:10px 0 8px;font:inherit;font-size:12px;color:rgba(255,255,255,.58);display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;transition:color .25s var(--ease),transform .25s var(--spring)}
+    background:#0a2342;border-top:1px solid rgba(169,213,255,.22);border-radius:24px 24px 0 0;box-shadow:0 -10px 30px rgba(0,0,0,.3)}
+  nav button{position:relative;background:none;border:0;padding:10px 0 8px;font:inherit;font-size:12px;color:rgba(255,255,255,.78);display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;transition:color .25s var(--ease),transform .25s var(--spring)}
   nav button svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;transition:transform .3s var(--spring)}
   nav button:active svg{transform:scale(.88)}
   nav button.on{color:var(--ice);font-weight:600}
@@ -115,7 +115,8 @@
   /* ---- การ์ด / ฟอร์ม ---- */
   .card{background:var(--card);border:1px solid #e6edf7;border-radius:var(--r);padding:18px;margin-bottom:16px;box-shadow:var(--shadow);transition:box-shadow .3s var(--ease),transform .3s var(--ease)}
   .card h2{font-size:16px;margin:0 0 12px;font-weight:600;color:var(--navy-royal)}
-  label{display:block;font-size:13px;color:var(--muted);margin:14px 0 6px;font-weight:500}
+  label{display:block;font-size:13.5px;color:#2b3d5c;margin:14px 0 6px;font-weight:600}
+  ::placeholder{color:#7a8aa3;opacity:1}
   input,select,textarea{width:100%;font:inherit;font-size:16px;padding:12px 14px;border:1.5px solid var(--line);border-radius:14px;background:#f8fafd;color:var(--ink);appearance:none;-webkit-appearance:none;transition:border-color .25s var(--ease),box-shadow .25s var(--ease),background .25s}
   textarea{min-height:80px;resize:vertical}
   input:hover,select:hover,textarea:hover{border-color:#c4d3e8}
