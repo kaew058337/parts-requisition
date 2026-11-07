@@ -1669,10 +1669,8 @@
       var lots = g.lots.map(function(l){
         var bits=[];
         if(l.serial) bits.push('S/N <a class="snl" data-sn="'+esc(l.serial)+'">'+esc(l.serial)+'</a>');
-        if(l.warr){ bits.push('<span class="chip '+(l.warr.status==='ok'?'ok':l.warr.status==='soon'?'warn':'bad')+'">'+(l.warr.status==='expired'?'หมดประกัน':'ประกันเหลือ '+l.warr.left+' วัน')+'</span>'); }
         bits.push('จำนวน '+fmtNum(l.qty));
         if(l.type) bits.push(esc(l.type));
-        if(l.cond) bits.push('COND '+esc(l.cond));
         if(l.location) bits.push(esc(l.location));
         if(l.kit) bits.push('<b>'+esc(l.kit)+'</b>');
         if(l.expire) bits.push('หมดอายุ '+esc(l.expire));
