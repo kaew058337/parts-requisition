@@ -3538,6 +3538,20 @@ function buildWeeklyData_(today) {
   rows.forEach(r => { info[pad_(r[1], 9) + '|' + str_(r[2])] = { name: str_(r[3]), machine: str_(r[8]) }; });
   const D = { today: today, w1: w1, w2: w2, n1: n1, n2: n2 };
 
+  // 0) พัสดุค้างจ่าย (ข้อมูลจาก TAI) — ใบเบิกที่ยังค้างรับและมีสถานะจาก TAI
+  D.tai = [];
+  rows.forEach(r => {
+    if (isCancelled_(r[7]) || !str_(r[17])) return;
+    const remain = Math.max(num_(r[4]) - (got[pad_(r[1], 9) + '|' + str_(r[2])] || 0), 0);
+    if (remain <= 0) return;
+    const t = taiOf_(r, today, r[16]);
+    if (!t) return;
+    D.tai.push({ doc: pad_(r[1], 9), part: str_(r[2]), name: str_(r[3]), machine: str_(r[8]), urg: str_(r[9]), type: str_(r[14]), remain: remain,
+      label: t.label, level: t.level, po: t.po, supplier: t.supplier, asof: t.asof, stale: t.stale, install: r[16] instanceof Date ? r[16] : null });
+  });
+  const lv = { bad: 0, warn: 1, '': 2 };
+  D.tai.sort((a, b) => (lv[a.level] - lv[b.level]) || (a.urg === 'AOG' ? -1 : 0) - (b.urg === 'AOG' ? -1 : 0) || (a.doc < b.doc ? -1 : 1));
+
   // 1) สถานะ TCI เดือนนี้
   const dash = getDashboard(dayKey_(today).substr(0, 7));
   D.tciSum = dash.tciSum;
@@ -3613,28 +3627,35 @@ function makeWeeklyPdf_(D) {
   para('รายงานสรุปประจำสัปดาห์', 22, true, NAVY, 2);
   para('ประจำวันที่ ' + weeklyRange_(D) + '   ·   จัดทำ ' + lineDay_(D.today), 11, false, '#444444', 10);
 
+  const tb = D.tai.filter(x => x.level === 'bad').length, tw = D.tai.filter(x => x.level === 'warn').length;
+  para('1. สถานะพัสดุค้างจ่าย (ข้อมูลจาก TAI)  ' + D.tai.length + ' รายการ', 14, true, NAVY, 3);
+  para('ต้องติดตาม ' + tb + '   เฝ้าระวัง ' + tw + '   ปกติ ' + (D.tai.length - tb - tw) + (D.tai.length && D.tai[0].asof ? '   ข้อมูล ณ ' + D.tai[0].asof : ''), 11, false, '#222222', 4);
+  table(['ที่', 'ใบเบิก', 'Part number', 'ชื่อพัสดุ', 'เครื่อง', 'ค้าง', 'สถานะ TAI', 'ผู้จำหน่าย / PO'],
+    D.tai.map((x, i) => [String(i + 1), x.doc, x.part, x.name, x.machine, String(x.remain), (x.urg === 'AOG' ? 'AOG · ' : '') + x.label + (x.stale ? ' (ข้อมูลเก่า)' : ''), [x.supplier, x.po].filter(String).join(' / ') || '-']),
+    [18, 58, 76, 84, 38, 26, 140, 75], '— ไม่มีพัสดุค้างจ่ายจาก TAI —');
+
   const s = D.tciSum || {};
-  para('1. สถานะงาน TCI เดือน ' + LINE_TH_MON_[D.today.getMonth()] + ' ' + String((D.today.getFullYear() + 543) % 100), 14, true, NAVY, 3);
+  para('2. สถานะงาน TCI เดือน ' + LINE_TH_MON_[D.today.getMonth()] + ' ' + String((D.today.getFullYear() + 543) % 100), 14, true, NAVY, 3);
   para('รับแล้ว ' + (s.done || 0) + ' / ' + (s.total || 0) + ' รายการ   ค้างรับ ' + (s.pending || 0) + '   รับบางส่วน ' + (s.partial || 0) + '   เกินวันติดตั้ง ' + (s.overdue || 0), 11, false, '#222222', 5);
   table(['ที่', 'Part number', 'ชื่อพัสดุ', 'เครื่อง', 'ติดตั้ง', 'จำนวน', 'สถานะ', 'ความคืบหน้า TAI'],
     D.tci.map((x, i) => [String(i + 1), x.part, x.name, x.machine, x.install, String(x.qty), x.state + (x.remain > 0 ? ' (ค้าง ' + x.remain + ')' : '') + (x.over ? ' เกิน ' + x.over + ' วัน' : ''), x.tai || '-']),
     [20, 80, 100, 40, 52, 30, 80, 113], '— ไม่มีงาน TCI ในเดือนนี้ —');
 
-  para('2. งาน TCI ที่จะติดตั้งสัปดาห์หน้า (' + th(D.n1) + ' – ' + th(D.n2) + ')', 14, true, NAVY, 3);
+  para('3. งาน TCI ที่จะติดตั้งสัปดาห์หน้า (' + th(D.n1) + ' – ' + th(D.n2) + ')', 14, true, NAVY, 3);
   para('ของมาแล้ว ' + D.next.filter(x => x.remain <= 0).length + ' รายการ   ของยังไม่มา ' + D.next.filter(x => x.remain > 0).length + ' รายการ', 11, false, '#222222', 5);
   table(['วันติดตั้ง', 'Part number', 'ชื่อพัสดุ', 'เครื่อง', 'จำนวน', 'ใบเบิก', 'สถานะของ', 'ความคืบหน้า TAI'],
     D.next.map(x => [th(x.d), x.part, x.name, x.machine, String(x.qty), x.doc, x.remain > 0 ? 'ยังไม่มา (ค้าง ' + x.remain + ')' : 'ของมาแล้ว', x.tai || '-']),
     [50, 76, 92, 38, 28, 54, 62, 115], '— ไม่มีงานติดตั้งสัปดาห์หน้า —');
 
-  para('3. พัสดุที่รับสัปดาห์นี้ (มีใบเบิก)  ' + D.recv.length + ' รายการ', 14, true, NAVY, 5);
+  para('4. พัสดุที่รับสัปดาห์นี้ (มีใบเบิก)  ' + D.recv.length + ' รายการ', 14, true, NAVY, 5);
   table(['วันที่รับ', 'Part number', 'ชื่อพัสดุ', 'เครื่อง', 'จำนวน', 'ใบเบิก'],
     D.recv.map(x => [th(x.d), x.part, x.name, x.machine, String(x.qty), x.doc]), [62, 110, 160, 56, 40, 62]);
 
-  para('4. รายการเบิกสัปดาห์นี้  ' + D.reqs.length + ' รายการ', 14, true, NAVY, 5);
+  para('5. รายการเบิกสัปดาห์นี้  ' + D.reqs.length + ' รายการ', 14, true, NAVY, 5);
   table(['วันที่เบิก', 'ใบเบิก', 'Part number', 'ชื่อพัสดุ', 'จำนวน', 'เครื่อง', 'ประเภท'],
     D.reqs.map(x => [th(x.d), x.doc, x.part, x.name, String(x.qty), x.machine, (x.urg === 'AOG' ? 'AOG · ' : '') + x.type]), [58, 62, 90, 120, 36, 52, 62]);
 
-  para('5. การจ่ายพัสดุสัปดาห์นี้  ' + D.iss.length + ' รายการ', 14, true, NAVY, 5);
+  para('6. การจ่ายพัสดุสัปดาห์นี้  ' + D.iss.length + ' รายการ', 14, true, NAVY, 5);
   table(['วันที่จ่าย', 'ใบเบิก', 'Part number', 'ชื่อพัสดุ', 'S/N', 'จำนวน', 'เครื่อง', 'ช่าง'],
     D.iss.map(x => [th(x.d), x.doc, x.part, x.name, x.sn, String(x.qty), x.tail, x.tech]), [54, 58, 80, 96, 56, 32, 48, 66]);
 
@@ -3655,6 +3676,7 @@ function weeklyLineText_(D, url) {
   const s = D.tciSum || {}, miss = D.next.filter(x => x.remain > 0).length;
   const L = ['📄 รายงานสรุปประจำสัปดาห์ ' + weeklyRange_(D), '────────────',
     '📊 TCI เดือน ' + LINE_TH_MON_[D.today.getMonth()] + ': รับแล้ว ' + (s.done || 0) + '/' + (s.total || 0) + (s.pending ? ' · ค้างรับ ' + s.pending : '') + (s.overdue ? ' · เกินวันติดตั้ง ' + s.overdue : ''),
+    '🚚 พัสดุค้างจ่าย (TAI) ' + D.tai.length + ' รายการ' + (D.tai.length ? ' · ต้องติดตาม ' + D.tai.filter(x => x.level === 'bad').length : ''),
     '🔧 ติดตั้งสัปดาห์หน้า ' + D.next.length + ' รายการ' + (D.next.length ? (miss ? ' · ของยังไม่มา ' + miss : ' · ของมาครบ') : ''),
     '📦 รับ ' + D.recv.length + ' · เบิก ' + D.reqs.length + ' · จ่าย ' + D.iss.length + ' รายการ', '',
     'ดูรายงานฉบับเต็ม (PDF): ' + url];
