@@ -3629,9 +3629,9 @@ function makeWeeklyPdf_(D) {
 
   const tb = D.tai.filter(x => x.level === 'bad').length, tw = D.tai.filter(x => x.level === 'warn').length;
   para('1. สถานะพัสดุค้างจ่าย (ข้อมูลจาก TAI)  ' + D.tai.length + ' รายการ', 14, true, NAVY, 3);
-  para('ต้องติดตาม ' + tb + '   เฝ้าระวัง ' + tw + '   ปกติ ' + (D.tai.length - tb - tw) + (D.tai.length && D.tai[0].asof ? '   ข้อมูล ณ ' + D.tai[0].asof : ''), 11, false, '#222222', 4);
+  para('ต้องติดตาม ' + tb + '   เฝ้าระวัง ' + tw + '   ปกติ ' + (D.tai.length - tb - tw) + (D.tai.length ? '   ใช้ข้อมูล TAI ล่าสุดที่นำเข้า' : ''), 11, false, '#222222', 4);
   table(['ที่', 'ใบเบิก', 'Part number', 'ชื่อพัสดุ', 'เครื่อง', 'ค้าง', 'สถานะ TAI', 'ผู้จำหน่าย / PO'],
-    D.tai.map((x, i) => [String(i + 1), x.doc, x.part, x.name, x.machine, String(x.remain), (x.urg === 'AOG' ? 'AOG · ' : '') + x.label + (x.stale ? ' (ข้อมูลเก่า)' : ''), [x.supplier, x.po].filter(String).join(' / ') || '-']),
+    D.tai.map((x, i) => [String(i + 1), x.doc, x.part, x.name, x.machine, String(x.remain), (x.urg === 'AOG' ? 'AOG · ' : '') + x.label + (x.asof ? ' [ข้อมูล ณ ' + x.asof + (x.stale ? ' · เก่า' : '') + ']' : ''), [x.supplier, x.po].filter(String).join(' / ') || '-']),
     [18, 58, 76, 84, 38, 26, 140, 75], '— ไม่มีพัสดุค้างจ่ายจาก TAI —');
 
   const s = D.tciSum || {};
