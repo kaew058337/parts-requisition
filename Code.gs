@@ -144,6 +144,28 @@ function verifyLine_(tok) {
   return prof;
 }
 
+/** ตรวจสิทธิ์เรียก API จากหน้าเว็บภายนอก (Cloudflare Pages ฯลฯ)
+ *  - ถ้าตั้ง Script property API_KEY (รหัสเข้าใช้งาน) : ผ่านเมื่อ req.key ตรงกับรหัส (เทียบแบบเวลาคงที่)
+ *  - ถ้าไม่ได้ตั้ง API_KEY : ใช้การตรวจ LINE token เดิม */
+function verifyAccess_(req) {
+  const props = PropertiesService.getScriptProperties();
+  const want = String(props.getProperty('API_KEY') || '');
+  if (!want) return verifyLine_(req.idToken);
+  const got = String(req.key || '');
+  let diff = want.length ^ got.length;
+  for (let i = 0; i < want.length; i++) diff |= want.charCodeAt(i) ^ (got.charCodeAt(i) || 0);
+  if (diff !== 0) throw authErr_('รหัสเข้าใช้งานไม่ถูกต้อง');
+  return { sub: 'key', name: '' };
+}
+
+/** เมนู/รันครั้งเดียว: ตั้งรหัสเข้าใช้งานสำหรับหน้าเว็บภายนอก (แก้ค่าในฟังก์ชันนี้ก่อนรัน หรือตั้งใน Project Settings → Script properties ชื่อ API_KEY) */
+function setApiKey(key) {
+  const k = String(key || '').trim();
+  if (k.length < 6) throw new Error('รหัสต้องยาวอย่างน้อย 6 ตัวอักษร');
+  PropertiesService.getScriptProperties().setProperty('API_KEY', k);
+  return 'ตั้งรหัสแล้ว';
+}
+
 /** เรียกฟังก์ชันของระบบผ่าน HTTP (ใช้เมื่อโฮสต์หน้าเว็บนอก Apps Script) */
 function apiPost_(e) {
   let out;
@@ -151,7 +173,7 @@ function apiPost_(e) {
     const req = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const fn = String(req.fn || '');
     if (!Object.prototype.hasOwnProperty.call(API_FUNCS_, fn)) throw new Error('ไม่รู้จักคำสั่ง: ' + fn);
-    verifyLine_(req.idToken);
+    verifyAccess_(req);
     const data = API_FUNCS_[fn].apply(null, Array.isArray(req.args) ? req.args : []);
     out = { ok: true, data: data === undefined ? null : data };
   } catch (err) {
