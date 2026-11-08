@@ -408,6 +408,10 @@ nav button.on::before{background:var(--gold);box-shadow:0 0 12px 2px rgba(212,17
 .dbx-tl .it{display:flex;gap:10px;padding:8px 0;position:relative}.dbx-tl .it+.it{border-top:0}
 .dbx-tl .pt{width:9px;height:9px;border-radius:50%;background:#d4b36a;margin-top:6px;flex:none;box-shadow:0 0 0 3px rgba(212,179,106,.25)}
 </style>
+<style id="offcss">
+#offbar{position:sticky;top:0;z-index:30;margin:0;padding:8px 14px;font-size:13px;font-weight:600;text-align:center;background:#fdf0dc;color:#8a4b08;border-bottom:1px solid #f0cf9c;cursor:pointer}
+#offbar.q{background:#e8f1fc;color:#17458f;border-color:#bcd3f2}
+</style>
 <style id="pg">@page{size:A5 landscape;margin:6mm}</style>
 </head>
 <body>
@@ -423,6 +427,7 @@ nav button.on::before{background:var(--gold);box-shadow:0 0 12px 2px rgba(212,17
   </div>
   <button class="hmb" id="menu-btn" aria-label="เมนู" aria-haspopup="dialog" aria-controls="drawer" aria-expanded="false"><span class="hb-l"><i></i><i></i><i></i></span><i class="hdot" id="menu-dot"></i></button>
 </header>
+<div id="offbar" style="display:none"></div>
 <div class="dr-scrim" id="dr-scrim"></div>
 <aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-label="เมนู" aria-hidden="true">
   <div class="dr-who dr-in" style="--i:0"><div class="dr-av" id="dr-av">?</div><div style="min-width:0"><b id="dr-name">ยังไม่ได้ตั้งชื่อผู้ใช้</b><small>ผู้ใช้งานปัจจุบัน</small></div><button class="dr-x" id="dr-x" aria-label="ปิดเมนู">×</button></div>
@@ -1049,10 +1054,58 @@ nav button.on::before{background:var(--gold);box-shadow:0 0 12px 2px rgba(212,17
   var API_URL = '';   // ← URL /exec ของเว็บแอป Apps Script (ใช้เฉพาะเมื่อโฮสต์นอก Apps Script)
   var liffDone = Promise.resolve();
   function inGas(){ return !!(window.google && google.script && google.script.run); }
+  /* ---------- ออฟไลน์เบื้องต้น: จำข้อมูลล่าสุดไว้ดู + เก็บใบเบิกรอส่ง ---------- */
+  var CACHEABLE = { getBootstrap:1, getStock:1, getPendingReceive:1, getDashboard:1 };
+  var cacheShown = null;
+  function lsGet(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } }
+  function lsSet(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+  function isNetErr(e){ var m=String((e&&e.message)||e||''); return !navigator.onLine || !m || /network|fetch|connect|timeout|timed out|load failed|failed to|offline|เชื่อมต่อ/i.test(m); }
+  function offbarUpdate(){
+    var b=document.getElementById('offbar'); if(!b) return;
+    var q=(lsGet('outbox1')||[]).length;
+    if(cacheShown){ b.className=''; b.style.display=''; b.textContent='📴 ออฟไลน์ — แสดงข้อมูลล่าสุดเมื่อ '+cacheShown+(q?' · ใบเบิกรอส่ง '+q+' ใบ':''); }
+    else if(q){ b.className='q'; b.style.display=''; b.textContent='📤 ใบเบิกรอส่ง '+q+' ใบ — แตะเพื่อส่งตอนนี้'; }
+    else b.style.display='none';
+  }
+  function timeStr(t){ var d=new Date(t); return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)+' น.'; }
+  var flushing=false;
+  function flushOutbox(){
+    var q=lsGet('outbox1')||[]; if(!q.length || flushing || !navigator.onLine) return; flushing=true;
+    var sent=0;
+    (function next(){
+      q=lsGet('outbox1')||[];
+      if(!q.length){ flushing=false; offbarUpdate(); if(sent){ toast('ส่งใบเบิกที่ค้างไว้แล้ว '+sent+' ใบ'); boot(); } return; }
+      var it=q[0], p=it.payload, label=(p.items||[]).map(function(i){return i.part||i.name;}).join(', ');
+      run('submitRequisition',[p]).then(function(r){
+        if(r && r.duplicate){
+          var ok=confirm('ใบเบิกที่บันทึกไว้ตอนออฟไลน์ ('+label+') พบว่าซ้ำกับใบเบิกเดิม\n\n'+r.dups.map(function(d){ return d.same?'• '+d.note:'• '+d.doc+' · เครื่อง '+d.machine+' · '+d.status; }).join('\n')+'\n\nส่งเบิกซ้ำหรือไม่? (ยกเลิก = ทิ้งใบนี้)');
+          if(ok){ p.confirmDup=true; lsSet('outbox1',q); return next(); }
+          q.shift(); lsSet('outbox1',q); return next();
+        }
+        sent++; q.shift(); lsSet('outbox1',q); next();
+      }).catch(function(e){
+        if(isNetErr(e)){ flushing=false; offbarUpdate(); return; }
+        toast('ส่งใบเบิก ('+label+') ไม่สำเร็จ: '+e.message+' — ทิ้งใบนี้', true);
+        q.shift(); lsSet('outbox1',q); next();
+      });
+    })();
+  }
+  window.addEventListener('online', function(){ cacheShown=null; offbarUpdate(); flushOutbox(); });
+  window.addEventListener('offline', offbarUpdate);
+  setInterval(function(){ if(navigator.onLine) flushOutbox(); }, 60000);
+  document.getElementById('offbar').addEventListener('click', function(){ flushOutbox(); });
+
   function run(fn, args){
     if(inGas()){
+      var ck = CACHEABLE[fn] ? 'cache1:'+fn+':'+JSON.stringify(args||[]) : null;
       return new Promise(function(res, rej){
-        var r = google.script.run.withSuccessHandler(res).withFailureHandler(function(e){
+        var useCache=function(){ var c=lsGet(ck); if(c){ cacheShown=timeStr(c.t); offbarUpdate(); res(c.v); return true; } return false; };
+        if(ck && !navigator.onLine && useCache()) return;
+        var r = google.script.run.withSuccessHandler(function(v){
+          if(ck){ lsSet(ck,{t:Date.now(),v:v}); if(cacheShown){ cacheShown=null; offbarUpdate(); } }
+          res(v);
+        }).withFailureHandler(function(e){
+          if(ck && isNetErr(e) && useCache()) return;
           rej(new Error(String((e && e.message) || e).replace(/^Error:\s*/, '')));
         });
         r[fn].apply(r, args||[]);
@@ -1161,6 +1214,7 @@ nav button.on::before{background:var(--gold);box-shadow:0 0 12px 2px rgba(212,17
       });
       buildUsers(d.users||[]);
       if(!state.draftDone){ state.draftDone=true; draftRestore(); }
+      flushOutbox();
       state.recon = d.recon||0;
       setOverdue(d.loansOverdue||0);
       if(d.synced) state.syncNotes=d.changes;
@@ -1278,6 +1332,13 @@ nav button.on::before{background:var(--gold);box-shadow:0 0 12px 2px rgba(212,17
     if(!payload.fullName){ toast('กรุณาเลือกผู้เบิก', true); return; }
     if(!state.reqToken) state.reqToken = Date.now().toString(36)+Math.random().toString(36).slice(2,8);
     payload.token = state.reqToken; payload.confirmDup = state.reqConfirmDup===true;
+    var queueIt=function(){
+      var q=lsGet('outbox1')||[]; q.push({ payload:payload, ts:Date.now() }); lsSet('outbox1',q);
+      state.reqToken=null; state.reqConfirmDup=false;
+      $('r-machine').value=''; $('r-issue').value=''; $('r-urg').value='เบิกธรรมดา'; $('r-items').innerHTML=''; addItem(); draftClear();
+      offbarUpdate(); toast('📴 ไม่มีสัญญาณ — บันทึกใบเบิกไว้ในเครื่อง จะส่งอัตโนมัติเมื่อกลับมาออนไลน์');
+    };
+    if(!navigator.onLine){ queueIt(); return; }
     var btn=$('r-submit'); busy(btn,true);
     run('submitRequisition', [payload]).then(function(r){
       if(r && r.duplicate){
@@ -1308,7 +1369,7 @@ nav button.on::before{background:var(--gold);box-shadow:0 0 12px 2px rgba(212,17
       $('r-machine').value=''; $('r-issue').value=''; $('r-urg').value='เบิกธรรมดา';
       $('r-items').innerHTML=''; addItem(); draftClear();
       boot();
-    }).catch(function(e){ state.reqConfirmDup=false; toast(e.message,true); }).then(function(){ busy(btn,false); });
+    }).catch(function(e){ state.reqConfirmDup=false; if(isNetErr(e)){ queueIt(); return; } toast(e.message,true); }).then(function(){ busy(btn,false); });
   });
 
 
@@ -2464,6 +2525,7 @@ nav button.on::before{background:var(--gold);box-shadow:0 0 12px 2px rgba(212,17
   });
 
   addItem();
+  offbarUpdate();
   boot();
   show('stk');
 
