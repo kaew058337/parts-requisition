@@ -5,7 +5,7 @@ import re, pathlib
 root = pathlib.Path(__file__).resolve().parent.parent
 s = (root / 'Index.html').read_text(encoding='utf-8')
 head = ('<link rel="manifest" href="manifest.webmanifest">\n'
-        '<link rel="icon" href="icon-192.png">\n<link rel="apple-touch-icon" href="apple-touch-icon.png">\n'
+        '<link rel="icon" href="favicon.png">\n<link rel="apple-touch-icon" href="apple-touch-icon.png">\n'
         '<meta name="apple-mobile-web-app-capable" content="yes">\n<meta name="mobile-web-app-capable" content="yes">\n'
         '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">\n'
         '<meta name="apple-mobile-web-app-title" content="เบิก-จ่าย">\n<script src="config.js"></script>\n')
