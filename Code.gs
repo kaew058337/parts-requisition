@@ -826,7 +826,43 @@ function cancelRequisition(p) {
 /* ---------- API: เบิก ---------- */
 
 function submitRequisition(p) {
-  return withLock_(() => submitRequisitionCore_(Object.assign({}, p, { requireInstall: true })));
+  return withLock_(() => {
+    /* กันกดซ้ำ/ส่งซ้ำ : โทเค็นเดียวกันได้ผลเดิม ไม่ออกใบเบิกใหม่ */
+    const tk = str_(p.token), cache = CacheService.getScriptCache();
+    if (tk) { const hit = cache.get('rq:' + tk); if (hit) { try { return JSON.parse(hit); } catch (e) { /* ข้าม */ } } }
+    /* กันเบิกซ้ำ : พัสดุเดียวกัน + เครื่องเดียวกัน ที่ยังค้างรับอยู่ (หรือซ้ำกันเองในใบนี้) */
+    if (p.confirmDup !== true) {
+      const dups = findDuplicateReqs_(p);
+      if (dups.length) return { duplicate: true, dups: dups };
+    }
+    const res = submitRequisitionCore_(Object.assign({}, p, { requireInstall: true }));
+    if (tk) { try { cache.put('rq:' + tk, JSON.stringify(res), 600); } catch (e) { /* ข้าม */ } }
+    return res;
+  });
+}
+
+/** ใบเบิกที่น่าจะซ้ำ : Part เดียวกัน (ถ้าไม่มี Part ใช้ชื่อ) + เครื่องเดียวกัน + ยังไม่ยกเลิก + ยังรับไม่ครบ ; และรายการซ้ำกันเองในใบเดียว */
+function findDuplicateReqs_(p) {
+  const key = i => (str_(i.part) || str_(i.name)).toUpperCase().replace(/\s+/g, '');
+  const items = (p.items || []).filter(i => str_(i.part) || str_(i.name));
+  const out = [], seen = {};
+  items.forEach((i, idx) => {
+    const k = key(i);
+    if (seen[k] !== undefined) out.push({ same: true, part: str_(i.part), name: str_(i.name), note: 'ซ้ำกับรายการที่ ' + (seen[k] + 1) + ' ในใบเดียวกัน' });
+    else seen[k] = idx;
+  });
+  const sh = getSheet_(SHEET_REQ), n = sh.getLastRow();
+  if (n < 2) return out;
+  const machine = str_(p.machine), got = receivedMap_();
+  const want = {}; items.forEach(i => { want[key(i)] = true; });
+  sh.getRange(2, 1, n - 1, 23).getValues().filter(isValidReqRow_).forEach(r => {
+    if (isCancelled_(r[7]) || str_(r[8]) !== machine) return;
+    if (!want[(str_(r[2]) || str_(r[3])).toUpperCase().replace(/\s+/g, '')]) return;
+    const remain = Math.max(num_(r[4]) - (got[pad_(r[1], 9) + '|' + str_(r[2])] || 0), 0);
+    if (remain <= 0) return;
+    out.push({ doc: pad_(r[1], 9), part: str_(r[2]), name: str_(r[3]), qty: num_(r[4]), remain: remain, date: fmtThai_(r[6]), urg: str_(r[9]) });
+  });
+  return out;
 }
 
 /** ออกใบเบิก (ไม่ล็อกเอง : ผู้เรียกต้องล็อกไว้แล้ว) */

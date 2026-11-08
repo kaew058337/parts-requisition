@@ -1276,8 +1276,20 @@ nav button.on::before{background:var(--gold);box-shadow:0 0 12px 2px rgba(212,17
       by:state.by
     };
     if(!payload.fullName){ toast('กรุณาเลือกผู้เบิก', true); return; }
+    if(!state.reqToken) state.reqToken = Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+    payload.token = state.reqToken; payload.confirmDup = state.reqConfirmDup===true;
     var btn=$('r-submit'); busy(btn,true);
     run('submitRequisition', [payload]).then(function(r){
+      if(r && r.duplicate){
+        state.reqConfirmDup=false;
+        var msg='⚠️ พบใบเบิกที่น่าจะซ้ำ\n\n'+r.dups.map(function(d){
+          return d.same ? '• '+(d.part||d.name)+' — '+d.note : '• '+d.doc+' · '+(d.part||'')+' '+d.name+' · เบิกไว้ '+d.qty+' (ค้างรับ '+d.remain+') เมื่อ '+d.date+(d.urg==='AOG'?' · AOG':'');
+        }).join('\n')+'\n\nต้องการเบิกซ้ำอีกครั้งหรือไม่?\n(กด ตกลง = เบิกซ้ำ, ยกเลิก = ไม่เบิก)';
+        if(confirm(msg)){ state.reqConfirmDup=true; setTimeout(function(){ $('r-submit').click(); },0); }
+        else { state.reqToken=null; }
+        return;
+      }
+      state.reqToken=null; state.reqConfirmDup=false;
       remember();
       var docs = r.docs || [{ docNo:r.docNo, part:items[0].part, name:items[0].name, qty:items[0].qty, unit:items[0].unit, itemType:items[0].itemType }];
       state.lastReqs = docs.map(function(x){ return { docNo:x.docNo, machine:payload.machine, part:x.part, name:x.name, qty:x.qty, unit:x.unit,
@@ -1296,7 +1308,7 @@ nav button.on::before{background:var(--gold);box-shadow:0 0 12px 2px rgba(212,17
       $('r-machine').value=''; $('r-issue').value=''; $('r-urg').value='เบิกธรรมดา';
       $('r-items').innerHTML=''; addItem(); draftClear();
       boot();
-    }).catch(function(e){ toast(e.message,true); }).then(function(){ busy(btn,false); });
+    }).catch(function(e){ state.reqConfirmDup=false; toast(e.message,true); }).then(function(){ busy(btn,false); });
   });
 
 
