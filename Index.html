@@ -1282,8 +1282,8 @@ nav button.on::before{background:var(--gold);box-shadow:0 0 12px 2px rgba(212,17
     run('submitRequisition', [payload]).then(function(r){
       if(r && r.duplicate){
         state.reqConfirmDup=false;
-        var msg='⚠️ พบใบเบิกที่น่าจะซ้ำ\n\n'+r.dups.map(function(d){
-          return d.same ? '• '+(d.part||d.name)+' — '+d.note : '• '+d.doc+' · '+(d.part||'')+' '+d.name+' · เบิกไว้ '+d.qty+' (ค้างรับ '+d.remain+') เมื่อ '+d.date+(d.urg==='AOG'?' · AOG':'');
+        var msg='⚠️ พบการเบิกพัสดุเดียวกันนี้ไว้แล้ว (ค้างรับเครื่องเดียวกัน หรือเบิกภายใน 30 วัน)\n\n'+r.dups.map(function(d){
+          return d.same ? '• '+(d.part||d.name)+' — '+d.note : '• '+d.doc+' · '+(d.part||'')+' '+d.name+' · เครื่อง '+d.machine+' · เบิก '+d.qty+' เมื่อ '+d.date+' · '+d.status+(d.remain>0&&d.status==='รับบางส่วน'?' (ค้าง '+d.remain+')':'')+(d.urg==='AOG'?' · AOG':'');
         }).join('\n')+'\n\nต้องการเบิกซ้ำอีกครั้งหรือไม่?\n(กด ตกลง = เบิกซ้ำ, ยกเลิก = ไม่เบิก)';
         if(confirm(msg)){ state.reqConfirmDup=true; setTimeout(function(){ $('r-submit').click(); },0); }
         else { state.reqToken=null; }

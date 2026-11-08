@@ -841,6 +841,7 @@ function submitRequisition(p) {
   });
 }
 
+const DUP_DAYS_ = 30;   // เตือนเบิกซ้ำ: P/N เดียวกันที่เบิกไว้ภายในกี่วัน
 /** ใบเบิกที่น่าจะซ้ำ : Part เดียวกัน (ถ้าไม่มี Part ใช้ชื่อ) + เครื่องเดียวกัน + ยังไม่ยกเลิก + ยังรับไม่ครบ ; และรายการซ้ำกันเองในใบเดียว */
 function findDuplicateReqs_(p) {
   const key = i => (str_(i.part) || str_(i.name)).toUpperCase().replace(/\s+/g, '');
@@ -854,14 +855,21 @@ function findDuplicateReqs_(p) {
   const sh = getSheet_(SHEET_REQ), n = sh.getLastRow();
   if (n < 2) return out;
   const machine = str_(p.machine), got = receivedMap_();
+  const nowD = parseDate_(p.date || todayStr_()), from = addDays_(nowD, -DUP_DAYS_);
   const want = {}; items.forEach(i => { want[key(i)] = true; });
+  const hits = [];
   sh.getRange(2, 1, n - 1, 23).getValues().filter(isValidReqRow_).forEach(r => {
-    if (isCancelled_(r[7]) || str_(r[8]) !== machine) return;
+    if (isCancelled_(r[7])) return;
     if (!want[(str_(r[2]) || str_(r[3])).toUpperCase().replace(/\s+/g, '')]) return;
     const remain = Math.max(num_(r[4]) - (got[pad_(r[1], 9) + '|' + str_(r[2])] || 0), 0);
-    if (remain <= 0) return;
-    out.push({ doc: pad_(r[1], 9), part: str_(r[2]), name: str_(r[3]), qty: num_(r[4]), remain: remain, date: fmtThai_(r[6]), urg: str_(r[9]) });
+    const d = asDate_(r[6]), recent = d instanceof Date && d >= from;
+    /* เตือนเมื่อ: ยังค้างรับและเครื่องเดียวกัน (ไม่จำกัดวัน) หรือ เบิกไว้ภายใน DUP_DAYS_ วัน (ทุกเครื่อง ทุกสถานะ) */
+    if (!((remain > 0 && str_(r[8]) === machine) || recent)) return;
+    hits.push({ doc: pad_(r[1], 9), part: str_(r[2]), name: str_(r[3]), qty: num_(r[4]), remain: remain, date: fmtThai_(r[6]), urg: str_(r[9]),
+      machine: str_(r[8]), status: remain <= 0 ? 'รับครบแล้ว' : (remain < num_(r[4]) ? 'รับบางส่วน' : 'ค้างรับ'), _t: d instanceof Date ? d.getTime() : 0 });
   });
+  hits.sort((a, b) => b._t - a._t);
+  hits.slice(0, 8).forEach(h => { delete h._t; out.push(h); });
   return out;
 }
 
