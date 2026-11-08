@@ -1470,7 +1470,7 @@ nav button.on::before{background:var(--gold);box-shadow:0 0 12px 2px rgba(212,17
 
   /* ---------- รับ ---------- */
   function loadRcv(){
-    if(!state.rcv||!state.rcv.length){ state.rcv=[]; $('c-list').innerHTML='<div class="empty">🔍 พิมพ์ค้นหาเลขใบเบิก · P/N · ชื่อ · เครื่อง เพื่อแสดงรายการ<br><span class="meta">กำลังโหลดข้อมูล…</span></div>'; }
+    if(!state.rcv||!state.rcv.length){ state.rcv=[]; $('c-list').innerHTML='<div class="empty"><span class="spin"></span></div>'; }
     run('getPendingReceive').then(function(rows){ state.rcv=rows; renderRcv(); })
       .catch(function(e){ $('c-list').innerHTML='<div class="empty">'+esc(e.message)+'</div>'; });
   }
@@ -1480,7 +1480,6 @@ nav button.on::before{background:var(--gold);box-shadow:0 0 12px 2px rgba(212,17
     var rows = state.rcv.filter(function(r){
       return !q || (r.docNo+' '+r.part+' '+r.name+' '+r.machine).toLowerCase().indexOf(q)>=0;
     });
-    if(!q){ $('c-list').innerHTML='<div class="empty">🔍 พิมพ์ค้นหาเลขใบเบิก · P/N · ชื่อ · เครื่อง เพื่อแสดงรายการ<br><span class="meta">'+(state.rcv.length?'มี '+state.rcv.length+' รายการรอรับ':'ไม่มีใบเบิกรอรับ')+'</span></div>'; return; }
     if(!rows.length){ $('c-list').innerHTML='<div class="empty">'+(state.rcv.length?'ไม่พบรายการ':'ไม่มีใบเบิกรอรับ')+'</div>'; return; }
     $('c-list').innerHTML = rows.map(function(r){
       var pct = r.qty? Math.min(100, r.received/r.qty*100):0;
@@ -1724,7 +1723,6 @@ nav button.on::before{background:var(--gold);box-shadow:0 0 12px 2px rgba(212,17
     }); });
     var total=0, lots=0; rows.forEach(function(g){ total+=g.qty; lots+=g.lots.length; });
     $('k-sum').textContent = rows.length ? rows.length+' Part number · '+lots+' ล็อต · รวม '+fmtNum(total)+' หน่วย' : '';
-    if(!q){ $('k-sum').textContent=''; $('k-list').innerHTML='<div class="empty">🔍 พิมพ์ค้นหา P/N · ชื่อ · S/N · ที่เก็บ เพื่อแสดงรายการ<br><span class="meta">'+((state.stk||[]).length?'ในคลังมี '+state.stk.length+' Part number':'กำลังโหลดข้อมูล…')+'</span></div>'; return; }
     if(!rows.length && q && (state.stk||[]).length){
       $('k-list').innerHTML='<div class="empty">ไม่พบ “'+esc($('k-search').value.trim())+'” ในคลัง<br><button class="btn" id="k-line" style="margin-top:14px;max-width:320px">ส่งหมายเลขนี้ทางไลน์</button><div class="meta" style="margin-top:8px">จะเปิดไลน์ให้เลือกแชตหรือกลุ่มที่จะส่ง (บนคอมพิวเตอร์จะคัดลอกข้อความไว้ให้วางด้วย)</div></div>'; return;
     }
