@@ -447,6 +447,7 @@ nav button.on::before{background:var(--gold);box-shadow:0 0 12px 2px rgba(212,17
   <!-- ===== รับ ===== -->
   <section class="view" id="v-rcv">
     <input class="search" id="c-search" type="search" placeholder="ค้นหา เลขเบิก / Part / ชื่อ / เครื่อง">
+    <div id="c-shuf" style="display:flex;gap:8px;margin:-4px 2px 10px"><button class="btn ghost sm" id="c-dice" type="button" style="margin:0">🎲 สุ่มลำดับ</button><button class="btn ghost sm" id="c-norm" type="button" style="margin:0;display:none">↺ เรียงปกติ</button></div>
     <div id="c-list"><div class="empty"><span class="spin"></span></div></div>
   </section>
 
@@ -465,6 +466,7 @@ nav button.on::before{background:var(--gold);box-shadow:0 0 12px 2px rgba(212,17
     <div id="k-stockpane">
       <div id="recon-bar" style="display:none;margin:0 0 10px;padding:10px 12px;border-radius:12px;background:#fde7e5;color:var(--bad);font-size:14px"></div>
       <input class="search" id="k-search" type="search" placeholder="ค้นหา Part / ชื่อ / Serial / LOCATION">
+      <div id="k-shuf" style="display:flex;gap:8px;margin:-4px 2px 10px"><button class="btn ghost sm" id="k-dice" type="button" style="margin:0">🎲 สุ่มลำดับ</button><button class="btn ghost sm" id="k-norm" type="button" style="margin:0;display:none">↺ เรียงปกติ</button></div>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin:-2px 2px 10px">
         <div class="meta" id="k-sum" style="flex:1;margin:0"></div>
         <button class="btn ghost sm" id="k-aw" title="พัสดุที่รับก่อนเบิกและยังไม่มีใบเบิก" style="display:none;margin:0;flex:none;width:auto;min-height:0;padding:5px 11px;font-size:13px;border-radius:12px">รอใบเบิก</button>
@@ -1475,11 +1477,22 @@ nav button.on::before{background:var(--gold);box-shadow:0 0 12px 2px rgba(212,17
       .catch(function(e){ $('c-list').innerHTML='<div class="empty">'+esc(e.message)+'</div>'; });
   }
   function taiLine(t){ if(!t) return ''; var c=t.level==='bad'?'#b91c1c':(t.level==='warn'?'#b45309':'#0f5f3f'); return '<div class="meta" style="margin-top:3px;color:'+c+';font-weight:600">🚚 TAI: '+esc(t.label)+(t.supplier?' · '+esc(t.supplier):'')+(t.asof?' <span style="font-weight:400;opacity:.75">(ข้อมูล '+esc(t.asof)+(t.stale?' · เก่า':'')+')</span>':'')+'</div>'; }
+  /* สุ่มลำดับรายการ (หน้าคลัง/รับ) */
+  var shuf={k:null,c:null};
+  function shufApply(key,rows,idf){
+    var m=shuf[key]; if(!m) return rows;
+    return rows.slice().sort(function(a,b){ var x=m[idf(a)], y=m[idf(b)]; if(x==null){x=m[idf(a)]=Math.random();} if(y==null){y=m[idf(b)]=Math.random();} return x-y; });
+  }
+  function shufInit(key,render){
+    $(key+'-dice').addEventListener('click',function(){ shuf[key]={}; $(key+'-norm').style.display=''; $(key+'-dice').textContent='🎲 สุ่มใหม่'; render(); });
+    $(key+'-norm').addEventListener('click',function(){ shuf[key]=null; this.style.display='none'; $(key+'-dice').textContent='🎲 สุ่มลำดับ'; render(); });
+  }
   function renderRcv(){
     var q = $('c-search').value.trim().toLowerCase();
     var rows = state.rcv.filter(function(r){
       return !q || (r.docNo+' '+r.part+' '+r.name+' '+r.machine).toLowerCase().indexOf(q)>=0;
     });
+    rows = shufApply('c', rows, function(r){ return r.docNo+'|'+r.part; });
     if(!rows.length){ $('c-list').innerHTML='<div class="empty">'+(state.rcv.length?'ไม่พบรายการ':'ไม่มีใบเบิกรอรับ')+'</div>'; return; }
     $('c-list').innerHTML = rows.map(function(r){
       var pct = r.qty? Math.min(100, r.received/r.qty*100):0;
@@ -1493,6 +1506,7 @@ nav button.on::before{background:var(--gold);box-shadow:0 0 12px 2px rgba(212,17
     }).join('');
   }
   $('c-search').addEventListener('input', renderRcv);
+  shufInit('c', renderRcv);
   $('c-list').addEventListener('click', function(e){
     var c = e.target.closest('.pcard'); if(!c) return;
     openRcv(state.rcv[Number(c.dataset.i)]);
@@ -1717,6 +1731,7 @@ nav button.on::before{background:var(--gold);box-shadow:0 0 12px 2px rgba(212,17
       var s=(g.part+' '+g.name+' '+g.lots.map(function(l){return l.serial+' '+l.location+' '+l.docNo;}).join(' ')).toLowerCase();
       return s.indexOf(q)>=0;
     });
+    rows = shufApply('k', rows, function(g){ return g.part; });
     state.lotMap = {};
     (state.stk||[]).forEach(function(g){ g.lots.forEach(function(l){
       state.lotMap[l.seq] = { seq:l.seq, part:g.part, name:g.name, unit:g.unit, serial:l.serial, qty:l.qty, type:l.type, location:l.location, kit:l.kit||'', source:l.docNo, issRow:l.issRow, issSeq:l.issSeq, machine:l.machine };
@@ -1744,6 +1759,7 @@ nav button.on::before{background:var(--gold);box-shadow:0 0 12px 2px rgba(212,17
     }).join('');
   }
   $('k-search').addEventListener('input', renderStock);
+  shufInit('k', renderStock);
   function copyFallback(t){ try{ var ta=document.createElement('textarea'); ta.value=t; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }catch(e){} }
   $('k-list').addEventListener('click', function(e){
     if(!e.target.closest('#k-line')) return;
