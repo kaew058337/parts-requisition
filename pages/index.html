@@ -1100,11 +1100,12 @@ function snWatch(id, getSeq){
   var cacheShown = null;
   function lsGet(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } }
   function lsSet(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+  var lastNetErr='';
   function isNetErr(e){ var m=String((e&&e.message)||e||''); return !navigator.onLine || !m || /network|fetch|connect|timeout|timed out|load failed|failed to|offline|เชื่อมต่อ/i.test(m); }
   function offbarUpdate(){
     var b=document.getElementById('offbar'); if(!b) return;
     var q=(lsGet('outbox1')||[]).length;
-    if(cacheShown){ b.className=''; b.style.display=''; b.textContent='📴 ออฟไลน์ — แสดงข้อมูลล่าสุดเมื่อ '+cacheShown+(q?' · ใบเบิกรอส่ง '+q+' ใบ':''); }
+    if(cacheShown){ b.className=''; b.style.display=''; b.textContent=(navigator.onLine?'⚠ ติดต่อเซิร์ฟเวอร์ไม่ได้ (แตะเพื่อตรวจสอบ) — แสดงข้อมูลล่าสุดเมื่อ ':'📴 ออฟไลน์ — แสดงข้อมูลล่าสุดเมื่อ ')+cacheShown+(q?' · ใบเบิกรอส่ง '+q+' ใบ':''); }
     else if(q){ b.className='q'; b.style.display=''; b.textContent='📤 ใบเบิกรอส่ง '+q+' ใบ — แตะเพื่อส่งตอนนี้'; }
     else b.style.display='none';
   }
@@ -1134,7 +1135,20 @@ function snWatch(id, getSeq){
   window.addEventListener('online', function(){ cacheShown=null; offbarUpdate(); flushOutbox(); });
   window.addEventListener('offline', offbarUpdate);
   setInterval(function(){ if(navigator.onLine) flushOutbox(); }, 60000);
-  document.getElementById('offbar').addEventListener('click', function(){ flushOutbox(); });
+  function diagnose(){
+    var out=['อินเทอร์เน็ตของเครื่อง: '+(navigator.onLine?'ปกติ':'ไม่มีสัญญาณ')];
+    if(inGas()){ alert(out.join('\n')+'\nเปิดผ่าน Apps Script โดยตรง'); return; }
+    out.push('ปลายทาง: '+(API_URL?API_URL.replace(/^(https:\/\/[^/]+\/macros\/s\/).{6}.*(\/[^/]+)$/,'$1…$2'):'(ไม่ได้ตั้งค่า)'));
+    var k=''; try{ k=localStorage.getItem('api-key')||''; }catch(e){}
+    fetch(API_URL,{method:'POST',redirect:'follow',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn:'getBootstrap',args:[],key:k})})
+    .then(function(r){ out.push('HTTP '+r.status); return r.text(); },function(e){ out.push('❌ ติดต่อไม่ได้: '+((e&&e.name)||'')+' '+((e&&e.message)||'')); out.push('สาเหตุที่พบบ่อย: Apps Script ยังไม่ได้ Deploy เป็น New version / สิทธิ์ไม่ใช่ "ทุกคน" / URL ผิด'); return null; })
+    .then(function(t){
+      if(t!==null){ try{ var o=JSON.parse(t); out.push(o.ok?'✅ เชื่อมต่อได้ปกติ':'⚠ เซิร์ฟเวอร์ตอบ: '+(o.error||'ผิดพลาด')+(o.auth?' (ต้องใช้รหัสเข้าใช้งาน)':'')); if(o.ok){ cacheShown=null; offbarUpdate(); setTimeout(function(){ boot(); },50); } }
+        catch(e){ out.push('❌ ตอบกลับไม่ใช่ข้อมูลระบบ: '+String(t).replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').slice(0,100)); out.push('มักเกิดจากยังไม่ได้ Deploy เวอร์ชันใหม่ หรือสิทธิ์ไม่ใช่ "ทุกคน"'); } }
+      alert(out.join('\n'));
+    });
+  }
+  document.getElementById('offbar').addEventListener('click', function(){ if(cacheShown && navigator.onLine) diagnose(); else flushOutbox(); });
 
   function transport(fn, args, retried){
     if(inGas()){
@@ -1151,7 +1165,10 @@ function snWatch(id, getSeq){
       var key=''; try{ key=localStorage.getItem('api-key')||''; }catch(e){}
       return fetch(API_URL, { method:'POST', redirect:'follow', headers:{'Content-Type':'text/plain;charset=utf-8'},
         body: JSON.stringify({ fn:fn, args:args||[], idToken:tok, key:key }) });
-    }).then(function(r){ return r.json(); }, function(){ throw new Error('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบอินเทอร์เน็ต'); })
+    }).then(function(r){
+      if(!r.ok) throw new Error('เซิร์ฟเวอร์ตอบ HTTP '+r.status);
+      return r.text().then(function(t){ try{ return JSON.parse(t); }catch(e){ throw new Error('เซิร์ฟเวอร์ตอบผิดรูปแบบ (ไม่ใช่ข้อมูลระบบ) — ตรวจว่า Deploy เวอร์ชันใหม่แล้ว และสิทธิ์เป็น "ทุกคน": '+String(t).replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').slice(0,80)); } });
+    }, function(e){ lastNetErr=(e&&e.name?e.name+': ':'')+((e&&e.message)||''); throw new Error('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบอินเทอร์เน็ต'); })
     .then(function(o){
       if(!o.ok){
         if(o.auth && !window.liff && !retried){
