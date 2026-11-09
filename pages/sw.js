@@ -1,5 +1,5 @@
 /* service worker: เก็บตัวหน้าแอปไว้ในเครื่อง เปิดได้แม้ไม่มีสัญญาณ ; ไม่แคช API */
-const V = 'v2';
+const V = 'v3';
 const SHELL = ['./', 'index.html', 'config.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'favicon.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(V).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {
