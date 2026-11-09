@@ -75,6 +75,7 @@ function doGet() {
 const LINE_CHANNEL_ID = '2012314415';
 const API_FUNCS_ = {
   checkSerial: checkSerial,
+  scanDuplicateSerials: scanDuplicateSerials,
   getBootstrap: getBootstrap,
   addOpeningStock: addOpeningStock,
   getAwaitingReq: getAwaitingReq,
@@ -2047,6 +2048,36 @@ function getReturnable() {
     });
   });
   return out.reverse();
+}
+
+/** สแกน S/N ซ้ำทั้งชีท "รับ" (อ่านอย่างเดียว ไม่แก้ข้อมูล)
+ *  bad  = S/N เดียวกันอยู่ในคลังพร้อมกันมากกว่า 1 ล็อต
+ *  warn = S/N เดียวกันแต่ต่าง Part number / พิมพ์ต่างกันเล็กน้อย (ช่องว่าง ขีด ตัวพิมพ์) / S/N แต่จำนวน > 1
+ *  info = เคยรับหลายครั้งแต่ไม่อยู่ในคลัง (ปกติ เช่น ส่งซ่อมแล้วรับคืน) */
+function scanDuplicateSerials() {
+  const lots = computeLots_().filter(l => str_(l.serial));
+  const norm = s => str_(s).toUpperCase().replace(/[^0-9A-Z\u0E00-\u0E7F]/g, '');
+  const by = {};
+  lots.forEach(l => { const k = norm(l.serial); if (k) (by[k] = by[k] || []).push(l); });
+  const pack = l => ({ seq: l.seq, label: l.label, part: l.part, serial: l.serial, qty: l.qty, remain: l.remain, loc: l.loc, recv: l.recvDate ? fmtThai_(l.recvDate) : '' });
+  const groups = [];
+  Object.keys(by).forEach(k => {
+    const g = by[k];
+    const live = g.filter(l => l.remain > 0);
+    const parts = {}; g.forEach(l => { parts[str_(l.part).toUpperCase()] = 1; });
+    const raws = {}; g.forEach(l => { raws[str_(l.serial)] = 1; });
+    const reasons = []; let level = '';
+    if (live.length > 1) { level = 'bad'; reasons.push('อยู่ในคลังพร้อมกัน ' + live.length + ' ล็อต'); }
+    if (g.length > 1 && Object.keys(parts).length > 1) { level = level || 'warn'; reasons.push('S/N เดียวกันแต่ต่าง Part number'); }
+    if (g.length > 1 && Object.keys(raws).length > 1) { level = level || 'warn'; reasons.push('พิมพ์ไม่เหมือนกัน (' + Object.keys(raws).join(' / ') + ')'); }
+    if (g.length === 1 && g[0].qty > 1) { level = 'warn'; reasons.push('มี S/N แต่จำนวน ' + g[0].qty + ' (ควรเป็น 1)'); }
+    if (!level && g.length > 1) { level = 'info'; reasons.push('เคยรับ ' + g.length + ' ครั้ง ปัจจุบัน' + (live.length ? 'อยู่ในคลัง 1 ล็อต' : 'ไม่อยู่ในคลัง')); }
+    if (level) groups.push({ sn: g[0].serial, level: level, reasons: reasons, lots: g.map(pack) });
+  });
+  const ord = { bad: 0, warn: 1, info: 2 };
+  groups.sort((a, b) => ord[a.level] - ord[b.level] || (a.sn < b.sn ? -1 : 1));
+  const cnt = { bad: 0, warn: 0, info: 0 }; groups.forEach(g => cnt[g.level]++);
+  return { scanned: lots.length, distinct: Object.keys(by).length, count: cnt, groups: groups.slice(0, 300), truncated: groups.length > 300 };
 }
 
 /** เช็ค S/N ซ้ำแบบเรียลไทม์ตอนพิมพ์: state = stock (มีในคลังอยู่แล้ว) | seen (เคยรับแล้ว ตอนนี้ไม่อยู่ในคลัง) | ok */

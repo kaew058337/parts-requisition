@@ -437,6 +437,7 @@ nav button.on::before{background:var(--gold);box-shadow:0 0 12px 2px rgba(212,17
   <div class="dr-sec dr-in" style="--i:4">ข้อมูล</div>
   <button class="dr-it dr-in" id="his-btn" style="--i:5"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>ประวัติ<span class="ex"><svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8M10 6H5a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1v-5"/></svg></span></button>
   <button class="dr-it dr-in" id="sn-btn" style="--i:6"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.2-4.2"/></svg>ประวัติ S/N · ประกัน · เคลม<span class="ex"><svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8M10 6H5a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1v-5"/></svg></span></button>
+  <button class="dr-it dr-in" id="dup-btn" style="--i:7"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/></svg>ตรวจ S/N ซ้ำ</button>
   <button class="dr-it dr-in" id="ex-btn" style="--i:7"><svg viewBox="0 0 24 24"><path d="M12 4v11"/><path d="M7 11l5 5 5-5"/><path d="M4 20h16"/></svg>ส่งออกรายงาน<span class="ex"><svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8M10 6H5a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1v-5"/></svg></span></button>
   <div class="dr-sec dr-in" style="--i:8">ระบบ</div>
   <button class="dr-it dr-in" id="who-btn" style="--i:9"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg><span id="who-lb">ตั้งชื่อผู้ใช้</span></button>
@@ -935,6 +936,16 @@ nav button.on::before{background:var(--gold);box-shadow:0 0 12px 2px rgba(212,17
   <div class="sheet">
     <div class="hd"><b>แดชบอร์ด</b><button class="x" id="db-x" aria-label="ปิด">×</button></div>
     <div id="db-body"><div class="empty"><span class="spin"></span></div></div>
+  </div>
+</div>
+
+<!-- ===== sheet: ตรวจ S/N ซ้ำทั้งชีท ===== -->
+<div class="sheet-bg" id="dup-bg">
+  <div class="sheet">
+    <div class="hd"><b>ตรวจ S/N ซ้ำทั้งชีท</b><button class="x" id="dup-x" aria-label="ปิด">×</button></div>
+    <div id="dup-sum" class="meta" style="margin:10px 0"></div>
+    <div id="dup-list"></div>
+    <button class="btn ghost" id="dup-re" style="margin-top:10px">สแกนใหม่</button>
   </div>
 </div>
 
@@ -2752,6 +2763,28 @@ function snWatch(id, getSeq){
     }).catch(function(e){ $('sn-res').innerHTML = '<div class="empty">'+esc(e.message)+'</div>'; });
   }
   $('sn-btn').addEventListener('click', function(){ snOpen(''); });
+
+  /* ---------- ตรวจ S/N ซ้ำทั้งชีท ---------- */
+  function dupScan(){
+    $('dup-sum').textContent='กำลังสแกน…'; $('dup-list').innerHTML='';
+    run('scanDuplicateSerials').then(function(r){
+      var c=r.count;
+      $('dup-sum').innerHTML='สแกน '+fmtNum(r.scanned)+' ล็อตที่มี S/N ('+fmtNum(r.distinct)+' S/N) · <b style="color:var(--bad,#c0392b)">ซ้ำในคลัง '+c.bad+'</b> · <b style="color:var(--warn,#b9770e)">ควรตรวจ '+c.warn+'</b> · ประวัติรับซ้ำ '+c.info;
+      if(!r.groups.length){ $('dup-list').innerHTML='<div class="info" style="margin-top:8px">✓ ไม่พบ S/N ซ้ำ</div>'; return; }
+      var col={bad:'var(--bad,#c0392b)',warn:'var(--warn,#b9770e)',info:'var(--muted,#6b7a90)'}, tag={bad:'ซ้ำในคลัง',warn:'ควรตรวจ',info:'ประวัติ'};
+      $('dup-list').innerHTML=r.groups.map(function(g){
+        return '<div class="card" style="margin:8px 0;border-left:4px solid '+col[g.level]+'"><div><b>'+esc(g.sn)+'</b> <span class="meta" style="color:'+col[g.level]+'">'+tag[g.level]+'</span></div>'+
+          '<div class="meta">'+g.reasons.map(esc).join(' · ')+'</div>'+
+          g.lots.map(function(l){ return '<div class="meta" style="margin-top:4px">• ลำดับรับ '+l.seq+' · '+esc(l.part)+' · '+esc(l.label)+(l.recv?' · รับ '+esc(l.recv):'')+' · '+(l.remain>0?'<b>อยู่ในคลัง'+(l.loc?' ('+esc(l.loc)+')':'')+'</b>':'ไม่อยู่ในคลัง')+'</div>'; }).join('')+
+          '<button class="btn sm ghost dup-h" data-sn="'+esc(g.sn)+'" style="margin-top:8px">ดูประวัติ S/N</button></div>';
+      }).join('')+(r.truncated?'<div class="meta">แสดง 300 กลุ่มแรก</div>':'');
+    }).catch(function(e){ $('dup-sum').textContent=e.message; });
+  }
+  $('dup-btn').addEventListener('click', function(){ $('dup-bg').classList.add('on'); dupScan(); });
+  $('dup-x').addEventListener('click', function(){ $('dup-bg').classList.remove('on'); });
+  $('dup-bg').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('on'); });
+  $('dup-re').addEventListener('click', dupScan);
+  $('dup-list').addEventListener('click', function(e){ var b=e.target.closest&&e.target.closest('.dup-h'); if(b){ $('dup-bg').classList.remove('on'); snOpen(b.dataset.sn); } });
   $('sn-x').addEventListener('click', function(){ $('sn-bg').classList.remove('on'); });
   $('sn-seg').addEventListener('click', function(e){ var b=e.target.closest('button[data-m]'); if(b) snSeg(b.dataset.m); });
   $('sn-go').addEventListener('click', snSearch);
