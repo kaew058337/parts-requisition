@@ -407,6 +407,51 @@ main .ty-chem{border-left:5px solid var(--ty-chem)}main .ty-kit{border-left:5px 
 .emp-i svg{width:32px;height:32px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .emp b{font-family:var(--serif);font-size:20px;color:var(--ink);font-weight:700;line-height:1.2}
 .emp>span{font-size:14px;max-width:32ch;line-height:1.5}
+  /* ===== ผังที่จัดเก็บ ===== */
+  .sm-live{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin:0 0 10px}
+  .sm-live .dot{width:9px;height:9px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 0 rgba(14,138,79,.5);animation:smPulse 2s infinite;flex:none}
+  .sm-live span{flex:1;min-width:0}
+  @keyframes smPulse{70%{box-shadow:0 0 0 8px rgba(14,138,79,0)}100%{box-shadow:0 0 0 0 rgba(14,138,79,0)}}
+  .sm-stats{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:14px;margin:10px 0 6px}
+  .sm-stats b{font-family:var(--serif);font-size:20px;color:var(--gold-d)}
+  .sm-legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted);margin-bottom:10px}
+  .sm-legend span{display:inline-flex;align-items:center;gap:6px}
+  .lg{width:14px;height:14px;border-radius:5px;border:1.5px solid;display:inline-block}
+  .lg.e,.scell.e{background:rgba(14,138,79,.10);border-color:rgba(14,138,79,.45)}
+  .lg.u,.scell.u{background:rgba(212,179,106,.30);border-color:#d4b36a}
+  .lg.d,.scell.d{background:rgba(217,119,6,.28);border-color:#d97706}
+  .lg.ox{background:transparent;border-style:dashed;border-color:var(--muted)}
+  .sg{margin:14px 0 4px}
+  .sg h4{margin:0 0 8px;font-family:var(--serif);font-size:20px;color:var(--navy-royal);display:flex;align-items:baseline;gap:10px}
+  .sg h4 small{font:400 12.5px 'Sarabun',sans-serif;color:var(--muted)}
+  .sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:7px}
+  .scell{aspect-ratio:1;min-width:0;border:1.5px solid;border-radius:12px;padding:5px 4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;cursor:pointer;color:var(--ink);font-family:inherit;position:relative;transition:transform .15s var(--ease),box-shadow .2s}
+  .scell:active{transform:scale(.94)}
+  .scell b{font-size:17px;line-height:1}
+  .scell i{font-style:normal;font-size:10px;line-height:1.15;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
+  .scell em{position:absolute;top:3px;right:5px;font-style:normal;font-size:10.5px;font-weight:700;color:var(--gold-d)}
+  .scell.ox{border-style:dashed}
+  .scell.dim{opacity:.28}
+  .scell.hit{outline:3px solid #4C8DCE;outline-offset:1px;box-shadow:0 0 14px 2px rgba(76,141,206,.65);z-index:1}
+  .scell.dest{outline:3px solid var(--gold);outline-offset:1px;box-shadow:0 0 16px 3px rgba(212,179,106,.8);z-index:1}
+  .sm-moving .scell.e{animation:smBlink 1.4s ease-in-out infinite}
+  @keyframes smBlink{50%{background:rgba(14,138,79,.28)}}
+  .sm-bar{position:sticky;top:calc(-16px - env(safe-area-inset-top));z-index:3;margin:8px 0;padding:10px 12px;border-radius:14px;background:var(--navy-royal);color:#fff;font-size:14px;display:grid;gap:8px;box-shadow:var(--shadow-up)}
+  html[data-theme=dark] .sm-bar{background:#1d4a7e}
+  .sm-bar[hidden]{display:none}
+  .sm-bar .acts{display:flex;gap:8px;flex-wrap:wrap}
+  .sm-bar .btn{padding:9px 14px}
+  .sm-admin{margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+  .sm-admin #sm-addf{margin-top:10px}
+  .sc-it{border-top:1px solid var(--line);padding:10px 0}
+  .sc-it:first-child{border-top:0}
+  .sc-it .n{font-weight:600}
+  .sc-it .acts{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+  .sc-find{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+  .sc-res{display:grid;gap:6px;margin-top:8px}
+  .sc-res button{text-align:left;display:block;width:100%;padding:9px 12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:14px;cursor:pointer}
+  .sc-res small{display:block;color:var(--muted)}
+  @media (prefers-reduced-motion:reduce){.sm-live .dot,.sm-moving .scell.e{animation:none}}
 /* ===== โครงการ์ดระหว่างโหลด ===== */
 .skl{display:grid;gap:12px;padding-top:4px}
 .skc{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:16px;display:grid;gap:9px;position:relative;overflow:hidden}
@@ -544,6 +589,7 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
   <div class="dr-sec dr-in" style="--i:4">ข้อมูล</div>
   <button class="dr-it dr-in" id="his-btn" style="--i:5"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>ประวัติ<span class="ex"><svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8M10 6H5a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1v-5"/></svg></span></button>
   <button class="dr-it dr-in" id="sn-btn" style="--i:6"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.2-4.2"/></svg>ประวัติ S/N · ประกัน · เคลม<span class="ex"><svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8M10 6H5a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1v-5"/></svg></span></button>
+  <button class="dr-it dr-in" id="shelf-btn" style="--i:2"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>ผังที่จัดเก็บ</button>
   <button class="dr-it dr-in" id="dup-btn" style="--i:7"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/></svg>ตรวจ S/N ซ้ำ</button>
   <button class="dr-it dr-in" id="ex-btn" style="--i:7"><svg viewBox="0 0 24 24"><path d="M12 4v11"/><path d="M7 11l5 5 5-5"/><path d="M4 20h16"/></svg>ส่งออกรายงาน<span class="ex"><svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8M10 6H5a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1v-5"/></svg></span></button>
   <div class="dr-sec dr-in" style="--i:8">ระบบ</div>
@@ -860,12 +906,46 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
   </div>
 </div>
 
+<!-- ===== sheet: ผังที่จัดเก็บ ===== -->
+<div class="sheet-bg" id="sm-bg">
+  <div class="sheet sm-sheet">
+    <div class="hd"><b>ผังที่จัดเก็บ</b><button class="x" id="sm-x" aria-label="ปิด">×</button></div>
+    <div class="sm-live"><i class="dot"></i><span id="sm-ts">กำลังโหลด…</span><button class="btn ghost sm" id="sm-re" type="button">รีเฟรช</button></div>
+    <input id="sm-q" type="search" placeholder="ค้นหา P/N · ชื่อ · S/N · ช่อง (ช่องที่ตรงจะเรืองแสง)" autocomplete="off">
+    <div class="sm-stats" id="sm-stats"></div>
+    <div class="sm-legend"><span><i class="lg e"></i>ว่าง</span><span><i class="lg u"></i>มีของ</span><span><i class="lg d"></i>แน่น (3+)</span><span><i class="lg ox"></i>นอกผัง</span></div>
+    <div class="sm-bar" id="sm-bar" hidden></div>
+    <div id="sm-body"></div>
+    <div id="sm-unp"></div>
+    <div class="sm-admin">
+      <button class="btn ghost sm" id="sm-addtog" type="button">+ เพิ่มช่องในผัง</button>
+      <div id="sm-addf" hidden>
+        <div class="row2"><div><label>กลุ่ม / ตู้ / ชั้น</label><input id="sm-g" placeholder="เช่น B2" autocomplete="off" autocapitalize="characters"></div>
+        <div><label>ช่อง ตั้งแต่ – ถึง</label><div class="row2"><input id="sm-a" type="number" inputmode="numeric" min="0" placeholder="1"><input id="sm-b" type="number" inputmode="numeric" min="0" placeholder="12"></div></div></div>
+        <div class="meta" style="margin:6px 0">สร้างช่อง เช่น B2-1 ถึง B2-12 ให้ปรากฏเป็นช่องว่างในผัง (ช่องที่มีอยู่แล้วจะข้าม)</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" id="sm-addgo" type="button">เพิ่มช่อง</button><button class="btn ghost sm" id="sm-fill" type="button">เติมช่องที่ขาดอัตโนมัติ</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== sheet: รายละเอียดช่องจัดเก็บ ===== -->
+<div class="sheet-bg" id="sc-bg">
+  <div class="sheet">
+    <div class="hd"><b id="sc-title">ช่อง</b><button class="x" id="sc-x" aria-label="ปิด">×</button></div>
+    <div id="sc-body"></div>
+  </div>
+</div>
+
 <!-- ===== sheet: แก้ไขพัสดุในคลัง ===== -->
 <div class="sheet-bg" id="ed-bg">
   <div class="sheet">
     <div class="hd"><b>แก้ไขพัสดุในคลัง</b><button class="x" id="ed-x" aria-label="ปิด">×</button></div>
     <div class="info" id="ed-info"></div>
-    <label>LOCATION (ที่จัดเก็บ)</label><input id="ed-loc" list="ed-locs" autocomplete="off">
+    <label>Part number (P/N)</label><input id="ed-part" autocomplete="off" autocapitalize="characters">
+    <label>ชื่อพัสดุ</label><input id="ed-name" autocomplete="off">
+    <label class="chk" style="display:flex;gap:8px;align-items:center;margin:6px 0;font-weight:400"><input type="checkbox" id="ed-nameall" style="width:auto;margin:0"> ใช้ชื่อนี้กับทุกล็อตของ P/N นี้</label>
+    <label>LOCATION (ที่จัดเก็บ / ย้ายที่เก็บ)</label><input id="ed-loc" list="ed-locs" autocomplete="off">
     <datalist id="ed-locs"></datalist>
     <label>จำนวนคงเหลือ</label><input id="ed-qty" type="number" inputmode="decimal" min="0" step="any">
     <label>S/N</label><input id="ed-sn" autocomplete="off" autocapitalize="characters">
@@ -879,18 +959,6 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
       </div>
       <button class="btn ghost" id="ed-kmove" style="margin-top:8px">ย้ายตามที่เลือก</button>
     </div>
-  </div>
-</div>
-
-<!-- ===== sheet: ย้ายที่จัดเก็บ ===== -->
-<div class="sheet-bg" id="mv-bg">
-  <div class="sheet">
-    <div class="hd"><b>ย้ายที่จัดเก็บ (LOCATION)</b><button class="x" id="mv-x" aria-label="ปิด">×</button></div>
-    <div class="info" id="mv-info"></div>
-    <label>LOCATION ใหม่</label><input id="mv-loc" list="mv-locs" autocomplete="off">
-    <datalist id="mv-locs"></datalist>
-    <div class="meta" style="margin:6px 0">ระบบจะแก้ LOCATION ในชีท รับ และ คลังพัสดุ ให้ตรงกันทันที</div>
-    <button class="btn" id="mv-submit">ย้ายที่จัดเก็บ</button>
   </div>
 </div>
 
@@ -1426,6 +1494,173 @@ function snWatch(id, getSeq){
     document.addEventListener('touchend', end, {passive:true});
     document.addEventListener('touchcancel', end, {passive:true});
   })();
+
+  /* ---------- ผังที่จัดเก็บ (Shelf Map) ---------- */
+  var SM={data:null,sig:'',q:'',timer:null,open:false,cell:'',moving:null,dest:'',idx:{},ts:null};
+  function smKey(s){ return String(s||'').toUpperCase().replace(/\s+/g,''); }
+  function smStamp(){ var d=SM.ts; if(!d) return; var p=function(n){return n<10?'0'+n:n;}; $('sm-ts').textContent='อัปเดตล่าสุด '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds())+' · อัตโนมัติทุก 15 วินาที'; }
+  function smLoad(manual){
+    if(manual) $('sm-ts').textContent='กำลังอัปเดต…';
+    return run('getShelfMap').then(function(d){
+      SM.ts=new Date(); smStamp();
+      var sg=JSON.stringify([d.groups,d.unplaced]);
+      if(sg!==SM.sig){ SM.sig=sg; SM.data=d; smRender(); if(SM.cell) smCell(); }
+    }).catch(function(e){ $('sm-ts').textContent='⚠ อัปเดตไม่ได้ — '+e.message; });
+  }
+  function smItemText(i){ return (i.part+' '+i.name+' '+i.serial+' '+i.doc).toLowerCase(); }
+  function smHit(c,q){ return !!q && (String(c.loc).toLowerCase().indexOf(q)>=0 || c.items.some(function(i){ return smItemText(i).indexOf(q)>=0; })); }
+  function smRender(){
+    var d=SM.data; if(!d) return;
+    var q=SM.q.trim().toLowerCase(), st=d.stats, hits=0;
+    SM.idx={};
+    $('sm-stats').innerHTML='ช่องทั้งหมด <b>'+fmtNum(st.cells)+'</b> · ว่าง <b>'+fmtNum(st.empty)+'</b> · มีของ <b>'+fmtNum(st.used)+'</b>'+(st.unplaced?' · <span style="color:var(--warn)">ยังไม่กำหนดช่อง '+fmtNum(st.unplaced)+'</span>':'');
+    var html=d.groups.map(function(g){
+      var used=g.cells.filter(function(c){return c.items.length;}).length;
+      var cells=g.cells.map(function(c){
+        var k=smKey(c.loc); SM.idx[k]=c;
+        var n=c.items.length, cls=n===0?'e':(n>=3?'d':'u');
+        if(!c.defined) cls+=' ox';
+        var hit=smHit(c,q); if(hit) hits++;
+        if(q) cls+=hit?' hit':' dim';
+        if(SM.dest===k) cls+=' dest';
+        var first=n?c.items[0].part:'ว่าง';
+        return '<button type="button" class="scell '+cls+'" data-k="'+esc(k)+'" aria-label="ช่อง '+esc(c.loc)+(n?' มี '+n+' รายการ':' ว่าง')+'"><b>'+esc(c.slot)+'</b><i>'+esc(first)+'</i>'+(n>1?'<em>+'+(n-1)+'</em>':'')+'</button>';
+      }).join('');
+      return '<section class="sg"><h4>'+esc(g.name)+' <small>มีของ '+used+' / '+g.cells.length+' ช่อง</small></h4><div class="sgrid">'+cells+'</div></section>';
+    }).join('');
+    if(!d.groups.length) html='<div class="empty"><div class="ico">▦</div><div class="t">ยังไม่มีช่องในผัง</div><div>กด "+ เพิ่มช่องในผัง" ด้านล่าง หรือกำหนด LOCATION ให้พัสดุก่อน</div></div>';
+    $('sm-body').innerHTML=html;
+    $('sm-body').className=SM.moving?'sm-moving':'';
+    if(q) $('sm-stats').innerHTML+=' · <span style="color:#4C8DCE">พบ '+hits+' ช่อง</span>';
+    var up=d.unplaced||[];
+    $('sm-unp').innerHTML=up.length?('<section class="sg"><h4>ยังไม่กำหนดช่อง <small>'+up.length+' รายการ</small></h4>'+up.map(function(i,ix){
+      return '<div class="sc-it"><div class="n">'+esc(i.name)+'</div><div class="meta">'+esc(i.part)+(i.serial?' · S/N '+esc(i.serial):'')+' · '+fmtNum(i.qty)+' '+esc(i.unit)+'</div><div class="acts"><button type="button" class="btn sm" data-up="'+ix+'">กำหนดช่อง</button><button type="button" class="btn ghost sm" data-upe="'+ix+'">แก้ไข</button></div></div>';
+    }).join('')+'</section>'):'';
+    smBar();
+  }
+  function smLotOf(i,loc){ return { seq:i.seq, part:i.part, name:i.name, unit:i.unit, serial:i.serial, qty:i.qty, type:i.type, location:loc||'', kit:i.kit||'' }; }
+  function smBar(){
+    var b=$('sm-bar');
+    if(!SM.moving){ b.hidden=true; b.innerHTML=''; return; }
+    var m=SM.moving, destC=SM.dest?SM.idx[SM.dest]:null;
+    b.hidden=false;
+    if(!destC){
+      b.innerHTML='<div>กำลังย้าย <b>'+esc(m.item.name)+'</b> ('+esc(m.item.part)+')'+(m.from?' จาก '+esc(m.from):'')+'<br>แตะช่องปลายทางในผัง (ช่องว่างกะพริบ)</div><div class="acts"><button type="button" class="btn ghost sm" id="sm-mc" style="color:#fff;border-color:#fff">ยกเลิก</button></div>';
+    } else {
+      var n=destC.items.length;
+      b.innerHTML='<div>ย้าย <b>'+esc(m.item.name)+'</b> → ช่อง <b>'+esc(destC.loc)+'</b>'+(n?'<br>⚠ ช่องนี้มีของอยู่แล้ว '+n+' รายการ (ย้ายรวมกันได้)':'<br>ช่องว่าง')+'</div><div class="acts"><button type="button" class="btn sm" id="sm-mg">ยืนยันย้าย</button><button type="button" class="btn ghost sm" id="sm-mc" style="color:#fff;border-color:#fff">ยกเลิก</button></div>';
+    }
+  }
+  function smStartMove(item,from,dest){
+    SM.moving={item:item,from:from||''}; SM.dest=dest||'';
+    $('sc-bg').classList.remove('on'); SM.cell='';
+    smRender();
+    $('sm-bar').scrollIntoView({block:'nearest'});
+  }
+  function smCancelMove(){ SM.moving=null; SM.dest=''; smRender(); }
+  function smDoMove(btn){
+    if(!state.by){ askBy(function(){ smDoMove(btn); }); return; }
+    var m=SM.moving, c=SM.idx[SM.dest]; if(!m||!c) return;
+    busy(btn,true);
+    run('moveLocation',[{seq:m.item.seq,location:c.loc,by:state.by}]).then(function(res){
+      toast(res.same?'อยู่ช่องนี้อยู่แล้ว':'ย้ายแล้ว → '+res.to);
+      SM.moving=null; SM.dest=''; SM.sig='';
+      loadStock(); return smLoad(true);
+    }).catch(function(e){ toast(e.message,true); }).then(function(){ busy(btn,false); });
+  }
+  /* รายละเอียดช่อง */
+  function smCell(){
+    var c=SM.idx[SM.cell];
+    if(!c){ $('sc-bg').classList.remove('on'); SM.cell=''; return; }
+    $('sc-title').textContent='ช่อง '+c.loc;
+    var n=c.items.length, h='';
+    h+='<div style="margin-bottom:8px"><span class="chip '+(n?'warn':'ok')+'">'+(n?'มีของ '+n+' รายการ':'ว่าง')+'</span>'+(c.defined?'':' <span class="chip info">ไม่อยู่ในผังที่กำหนด</span>')+'</div>';
+    h+=c.items.map(function(i,ix){
+      return '<div class="sc-it"><div class="n">'+esc(i.name)+'</div><div class="meta">'+esc(i.part)+(i.serial?' · S/N '+esc(i.serial):'')+' · จำนวน '+fmtNum(i.qty)+' '+esc(i.unit)+(i.type?' · '+esc(i.type):'')+(i.kit?' · <b>'+esc(i.kit)+'</b>':'')+'<br>'+esc(i.doc)+'</div><div class="acts"><button type="button" class="btn ghost sm" data-ce="'+ix+'">แก้ไข</button><button type="button" class="btn sm" data-cm="'+ix+'">ย้ายไปช่องอื่น</button></div></div>';
+    }).join('');
+    if(!n) h+='<div class="meta" style="margin:6px 0 10px">ช่องนี้ว่าง ไม่มีพัสดุ</div>';
+    h+='<div class="sc-find"><label style="margin-top:0">นำพัสดุอื่นมาวางที่ช่องนี้</label><input id="sc-f" placeholder="ค้นหา P/N · ชื่อ · S/N" autocomplete="off"><div class="sc-res" id="sc-res"></div></div>';
+    h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">';
+    if(!c.defined) h+='<button type="button" class="btn ghost sm" id="sc-def">เพิ่มช่องนี้เข้าผัง</button>';
+    if(c.defined && !n) h+='<button type="button" class="btn ghost sm" id="sc-del" style="color:var(--bad)">ลบช่องนี้ออกจากผัง</button>';
+    h+='</div>';
+    var keep=$('sc-f')?$('sc-f').value:'';
+    $('sc-body').innerHTML=h;
+    if(keep){ $('sc-f').value=keep; smFind(); }
+  }
+  function smFind(){
+    var q=$('sc-f').value.trim().toLowerCase(), box=$('sc-res'), out=[];
+    if(q.length<2){ box.innerHTML=''; return; }
+    SM.data.groups.forEach(function(g){ g.cells.forEach(function(c){ c.items.forEach(function(i){ if(smItemText(i).indexOf(q)>=0) out.push({i:i,loc:c.loc}); }); }); });
+    (SM.data.unplaced||[]).forEach(function(i){ if(smItemText(i).indexOf(q)>=0) out.push({i:i,loc:''}); });
+    SM.found=out.slice(0,8);
+    box.innerHTML=SM.found.length?SM.found.map(function(o,ix){ return '<button type="button" data-fm="'+ix+'">'+esc(o.i.name)+'<small>'+esc(o.i.part)+(o.i.serial?' · S/N '+esc(o.i.serial):'')+' · อยู่ที่ '+(o.loc?esc(o.loc):'(ยังไม่กำหนด)')+'</small></button>'; }).join(''):'<div class="meta">ไม่พบ</div>';
+  }
+  function smOpen(){
+    SM.open=true; SM.moving=null; SM.dest=''; SM.cell='';
+    $('sm-bg').classList.add('on');
+    if(SM.data) smRender(); else $('sm-body').innerHTML=skel();
+    smLoad(true);
+    clearInterval(SM.timer);
+    SM.timer=setInterval(function(){ if(SM.open && !document.hidden) smLoad(); },15000);
+  }
+  function smClose(){ SM.open=false; clearInterval(SM.timer); SM.timer=null; SM.moving=null; SM.dest=''; $('sm-bg').classList.remove('on'); $('sc-bg').classList.remove('on'); }
+  document.addEventListener('visibilitychange', function(){ if(SM.open && !document.hidden) smLoad(); });
+  $('shelf-btn').addEventListener('click', smOpen);
+  $('sm-x').addEventListener('click', smClose);
+  $('sm-bg').addEventListener('click', function(e){ if(e.target===this) smClose(); });
+  $('sm-re').addEventListener('click', function(){ smLoad(true); });
+  $('sm-q').addEventListener('input', function(){ SM.q=this.value; smRender(); });
+  $('sm-body').addEventListener('click', function(e){
+    var b=e.target.closest('.scell'); if(!b) return;
+    var k=b.dataset.k;
+    if(SM.moving){
+      var c=SM.idx[k]; if(!c) return;
+      if(smKey(SM.moving.from)===k){ toast('อยู่ช่องนี้อยู่แล้ว'); return; }
+      SM.dest=k; smRender(); return;
+    }
+    SM.cell=k; smCell(); $('sc-bg').classList.add('on');
+  });
+  $('sm-bar').addEventListener('click', function(e){
+    if(e.target.closest('#sm-mc')) smCancelMove();
+    var g=e.target.closest('#sm-mg'); if(g) smDoMove(g);
+  });
+  $('sm-unp').addEventListener('click', function(e){
+    var up=SM.data.unplaced||[], b=e.target.closest('[data-up]');
+    if(b){ smStartMove(up[Number(b.dataset.up)],''); return; }
+    var be=e.target.closest('[data-upe]'); if(be){ var i=up[Number(be.dataset.upe)]; openEditLot(smLotOf(i,'')); }
+  });
+  $('sc-x').addEventListener('click', function(){ $('sc-bg').classList.remove('on'); SM.cell=''; });
+  $('sc-bg').addEventListener('click', function(e){ if(e.target===this){ this.classList.remove('on'); SM.cell=''; } });
+  $('sc-body').addEventListener('input', function(e){ if(e.target.id==='sc-f') smFind(); });
+  $('sc-body').addEventListener('click', function(e){
+    var c=SM.idx[SM.cell]; if(!c) return;
+    var be=e.target.closest('[data-ce]'); if(be){ openEditLot(smLotOf(c.items[Number(be.dataset.ce)],c.loc)); return; }
+    var bm=e.target.closest('[data-cm]'); if(bm){ smStartMove(c.items[Number(bm.dataset.cm)],c.loc); return; }
+    var bf=e.target.closest('[data-fm]'); if(bf){ var o=SM.found[Number(bf.dataset.fm)]; smStartMove(o.i,o.loc,SM.cell); return; }
+    var df=e.target.closest('#sc-def'), dl=e.target.closest('#sc-del');
+    if(!df && !dl) return;
+    if(!state.by){ askBy(function(){ e.target.click(); }); return; }
+    var btn=df||dl; busy(btn,true);
+    (df?run('addShelfSlots',[{locs:[c.loc],by:state.by}]):run('removeShelfSlot',[{loc:c.loc,by:state.by}])).then(function(){
+      toast(df?'เพิ่มช่องเข้าผังแล้ว':'ลบช่องออกจากผังแล้ว'); if(dl){ $('sc-bg').classList.remove('on'); SM.cell=''; } SM.sig=''; return smLoad(true);
+    }).catch(function(er){ toast(er.message,true); }).then(function(){ busy(btn,false); });
+  });
+  $('sm-addtog').addEventListener('click', function(){ var f=$('sm-addf'); f.hidden=!f.hidden; });
+  $('sm-addgo').addEventListener('click', function(){
+    if(!state.by){ askBy(function(){ $('sm-addgo').click(); }); return; }
+    var g=$('sm-g').value.trim(), a=$('sm-a').value, b=$('sm-b').value;
+    if(!g||a===''||b===''){ toast('กรอกกลุ่ม และช่วงช่อง ตั้งแต่–ถึง',true); return; }
+    var btn=this; busy(btn,true);
+    run('addShelfSlots',[{group:g,from:a,to:b,by:state.by}]).then(function(r){ toast('เพิ่ม '+r.added+' ช่อง'+(r.skipped?' (ข้ามที่มีแล้ว '+r.skipped+')':'')); SM.sig=''; return smLoad(true); })
+    .catch(function(e){ toast(e.message,true); }).then(function(){ busy(btn,false); });
+  });
+  $('sm-fill').addEventListener('click', function(){
+    if(!state.by){ askBy(function(){ $('sm-fill').click(); }); return; }
+    var btn=this; busy(btn,true);
+    run('fillShelfGaps',[{by:state.by}]).then(function(r){ toast(r.added?'เติมช่องที่ขาด '+r.added+' ช่อง':'ไม่มีช่องที่ขาด'); SM.sig=''; return smLoad(true); })
+    .catch(function(e){ toast(e.message,true); }).then(function(){ busy(btn,false); });
+  });
   /* ---------- boot ---------- */
   function boot(manual){
     run('getBootstrap').then(function(d){
@@ -2066,7 +2301,7 @@ function snWatch(id, getSeq){
         if(l.location) bits.push(esc(l.location));
         if(l.kit) bits.push('<b>'+esc(l.kit)+'</b>');
         if(l.expire) bits.push('หมดอายุ '+esc(l.expire));
-        return '<div class="meta" style="padding:5px 0;border-top:1px solid var(--line)">'+bits.join(' · ')+'<br>'+(l.docNo==='ยอดยกมา'||l.docNo==='คืนเข้าคลัง'||l.docNo==='รับก่อนเบิก'||l.docNo==='ย้ายจากชุด'?esc(l.docNo)+(l.note?' ('+esc(l.note)+')':''):'เลขเบิก '+esc(l.docNo))+' · รับ '+esc(l.received)+'<div style="display:flex;gap:8px;margin-top:6px">'+(l.free?'<button class="btn sm" data-is="'+l.seq+'">จ่าย</button>':(l.issRow?'<button class="btn sm" data-ix="'+l.seq+'">จ่าย</button>':''))+'<button class="btn ghost sm" data-bl="'+l.seq+'">ยืมออก</button><button class="btn ghost sm" data-mv="'+l.seq+'">ย้ายที่เก็บ</button><button class="btn ghost sm" data-ed="'+l.seq+'">แก้ไข</button></div>'+(l.linkNote?'<div style="color:var(--bad);margin-top:4px">⚠ '+esc(l.linkNote)+'</div>':'')+'</div>';
+        return '<div class="meta" style="padding:5px 0;border-top:1px solid var(--line)">'+bits.join(' · ')+'<br>'+(l.docNo==='ยอดยกมา'||l.docNo==='คืนเข้าคลัง'||l.docNo==='รับก่อนเบิก'||l.docNo==='ย้ายจากชุด'?esc(l.docNo)+(l.note?' ('+esc(l.note)+')':''):'เลขเบิก '+esc(l.docNo))+' · รับ '+esc(l.received)+'<div style="display:flex;gap:8px;margin-top:6px">'+(l.free?'<button class="btn sm" data-is="'+l.seq+'">จ่าย</button>':(l.issRow?'<button class="btn sm" data-ix="'+l.seq+'">จ่าย</button>':''))+'<button class="btn ghost sm" data-bl="'+l.seq+'">ยืมออก</button><button class="btn ghost sm" data-ed="'+l.seq+'">แก้ไข</button></div>'+(l.linkNote?'<div style="color:var(--bad);margin-top:4px">⚠ '+esc(l.linkNote)+'</div>':'')+'</div>';
       }).join('');
       return '<div class="card lift'+tyCls(g.lots[0]&&g.lots[0].type, g.lots.some(function(l){return l.kit;}))+'" style="padding:14px 16px">'+
         '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><b>'+esc(g.part||'-')+'</b><span class="chip ok">'+fmtNum(g.qty)+' '+esc(g.unit)+'</span></div>'+
@@ -2088,49 +2323,28 @@ function snWatch(id, getSeq){
     document.body.appendChild(a); a.click(); setTimeout(function(){ a.remove(); },500);
   });
 
-  /* ---------- ย้ายที่จัดเก็บ ---------- */
-  $('k-list').addEventListener('click', function(e){
-    var b=e.target.closest('button[data-mv]'); if(!b) return;
-    var l=state.lotMap && state.lotMap[Number(b.dataset.mv)]; if(!l) return;
-    state.mv=l;
-    $('mv-info').innerHTML='<b>'+esc(l.name)+'</b><br><span class="meta">'+esc(l.part)+(l.serial?' · S/N '+esc(l.serial):'')+' · จำนวน '+fmtNum(l.qty)+' '+esc(l.unit)+'<br>ที่เก็บปัจจุบัน: <b>'+esc(l.location||'(ยังไม่ระบุ)')+'</b></span>';
-    var seen={}, opts='';
-    (state.stk||[]).forEach(function(g){ g.lots.forEach(function(x){ if(x.location && !seen[x.location]){ seen[x.location]=1; opts+='<option value="'+esc(x.location)+'">'; } }); });
-    $('mv-locs').innerHTML=opts;
-    $('mv-loc').value=l.location||'';
-    $('mv-bg').classList.add('on');
-    setTimeout(function(){ $('mv-loc').focus(); $('mv-loc').select(); },50);
-  });
-  $('mv-x').addEventListener('click', function(){ $('mv-bg').classList.remove('on'); });
-  $('mv-bg').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('on'); });
-  $('mv-submit').addEventListener('click', function(){
-    if(!state.by){ askBy(function(){ $('mv-submit').click(); }); return; }
-    var l=state.mv; if(!l) return;
-    var loc=$('mv-loc').value.trim();
-    if(!loc){ toast('กรุณาระบุที่จัดเก็บใหม่',true); return; }
-    var b=this; busy(b,true);
-    run('moveLocation', [{ seq:l.seq, location:loc, by:state.by }]).then(function(res){
-      $('mv-bg').classList.remove('on');
-      toast(res.same ? 'ไม่มีการเปลี่ยนแปลง' : 'ย้ายแล้ว → '+res.to);
-      loadStock();
-    }).catch(function(err){ toast(err.message,true); }).then(function(){ busy(b,false); });
-  });
-
   /* ---------- แก้ไขพัสดุในคลัง (ที่เก็บ / จำนวน / S/N) ---------- */
-  $('k-list').addEventListener('click', function(e){
-    var b=e.target.closest('button[data-ed]'); if(!b) return;
-    var l=state.lotMap && state.lotMap[Number(b.dataset.ed)]; if(!l) return;
+  function openEditLot(l){
     state.ed=l;
     $('ed-info').innerHTML='<b>'+esc(l.name)+'</b><br><span class="meta">'+esc(l.part)+' · ลำดับรับ '+l.seq+'</span>';
     var seen={}, opts='';
-    (state.stk||[]).forEach(function(g){ g.lots.forEach(function(x){ if(x.location && !seen[x.location]){ seen[x.location]=1; opts+='<option value="'+esc(x.location)+'">'; } }); });
+    function addLoc(x){ if(x && !seen[x]){ seen[x]=1; opts+='<option value="'+esc(x)+'">'; } }
+    (state.stk||[]).forEach(function(g){ g.lots.forEach(function(x){ addLoc(x.location); }); });
+    if(SM.data) SM.data.groups.forEach(function(g){ g.cells.forEach(function(c){ addLoc(c.loc); }); });
     $('ed-locs').innerHTML=opts;
+    $('ed-part').value=l.part||''; $('ed-name').value=l.name||''; $('ed-nameall').checked=false;
     $('ed-loc').value=l.location||'';
     $('ed-qty').value=l.qty;
     $('ed-sn').value=l.serial||'';
     $('ed-qty').disabled=!!l.serial;
     $('ed-kit').value=l.kit||''; $('ed-kqty').value=l.qty; $('ed-kqty').disabled=!!l.serial;
     $('ed-bg').classList.add('on');
+  }
+  $('k-list').addEventListener('click', function(e){
+    var b=e.target.closest('button[data-ed]'); if(!b) return;
+    var l=state.lotMap && state.lotMap[Number(b.dataset.ed)]; if(!l) return;
+    var g=(state.stk||[]).filter(function(x){ return x.lots.indexOf(l)>=0; })[0];
+    openEditLot(Object.assign({part:g?g.part:'',name:g?g.name:'',unit:g?g.unit:''}, l));
   });
   snWatch('ed-sn', function(){ return state.ed?state.ed.seq:0; });
   $('ed-sn').addEventListener('input', function(){
@@ -2146,7 +2360,7 @@ function snWatch(id, getSeq){
     run('moveToKit', [{ seq:l.seq, kit:$('ed-kit').value, qty:q, by:state.by }]).then(function(res){
       $('ed-bg').classList.remove('on');
       toast(res.same ? 'อยู่ที่นี่อยู่แล้ว ไม่มีการเปลี่ยนแปลง' : (res.kit ? 'ย้าย '+fmtNum(res.moved)+' เข้า '+res.kit+' แล้ว' : 'ย้ายกลับคลังปกติแล้ว'));
-      loadStock();
+      loadStock(); if(SM.open) smLoad(true);
     }).catch(function(err){ toast(err.message,true); }).then(function(){ busy(b,false); });
   });
   $('ed-x').addEventListener('click', function(){ $('ed-bg').classList.remove('on'); });
@@ -2156,11 +2370,15 @@ function snWatch(id, getSeq){
     var l=state.ed; if(!l) return;
     var qty=Number($('ed-qty').value);
     if(!(qty>0)){ toast('จำนวนต้องมากกว่า 0 (ถ้าไม่มีของแล้วให้ใช้ปุ่ม จ่าย)',true); return; }
+    
+    var part=$('ed-part').value.trim(), nm=$('ed-name').value.trim();
+    if(!part){ toast('Part number ว่างไม่ได้',true); return; }
+    if(!nm){ toast('ชื่อพัสดุว่างไม่ได้',true); return; }
     var b=this; busy(b,true);
-    run('editLot', [{ seq:l.seq, location:$('ed-loc').value.trim(), qty:qty, serial:$('ed-sn').value.trim(), by:state.by }]).then(function(res){
+    run('editLot', [{ seq:l.seq, part:part, name:nm, nameAll:$('ed-nameall').checked, location:$('ed-loc').value.trim(), qty:qty, serial:$('ed-sn').value.trim(), by:state.by }]).then(function(res){
       $('ed-bg').classList.remove('on');
       toast(res.same ? 'ไม่มีการเปลี่ยนแปลง' : 'แก้ไขแล้ว: '+res.changes.join(', '));
-      loadStock();
+      loadStock(); if(SM.open) smLoad(true);
     }).catch(function(err){ toast(err.message,true); }).then(function(){ busy(b,false); });
   });
 

@@ -19,6 +19,7 @@ const SHEET_CLAIM = 'เคลม';
 const SHEET_KIT = 'FLY AWAY KIT';       // ชีทแสดง/แก้พัสดุที่ TAIL No. เป็น FLY AWAY KIT 1-2 (ลิงก์กับชีท รับ ด้วยลำดับรับ)
 const SHEET_KITREQ = 'รายการชุด FLY AWAY KIT';   // รายการตายตัวที่แต่ละชุดต้องมี + จำนวน (ผู้ใช้กรอก) ระบบเทียบกับของจริงในชุด
 const SHEET_HOL = 'วันหยุด';              // วันหยุดราชการที่ไม่ส่งสรุปไลน์ (นอกจากเสาร์-อาทิตย์)
+const SHEET_SHELF = 'ผังที่จัดเก็บ';       // รายการช่องจัดเก็บที่กำหนดไว้ (รวมช่องว่าง) ใช้วาดแผนผัง
 const SHEET_RCV2 = 'รับคืนเข้าคลัง';   // ประวัติรับ "คืนเข้าคลัง" แยกจากรับปกติ (โครงสร้างเหมือนชีท รับ)
 const WARRANTY_DAYS = 365;        // ประกัน 1 ปี นับจากวันที่รับ (LRU / LRU(TCI)) ; ของที่เคลมกลับมานับใหม่จากวันที่ได้รับกลับ
 const WARRANTY_SOON_DAYS = 60;    // เตือน "ใกล้หมดประกัน" เมื่อเหลือไม่เกินกี่วัน
@@ -74,6 +75,10 @@ function doGet() {
    - Script property API_REQUIRE_LINE = 0 ปิดการตรวจ (ใช้ทดสอบเท่านั้น) */
 const LINE_CHANNEL_ID = '2012314415';
 const API_FUNCS_ = {
+  getShelfMap: getShelfMap,
+  addShelfSlots: addShelfSlots,
+  removeShelfSlot: removeShelfSlot,
+  fillShelfGaps: fillShelfGaps,
   checkSerial: checkSerial,
   scanDuplicateSerials: scanDuplicateSerials,
   getBootstrap: getBootstrap,
@@ -193,6 +198,7 @@ function setup() {
 }
 
 let MIGRATING_ = false;
+HEADERS[SHEET_SHELF] = ['กลุ่ม (ตู้/ชั้น)', 'ช่อง', 'LOCATION', 'หมายเหตุ'];
 let MIGRATION_NOTE_ = '';
 HEADERS[SHEET_RCV2] = HEADERS[SHEET_RCV];
 const HDR_STYLE_ = (rg) => rg.setFontWeight('bold').setBackground('#1a56db').setFontColor('#ffffff')
@@ -258,6 +264,8 @@ function getSheet_(name) {
       sh.getRange('M2:M').setNumberFormat('dd/mm/yyyy');
       sh.getRange('O2:O').setNumberFormat('dd/mm/yyyy');
       sh.getRange('Q2:Q').setNumberFormat('@');
+    } else if (name === SHEET_SHELF) {
+      sh.getRange('A2:D').setNumberFormat('@');
     } else if (name === SHEET_LOG) {
       sh.getRange('A2:A').setNumberFormat('dd/mm/yyyy hh:mm:ss');
       sh.getRange('E2:E').setNumberFormat('@');
@@ -1441,22 +1449,34 @@ function editLot(p) {
     const rc = readRcv_();
     const r = rc.filter(x => Number(x[RC.SEQ]) === seq)[0];
     if (!r) throw new Error('ไม่พบแถวรับของพัสดุนี้');
-    const oldSn = str_(r[RC.SN]), oldLoc = str_(r[RC.LOC]);
+    const oldSn = str_(r[RC.SN]), oldLoc = str_(r[RC.LOC]), oldPart = str_(r[RC.PART]), oldName = str_(r[RC.NAME]);
     const newLoc = p.location === undefined ? oldLoc : str_(p.location);
     const newSn = p.serial === undefined ? oldSn : str_(p.serial);
+    const newPart = p.part === undefined ? oldPart : str_(p.part);
+    const newName = p.name === undefined ? oldName : str_(p.name);
     const newRemain = p.qty === undefined || p.qty === '' ? lot.remain : num_(p.qty);
+    if (!newPart) throw new Error('Part number ว่างไม่ได้');
+    if (!newName) throw new Error('ชื่อพัสดุว่างไม่ได้');
     if (!(newRemain > 0)) throw new Error('จำนวนต้องมากกว่า 0 (ถ้าไม่มีของแล้วให้ใช้ จ่าย)');
     if (newSn && newRemain !== 1) throw new Error('พัสดุที่มี S/N ต้องมีจำนวน 1');
     if (!newSn && oldSn) throw new Error('ลบ S/N ที่มีอยู่แล้วไม่ได้');
     const snCh = newSn !== oldSn, locCh = newLoc !== oldLoc, qtyCh = newRemain !== lot.remain;
+    const partCh = newPart !== oldPart, nameCh = newName !== oldName;
     if (snCh && newSn && rc.some(x => Number(x[RC.SEQ]) !== seq && snKey_(x[RC.SN]) === snKey_(newSn))) throw new Error('S/N ' + newSn + ' ซ้ำกับรายการอื่น');
     const changes = [];
-    if (snCh) {
-      propagatePartSn_(r, str_(r[RC.SEQ]), null, newSn, readIss_(), readLoans_());
-      changes.push('S/N ' + (oldSn || '(ว่าง)') + ' → ' + newSn);
+    if (snCh || partCh) {
+      propagatePartSn_(r, str_(r[RC.SEQ]), partCh ? newPart : null, snCh ? newSn : null, readIss_(), readLoans_());
+      if (partCh) changes.push('P/N ' + oldPart + ' → ' + newPart);
+      if (snCh) changes.push('S/N ' + (oldSn || '(ว่าง)') + ' → ' + newSn);
+    }
+    if (nameCh) {
+      const seqs = {}; seqs[str_(r[RC.SEQ])] = 1;
+      if (p.nameAll) rc.forEach(x => { if (str_(x[RC.PART]) === (partCh ? newPart : oldPart) || str_(x[RC.PART]) === oldPart) seqs[str_(x[RC.SEQ])] = 1; });
+      propagateName_(rc, seqs, newName);
+      changes.push('ชื่อ ' + oldName + ' → ' + newName + (p.nameAll ? ' (ทุกล็อตของ P/N นี้)' : ''));
     }
     if (locCh) {
-      getSheet_(r._sh).getRange(r._row, rcCol_(RC.LOC)).setValue(newLoc);
+      getSheet_(r._sh).getRange(r._row, rcCol_(RC.LOC)).setNumberFormat('@').setValue(newLoc);
       changes.push('ที่เก็บ ' + (oldLoc || '(ว่าง)') + ' → ' + (newLoc || '(ว่าง)'));
     }
     if (qtyCh) {
@@ -1464,10 +1484,19 @@ function editLot(p) {
       changes.push('จำนวน ' + lot.remain + ' → ' + newRemain);
     }
     if (!changes.length) return { ok: true, same: true, changes: [] };
-    log_('แก้ไขล็อตในคลัง', lot.doc, [lot.part, changes.join(' | ')].filter(Boolean).join(' | '), p.by);
+    log_('แก้ไขล็อตในคลัง', lot.doc, [partCh ? newPart : oldPart, changes.join(' | ')].filter(Boolean).join(' | '), p.by);
     rebuildStock_();
     return { ok: true, changes: changes };
   });
+}
+
+/** เปลี่ยนชื่อพัสดุของล็อตที่ระบุ (seqs = { 'ลำดับรับ': 1 }) ในชีท รับ / จ่าย / ยืม ให้ตรงกัน */
+function propagateName_(rcRows, seqs, newName) {
+  const setTxt = (sh, row, col, v) => sh.getRange(row, col).setNumberFormat('@').setValue(v);
+  rcRows.forEach(x => { if (seqs[str_(x[RC.SEQ])] && str_(x[RC.NAME]) !== newName) setTxt(getSheet_(x._sh), x._row, rcCol_(RC.NAME), newName); });
+  const iss = getSheet_(SHEET_ISS), loan = getSheet_(SHEET_LOAN);
+  readIss_().forEach((ir, j) => { if (seqs[str_(ir[IS.RSEQ])] && str_(ir[IS.NAME]) !== newName) setTxt(iss, j + 2, IS.NAME + 1, newName); });
+  readLoans_().forEach((lr, j) => { if (seqs[str_(lr[17])] && str_(lr[3]) !== newName) setTxt(loan, j + 2, 4, newName); });
 }
 
 function moveLocation(p) {
@@ -1477,11 +1506,114 @@ function moveLocation(p) {
     const lot = computeLots_().filter(l => l.seq === Number(p.seq))[0];
     if (!lot || lot.remain <= 0) throw new Error('ไม่พบพัสดุในคลัง (อาจถูกจ่ายไปแล้ว) กรุณารีเฟรช');
     if (lot.loc === loc) return { ok: true, from: lot.loc, to: loc, same: true };
-    getSheet_(lot.sh || SHEET_RCV).getRange(lot.row, rcCol_(RC.LOC)).setValue(loc);
+    getSheet_(lot.sh || SHEET_RCV).getRange(lot.row, rcCol_(RC.LOC)).setNumberFormat('@').setValue(loc);
     log_('ย้ายที่จัดเก็บ', lot.doc, [lot.part, lot.serial ? 'S/N ' + lot.serial : '', (lot.loc || '(ว่าง)') + ' → ' + loc].filter(Boolean).join(' | '), p.by);
     rebuildStock_();
     return { ok: true, from: lot.loc, to: loc };
   });
+}
+
+/* ---------- ผังที่จัดเก็บ (Shelf Map) ---------- */
+const SHELF_MAX_SLOTS_ = 600;
+
+/** "B2-6" -> { group:'B2', slot:'6' } ; ไม่มีขีด -> กลุ่ม 'อื่น ๆ' */
+function shelfParse_(loc) {
+  const s = str_(loc).replace(/\s+/g, ' ');
+  const i = s.lastIndexOf('-');
+  if (i > 0 && i < s.length - 1) return { group: s.slice(0, i).trim(), slot: s.slice(i + 1).trim() };
+  return { group: 'อื่น ๆ', slot: s };
+}
+function shelfKey_(loc) { return str_(loc).toUpperCase().replace(/\s+/g, ''); }
+function natCmp_(a, b) {
+  const x = String(a).match(/\d+|\D+/g) || [], y = String(b).match(/\d+|\D+/g) || [];
+  for (let i = 0; i < Math.min(x.length, y.length); i++) {
+    const nx = /^\d/.test(x[i]), ny = /^\d/.test(y[i]);
+    if (nx && ny) { const d = Number(x[i]) - Number(y[i]); if (d) return d; }
+    else if (x[i] !== y[i]) return x[i] < y[i] ? -1 : 1;
+  }
+  return x.length - y.length;
+}
+function readShelf_() {
+  const sh = getSheet_(SHEET_SHELF), last = sh.getLastRow();
+  if (last < 2) return [];
+  return sh.getRange(2, 1, last - 1, 4).getValues().map((r, i) => ({ row: i + 2, loc: str_(r[2]), note: str_(r[3]) })).filter(o => o.loc);
+}
+
+/** ข้อมูลผังคลังทั้งหมด (เรียกซ้ำได้ทุก ~15 วินาทีเพื่ออัปเดตแบบเรียลไทม์) */
+function getShelfMap() {
+  const cells = {};
+  const cell = loc => {
+    const k = shelfKey_(loc);
+    if (!cells[k]) { const ps = shelfParse_(loc); cells[k] = { loc: str_(loc), group: ps.group, slot: ps.slot, defined: false, note: '', items: [] }; }
+    return cells[k];
+  };
+  readShelf_().forEach(o => { const c = cell(o.loc); c.defined = true; c.note = o.note; });
+  const unplaced = [];
+  let items = 0;
+  computeLots_().filter(l => l.remain > 0).forEach(l => {
+    const it = { seq: l.seq, part: l.part, name: l.name, serial: l.serial, qty: l.remain, unit: l.unit, type: l.type || '', cond: l.cond || '', doc: l.label, kit: kitOf_(l.v[RC.TAIL]) };
+    items++;
+    if (!str_(l.loc)) unplaced.push(it); else cell(l.loc).items.push(it);
+  });
+  const groups = {};
+  Object.keys(cells).forEach(k => { const c = cells[k]; (groups[c.group] = groups[c.group] || []).push(c); });
+  const out = Object.keys(groups).sort(natCmp_).map(g => {
+    const cs = groups[g].sort((a, b) => natCmp_(a.slot, b.slot));
+    return { name: g, cells: cs.map(c => ({ loc: c.loc, slot: c.slot, defined: c.defined, note: c.note, items: c.items })) };
+  });
+  let total = 0, used = 0;
+  out.forEach(g => g.cells.forEach(c => { total++; if (c.items.length) used++; }));
+  return { groups: out, unplaced: unplaced, stats: { cells: total, used: used, empty: total - used, items: items, unplaced: unplaced.length, defined: readShelf_().length }, ts: Date.now() };
+}
+
+/** เพิ่มช่องในผัง: { group, from, to } (ตัวเลข) หรือ { locs:['A-1','A-2'] } */
+function addShelfSlots(p) {
+  return withLock_(() => {
+    let list = [];
+    if (p.locs && p.locs.length) list = p.locs.map(str_).filter(Boolean);
+    else {
+      const g = str_(p.group), a = Math.floor(Number(p.from)), b = Math.floor(Number(p.to));
+      if (!g) throw new Error('กรุณาระบุชื่อกลุ่ม/ตู้/ชั้น เช่น B2');
+      if (!(a >= 0) || !(b >= a)) throw new Error('ช่วงช่องไม่ถูกต้อง (ตั้งแต่ ≤ ถึง)');
+      for (let i = a; i <= b; i++) list.push(g + '-' + i);
+    }
+    const have = {}; readShelf_().forEach(o => { have[shelfKey_(o.loc)] = 1; });
+    const add = list.filter(l => !have[shelfKey_(l)]);
+    if (readShelf_().length + add.length > SHELF_MAX_SLOTS_) throw new Error('ผังมีช่องได้ไม่เกิน ' + SHELF_MAX_SLOTS_ + ' ช่อง');
+    if (add.length) {
+      const sh = getSheet_(SHEET_SHELF), start = Math.max(sh.getLastRow(), 1) + 1;
+      sh.getRange(start, 1, add.length, 4).setNumberFormat('@').setValues(add.map(l => { const ps = shelfParse_(l); return [ps.group, ps.slot, l, '']; }));
+      log_('เพิ่มช่องในผัง', '', add.slice(0, 6).join(', ') + (add.length > 6 ? ' ... รวม ' + add.length + ' ช่อง' : ''), p.by);
+    }
+    return { ok: true, added: add.length, skipped: list.length - add.length };
+  });
+}
+
+/** ลบช่องออกจากผัง (ทำได้เมื่อช่องว่างเท่านั้น) */
+function removeShelfSlot(p) {
+  return withLock_(() => {
+    const k = shelfKey_(p.loc);
+    if (computeLots_().some(l => l.remain > 0 && shelfKey_(l.loc) === k)) throw new Error('ช่องนี้ยังมีพัสดุอยู่ ย้ายออกก่อน');
+    const rows = readShelf_().filter(o => shelfKey_(o.loc) === k).map(o => o.row).sort((a, b) => b - a);
+    if (!rows.length) throw new Error('ช่องนี้ไม่ได้อยู่ในรายการผัง');
+    const sh = getSheet_(SHEET_SHELF);
+    rows.forEach(r => sh.deleteRow(r));
+    log_('ลบช่องออกจากผัง', '', str_(p.loc), p.by);
+    return { ok: true };
+  });
+}
+
+/** สร้างช่องว่างระหว่างเลขต่ำสุด–สูงสุดของแต่ละกลุ่มโดยอัตโนมัติ (เฉพาะกลุ่มที่ช่องเป็นตัวเลข) */
+function fillShelfGaps(p) {
+  const map = getShelfMap(), list = [];
+  map.groups.forEach(g => {
+    const nums = g.cells.filter(c => /^\d+$/.test(c.slot)).map(c => Number(c.slot));
+    if (nums.length < 1 || g.name === 'อื่น ๆ') return;
+    const lo = Math.min.apply(null, nums), hi = Math.max.apply(null, nums);
+    if (hi - lo > 200) return;
+    for (let i = lo; i <= hi; i++) list.push(g.name + '-' + i);
+  });
+  return addShelfSlots({ locs: list, by: p && p.by });
 }
 
 /* ---------- FLY AWAY KIT: พัสดุที่ TAIL No. = FLY AWAY KIT 1 / 2 (ชีทนี้เป็นมุมมองที่ลิงก์กับชีท รับ ด้วยลำดับรับ) ---------- */
