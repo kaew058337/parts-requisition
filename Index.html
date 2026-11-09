@@ -1044,6 +1044,29 @@ nav button.on::before{background:var(--gold);box-shadow:0 0 12px 2px rgba(212,17
 <script>
 (function(){
   var $ = function(id){ return document.getElementById(id); };
+
+/* ===== เช็ค S/N ซ้ำทันทีตอนพิมพ์ ===== */
+function snWatch(id, getSeq){
+  var el=$(id); if(!el) return;
+  var box=document.createElement('div'); box.className='meta'; box.style.cssText='margin-top:4px;display:none';
+  el.parentNode.insertBefore(box, el.nextSibling);
+  var tm=null, last='';
+  function show(t,color){ box.textContent=t; box.style.color=color; box.style.display=t?'block':'none'; }
+  el.addEventListener('input', function(){
+    clearTimeout(tm); var v=el.value.trim(); last=v;
+    if(v.length<3){ show('',''); return; }
+    tm=setTimeout(function(){
+      run('checkSerial',[v, getSeq?getSeq():0]).then(function(r){
+        if(last!==v) return;
+        if(r.state==='stock') show('⚠ S/N '+v+' ซ้ำ: มีในคลังแล้ว ('+r.label+(r.part?' · '+r.part:'')+(r.loc?' · '+r.loc:'')+') — บันทึกไม่ได้','var(--bad,#c0392b)');
+        else if(r.state==='seen') show('ℹ S/N นี้เคยรับแล้ว ('+r.label+') ตอนนี้ไม่อยู่ในคลัง — ตรวจว่าใช่ของที่ส่งซ่อม/คืนหรือไม่','var(--warn,#b9770e)');
+        else if(r.state==='ok') show('✓ S/N นี้ยังไม่มีในระบบ','var(--ok,#1e8449)');
+        else show('','');
+      }).catch(function(){ show('',''); });
+    }, 450);
+  });
+  el.addEventListener('blur', function(){ if(!el.value.trim()) show('',''); });
+}
   var state = { users:[], today:'', rcv:[], iss:[], curR:null, curI:null, hist:'req', histData:null, parts:{} };
 
   /* ---------- utils ---------- */
@@ -1708,6 +1731,8 @@ nav button.on::before{background:var(--gold);box-shadow:0 0 12px 2px rgba(212,17
   }
   ['p-qty','p-price'].forEach(function(id){ $(id).addEventListener('input', calcRcv); });
   $('p-sn').addEventListener('input', snQty);
+  snWatch('p-sn', function(){ var o=$('p-lot').options[$('p-lot').selectedIndex]; if(o&&o.dataset.k==='L'){ var l=state.lots[Number(o.dataset.i)]; return l?l.seq:0; } return 0; });
+  snWatch('o-sn');
   $('s-x').addEventListener('click', closeRcv);
   $('s-bg').addEventListener('click', function(e){ if(e.target===this) closeRcv(); });
 
@@ -1916,6 +1941,7 @@ nav button.on::before{background:var(--gold);box-shadow:0 0 12px 2px rgba(212,17
     $('ed-kit').value=l.kit||''; $('ed-kqty').value=l.qty; $('ed-kqty').disabled=!!l.serial;
     $('ed-bg').classList.add('on');
   });
+  snWatch('ed-sn', function(){ return state.ed?state.ed.seq:0; });
   $('ed-sn').addEventListener('input', function(){
     if(this.value.trim()){ $('ed-qty').value=1; $('ed-qty').disabled=true; }
     else $('ed-qty').disabled=!!(state.ed && state.ed.serial);
@@ -2207,6 +2233,12 @@ nav button.on::before{background:var(--gold);box-shadow:0 0 12px 2px rgba(212,17
     $('t-qty').disabled = n>0;
     if(n>0) $('t-qty').value=n;
     $('t-sn-hint').textContent = n>1 ? 'ส่งคืน '+n+' Serial · บันทึกแยกเป็น '+n+' แถวในชีทส่งคืน (แถวละ 1 ชิ้น)' : '';
+    var seen={}, dups=[];
+    snList($('t-sn-ret').value).forEach(function(s){ var k=s.toUpperCase(); if(seen[k]&&dups.indexOf(s)<0) dups.push(s); seen[k]=1; });
+    var seen2={}, dups2=[];
+    snList($('t-sn-in').value).forEach(function(s){ var k=s.toUpperCase(); if(seen2[k]&&dups2.indexOf(s)<0) dups2.push(s); seen2[k]=1; });
+    var w=[]; if(dups.length) w.push('⚠ Serial ส่งคืนซ้ำกันเอง: '+dups.join(', ')); if(dups2.length) w.push('⚠ Serial ที่ใส่ซ้ำกันเอง: '+dups2.join(', '));
+    if(w.length){ $('t-sn-hint').textContent=w.join(' · '); $('t-sn-hint').style.color='var(--bad,#c0392b)'; } else $('t-sn-hint').style.color='';
   }
   function warnSerial(serial, part, inlineEl){
     if(inlineEl) inlineEl.innerHTML='';
@@ -2241,7 +2273,7 @@ nav button.on::before{background:var(--gold);box-shadow:0 0 12px 2px rgba(212,17
     if(typeof draftSave==='function') draftSave();
   });
   ['input','change'].forEach(function(ev){ $('t-part').addEventListener(ev, function(){ clearTimeout(issTimer); issTimer=setTimeout(loadIssuedChips,350); }); });
-  $('t-sn-ret').addEventListener('input', snCount);
+  $('t-sn-ret').addEventListener('input', snCount); $('t-sn-in').addEventListener('input', snCount);
   $('t-sn-ret').addEventListener('change', function(){
     snCount(); $('t-warn').innerHTML='';
     if(!snList(this.value).length) return;

@@ -74,6 +74,7 @@ function doGet() {
    - Script property API_REQUIRE_LINE = 0 ปิดการตรวจ (ใช้ทดสอบเท่านั้น) */
 const LINE_CHANNEL_ID = '2012314415';
 const API_FUNCS_ = {
+  checkSerial: checkSerial,
   getBootstrap: getBootstrap,
   addOpeningStock: addOpeningStock,
   getAwaitingReq: getAwaitingReq,
@@ -2046,6 +2047,18 @@ function getReturnable() {
     });
   });
   return out.reverse();
+}
+
+/** เช็ค S/N ซ้ำแบบเรียลไทม์ตอนพิมพ์: state = stock (มีในคลังอยู่แล้ว) | seen (เคยรับแล้ว ตอนนี้ไม่อยู่ในคลัง) | ok */
+function checkSerial(sn, exceptSeq) {
+  const k = snKey_(sn);
+  if (!k || k.length < 3) return { state: '' };
+  const ex = Number(exceptSeq) || 0;
+  const lots = computeLots_().filter(l => l.seq !== ex && snKey_(l.serial) === k);
+  const live = lots.filter(l => l.remain > 0)[0];
+  if (live) return { state: 'stock', label: live.label, part: live.part, loc: live.loc || '' };
+  if (lots.length) { const l = lots[lots.length - 1]; return { state: 'seen', label: l.label, part: l.part }; }
+  return { state: 'ok' };
 }
 
 /** จ่ายล่าสุดของ Part number นี้ที่มี S/N (ใช้ช่วยกรอก "Serial ที่ใส่" ตอนบันทึกส่งคืน) */
