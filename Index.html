@@ -407,18 +407,6 @@ main .ty-chem{border-left:5px solid var(--ty-chem)}main .ty-kit{border-left:5px 
 .emp-i svg{width:32px;height:32px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .emp b{font-family:var(--serif);font-size:20px;color:var(--ink);font-weight:700;line-height:1.2}
 .emp>span{font-size:14px;max-width:32ch;line-height:1.5}
-/* ===== เส้นเวลาขั้นตอนใบเบิก ===== */
-.stp{display:flex;margin:12px 0 2px;font-size:11.5px;color:var(--muted)}
-.stp .s{flex:1;position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;min-width:0}
-.stp .s::before{content:'';position:absolute;top:8px;right:50%;width:100%;height:2px;background:var(--line)}
-.stp .s:first-child::before{display:none}
-.stp .s.done::before,.stp .s.cur::before{background:var(--gold)}
-.stp i{position:relative;z-index:1;width:18px;height:18px;border-radius:50%;background:var(--card);border:2px solid var(--line);display:grid;place-items:center;font-style:normal;font-size:10px;font-weight:700;color:#fff;line-height:1}
-.stp .done i{background:var(--gold);border-color:var(--gold);color:#fff}
-.stp .cur i{border-color:var(--gold);background:var(--card);box-shadow:0 0 0 4px rgba(212,179,106,.28)}
-.stp .cur i::after{content:'';width:8px;height:8px;border-radius:50%;background:var(--gold)}
-.stp .done,.stp .cur{color:var(--ink)}.stp .cur{font-weight:700}
-.stp small{display:block;font-weight:500;color:var(--muted);font-size:10.5px}
 /* ===== โครงการ์ดระหว่างโหลด ===== */
 .skl{display:grid;gap:12px;padding-top:4px}
 .skc{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:16px;display:grid;gap:9px;position:relative;overflow:hidden}
@@ -488,7 +476,6 @@ html[data-theme=dark] #offbar.q{background:#12325a;color:#cfe3ff;border-color:#2
 html[data-theme=dark] a.snl{color:#9cc3ff}
 html[data-theme=dark] .pcard .doc,html[data-theme=dark] .doc-ok .big,html[data-theme=dark] .ci-h b{color:var(--navy-royal)}
 html[data-theme=dark] .tgl-tr{background:linear-gradient(180deg,#17355a,#0f2848)}
-html[data-theme=dark] .stp i{color:#071B35}
 html[data-theme=dark] .emp-i{box-shadow:0 6px 18px rgba(0,0,0,.35)}
 html[data-theme=dark] hr{border-color:var(--line)}
 html[data-theme=dark] .meta{color:var(--muted)}
@@ -1181,7 +1168,6 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
 /* ===== helper: หน้าว่าง / เส้นเวลา / สีตามประเภท ===== */
 var EMP_ICO={box:'<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/>',search:'<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.2-4.2"/>',inbox:'<path d="M4 13l2.5-8h11L20 13v6H4z"/><path d="M4 13h5l1 2h4l1-2h5"/>',check:'<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 9.5"/>',doc:'<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h5M10 16h5"/>',swap:'<path d="M7 4L3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'};
 function emp(ico,title,hint,extra){ return '<div class="empty emp"><div class="emp-i"><svg viewBox="0 0 24 24">'+(EMP_ICO[ico]||EMP_ICO.box)+'</svg></div><b>'+title+'</b>'+(hint?'<span>'+hint+'</span>':'')+(extra||'')+'</div>'; }
-function steps(cur,sub){ var L=['เบิก','รับ','จ่าย','ติดตั้ง']; return '<div class="stp" role="img" aria-label="ขั้นตอน: '+L[cur]+'">'+L.map(function(t,i){ var c=i<cur?'done':(i===cur?'cur':''); return '<div class="s '+c+'"><i>'+(i<cur?'✓':'')+'</i><span>'+t+(i===cur&&sub?'<small>'+sub+'</small>':'')+'</span></div>'; }).join('')+'</div>'; }
 function skel(){ return '<div class="skl" aria-busy="true" aria-label="กำลังโหลด"><div class="skc"><i class="w1"></i><i class="w2"></i><i class="w3"></i><span><b></b><b></b><b></b></span></div><div class="skc"><i class="w1"></i><i class="w2"></i><i class="w3"></i><span><b></b><b></b><b></b></span></div><div class="skc"><i class="w1"></i><i class="w2"></i><i class="w3"></i><span><b></b><b></b><b></b></span></div></div>'; }
 function tyCls(t,kit){ if(kit) return ' ty-kit'; t=String(t||''); if(t.indexOf('TCI')>=0) return ' ty-tci'; if(t.indexOf('LRU')===0) return ' ty-lru'; if(t.indexOf('SP')===0) return ' ty-sp'; if(t.indexOf('สารเคมี')===0) return ' ty-chem'; return ''; }
 
@@ -1830,7 +1816,6 @@ function snWatch(id, getSeq){
         '<div class="nm">'+esc(r.name)+'</div>'+
         '<div class="meta">'+esc(r.part)+' · ค้างรับ '+fmtNum(r.remain)+' / '+fmtNum(r.qty)+' '+esc(r.unit)+'</div>'+
         '<div class="meta">เบิก '+esc(r.date)+(r.machine?' · เครื่อง '+esc(r.machine):'')+'</div>'+taiLine(r.tai)+
-        steps(1, r.received>0?fmtNum(r.received)+'/'+fmtNum(r.qty):'')+
       '</div>';
     }).join('');
   }
@@ -1993,7 +1978,6 @@ function snWatch(id, getSeq){
         '<div class="nm">'+esc(r.name)+'</div>'+
         '<div class="meta">'+esc(r.part)+(r.serial?' · S/N '+esc(r.serial):'')+' · จำนวน '+fmtNum(r.qty)+' '+esc(r.unit)+'</div>'+
         '<div class="meta">'+(r.machine?'เครื่อง '+esc(r.machine):'')+(r.location?' · '+esc(r.location):'')+'</div>'+
-        steps(2)+
       '</div>';
     }).join('');
   }
