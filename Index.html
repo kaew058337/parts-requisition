@@ -989,6 +989,7 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
     <label class="chk" style="display:flex;gap:8px;align-items:center;margin:6px 0;font-weight:400"><input type="checkbox" id="ed-nameall" style="width:auto;margin:0"> ใช้ชื่อนี้กับทุกล็อตของ P/N นี้</label>
     <label>LOCATION (ที่จัดเก็บ / ย้ายที่เก็บ)</label><input id="ed-loc" list="ed-locs" autocomplete="off">
     <datalist id="ed-locs"></datalist>
+    <datalist id="loc-dl"></datalist>
     <label>จำนวนคงเหลือ</label><input id="ed-qty" type="number" inputmode="decimal" min="0" step="any">
     <label>S/N</label><input id="ed-sn" autocomplete="off" autocapitalize="characters">
     <div class="meta" style="margin:6px 0" id="ed-note">เมื่อบันทึก ระบบจะแก้ในชีท รับ / จ่าย / ยืมพัสดุ / ใบเบิก / เคลม / คลังพัสดุ ให้ตรงกันทั้งหมด</div>
@@ -2476,6 +2477,32 @@ function snWatch(id, getSeq){
     document.body.appendChild(a); a.click(); setTimeout(function(){ a.remove(); },500);
   });
 
+
+  /* ---------- ตัวเลือกที่เก็บ: ช่องว่างขึ้นก่อน แล้วตามด้วยช่องที่มีของ ---------- */
+  var LOCC={ts:0,busy:false};
+  function locFill(){
+    var dl=$('loc-dl'); if(!dl) return;
+    var d=SM.data||LOCC.data, seen={}, empty=[], used=[], extra=[];
+    function lab(s){ return esc(s); }
+    if(d) d.groups.forEach(function(g){ g.cells.forEach(function(c){
+      if(!c.defined||seen[c.loc]) return; seen[c.loc]=1;
+      if(c.items.length) used.push([c.loc,'มีของ '+c.items.length+' รายการ']); else empty.push([c.loc,'ว่าง']);
+    }); });
+    (state.stk||[]).forEach(function(g){ g.lots.forEach(function(x){ if(x.location && !seen[x.location]){ seen[x.location]=1; extra.push([x.location,'ใช้อยู่']); } }); });
+    function opt(a){ return '<option value="'+esc(a[0])+'" label="'+esc(a[1])+'">'; }
+    dl.innerHTML=empty.map(function(a){ return '<option value="'+esc(a[0])+'" label="🟢 ว่าง">'; }).join('')+used.map(opt).join('')+extra.map(opt).join('');
+  }
+  function locRefresh(){
+    if(LOCC.busy || Date.now()-LOCC.ts<20000){ locFill(); return; }
+    LOCC.busy=true;
+    run('getShelfMap').then(function(d){ LOCC.data=d; LOCC.ts=Date.now(); locFill(); }).catch(function(){ locFill(); }).then(function(){ LOCC.busy=false; });
+    locFill();
+  }
+  ['p-loc','o-loc','rs-loc','ed-loc'].forEach(function(id){
+    var el=$(id); if(!el) return;
+    el.setAttribute('list','loc-dl'); el.setAttribute('autocomplete','off');
+    el.addEventListener('focus', locRefresh);
+  });
   /* ---------- แก้ไขพัสดุในคลัง (ที่เก็บ / จำนวน / S/N) ---------- */
   function openEditLot(l){
     state.ed=l;
