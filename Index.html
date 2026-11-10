@@ -279,13 +279,11 @@
   .ct-bar{display:flex;gap:8px;margin:10px 0}
   .ct-bar .btn{margin:0;flex:1}
   .tg-pg{width:210mm;padding-top:21mm;font-family:'TH Sarabun PSK','THSarabunPSK','TH SarabunPSK','Sarabun',sans-serif;font-size:16pt;color:#000;line-height:1.05}
-  .tg{box-sizing:border-box;width:150mm;height:85mm;margin:0 auto;border:.3mm dashed #777;padding:2.5mm 3mm;display:flex;flex-direction:column}
-  .tg-h{display:flex;justify-content:space-between;align-items:baseline;padding-bottom:1mm}.tg-h b{font-size:18pt}.tg-h span{width:40mm}.tg-f{text-align:right;font-weight:700;white-space:nowrap}
-  .tg-r{display:flex;border:.3mm solid #000;border-top:0;padding:.6mm 1.6mm;flex:1;min-height:0}
-  .tg-h+.tg-r{border-top:.3mm solid #000}
-  .tg-r>div{padding-right:1.5mm}.tg-r b{margin-right:1.2mm;white-space:nowrap}.tg-r>.tg-l{flex:1.2;border-left:.3mm solid #000;padding-left:1.6mm}
-  .tg-r>div:first-child{overflow:hidden}
-  .tg-w{flex:.8}.tg-n{flex:1.4}.tg-last{flex:1.6}
+  .tg{position:relative;width:150mm;height:85mm;margin:0 auto;overflow:hidden}
+  .tg svg{position:absolute;left:0;top:0;width:150mm;height:85mm}
+  .tg i{position:absolute;font-style:normal;white-space:nowrap;line-height:5mm}.tg i.c{overflow:hidden;text-overflow:ellipsis}
+  .tg i b{margin-right:2.5mm}
+  .tg .ln{display:block;white-space:normal;overflow:hidden;text-overflow:clip}
   #print-area{display:none}
   @media print{
     html,body{background:#fff}
@@ -2350,15 +2348,33 @@ function snWatch(id, getSeq){
 
   /* ---------- ป้ายกำกับพัสดุดี (แบบ ทอ.๑๔๑ ก.) 15 x 8.5 ซม. : A4 แนวตั้ง 3 ใบ/แผ่น ---------- */
   function tgDate(){ var d=new Date(); return d.getDate()+' '+TH_MON[d.getMonth()]+' '+(d.getFullYear()+543); }
+  /* พิกัดทั้งหมดเป็นมม. วัดจากรูปป้ายจริง (ป้ายกว้าง 150 สูง 85 มม. หัวป้ายมีรู อยู่ซ้าย) */
   function tagHtml(l,dt){
     var q=(l.qty===0||l.qty)?fmtNum(l.qty):'';
-    return '<div class="tg"><div class="tg-h"><span></span><b>ป้ายกำกับพัสดุดี</b><span class="tg-f">แบบ ทอ. ๑๔๑ ก.</span></div>'+
-      '<div class="tg-r tg-w"><b>หมายเลข</b> '+esc(l.part)+'</div>'+
-      '<div class="tg-r tg-n"><b>ชื่อและชนิด</b> '+esc(l.name)+'</div>'+
-      '<div class="tg-r"><div style="flex:2.6"><b>หมายเลขอันดับ</b> '+esc(l.serial)+'</div><div class="tg-l"><b>บริษัทสร้าง</b></div></div>'+
-      '<div class="tg-r"><div style="flex:2.6"><b>ส่งตรวจหรือทดลองถ้าเก็บไว้เกินวันที่</b></div><div class="tg-l"><b>จำนวน</b> '+esc(q)+'</div></div>'+
-      '<div class="tg-r"><div style="flex:2.6"><b>ใบสั่งหรือสัญญาหรือเลขงานที่</b></div><div class="tg-l"><b>หน่วยนับ</b> '+esc(l.unit)+'</div></div>'+
-      '<div class="tg-r tg-last"><div style="flex:2.6"><b>วัน เดือน ปี</b> '+esc(dt)+'</div><div class="tg-l"><b>ผู้ตรวจ</b>(ลงชื่อ)<br>'+esc(l.recv)+'</div></div></div>';
+    function T(x,y,w,inner,cls,st){ return '<i'+(cls?' class="'+cls+'"':'')+' style="left:'+x+'mm;top:'+y+'mm;width:'+w+'mm;'+(st||'')+'">'+inner+'</i>'; }
+    function B(s){ return '<b>'+s+'</b>'; }
+    var ln=function(x1,y1,x2,y2){ return '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'"/>'; };
+    var svg='<svg viewBox="0 0 150 85"><path d="M19.8 .2H149.8V84.8H13.6L.2 68.6V20.2Z" fill="none" stroke="#777" stroke-width=".25" stroke-dasharray="1.2 .8"/>'+
+      '<circle cx="11.7" cy="42.1" r="3" fill="none" stroke="#777" stroke-width=".25"/>'+
+      '<g stroke="#000" stroke-width=".4" stroke-linecap="square">'+
+      ln(20.8,13.5,137.7,13.5)+ln(20.8,27.1,137.5,27.1)+ln(20.8,34.8,137.5,34.8)+ln(20.8,45.2,137.5,45.2)+
+      ln(20.8,55.3,121.1,55.3)+ln(20.8,65.1,121.1,65.1)+ln(20.8,78.6,61.1,78.6)+ln(61.1,76.6,137.5,76.6)+
+      ln(20.8,13.5,20.8,78.6)+ln(61.1,34.8,61.1,45.2)+ln(61.1,65.1,61.1,78.6)+
+      ln(86.5,45.2,86.5,55.3)+ln(103.8,45.2,103.8,55.3)+ln(121.1,45.2,121.1,65.1)+'</g></svg>';
+    return '<div class="tg">'+svg+
+      T(40,5.6,80.8,'<b style="font-size:18pt">ป้ายกำกับพัสดุดี</b>','','text-align:center;line-height:6.6mm')+
+      T(97.5,6.6,40.5,'<b>แบบ ทอ. ๑๔๑ ก.</b>','','text-align:right')+
+      T(22,14.5,114,B('หมายเลข')+esc(l.part),'c','line-height:6mm')+
+      T(22,21,114.5,B('ชื่อและชนิด')+esc(l.name),'ln','line-height:7mm;max-height:14mm')+
+      T(22,35.3,38,B('หมายเลขอันดับ'))+T(22,40.2,38.5,esc(l.serial),'c')+
+      T(62.7,35.3,74,B('บริษัทสร้าง'))+
+      T(22,45.8,63,B('ส่งตรวจหรือทดลองถ้าเก็บไว้เกินวันที่'))+
+      T(88,45.3,15,B('จำนวน'))+T(88,50.2,15.5,esc(q),'c')+
+      T(105.2,45.3,15,B('หน่วยนับ'))+T(105.2,50.2,15.5,esc(l.unit),'c')+
+      T(22,56.6,98,B('ใบสั่งหรือสัญญาหรือเลขงานที่'))+
+      T(23,66.9,37,B('วัน เดือน ปี'))+T(23,72.4,37,esc(dt),'c')+
+      T(62.9,66.3,74,B('ผู้ตรวจ'))+T(62.9,72.1,74,B('(ลงชื่อ)')+esc(l.recv),'c')+
+      '</div>';
   }
   function printTags(seqs){
     var dt=tgDate(), list=seqs.map(function(s){return state.lotMap&&state.lotMap[s];}).filter(Boolean);
