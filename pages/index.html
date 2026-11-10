@@ -1568,7 +1568,7 @@ function snWatch(id, getSeq){
   /* ---------- ผังที่จัดเก็บ (Shelf Map) ---------- */
   var SM={data:null,sig:'',q:'',timer:null,open:false,cell:'',moving:null,dest:'',idx:{},ts:null};
   function smKey(s){ return String(s||'').toUpperCase().replace(/\s+/g,''); }
-  function smStamp(){ var d=SM.ts; if(!d) return; var p=function(n){return n<10?'0'+n:n;}; $('sm-ts').textContent='อัปเดตล่าสุด '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds())+' · อัตโนมัติทุก 15 วินาที'; }
+  function smStamp(){ var d=SM.ts; if(!d) return; var p=function(n){return n<10?'0'+n:n;}; $('sm-ts').textContent='อัปเดตล่าสุด '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds())+' · อัตโนมัติทุก 1 นาที'; }
   function smLoad(manual){
     if(manual) $('sm-ts').textContent='กำลังอัปเดต…';
     return run('getShelfMap').then(function(d){
@@ -1750,7 +1750,7 @@ function snWatch(id, getSeq){
     if(SM.data) smRender(); else $('sm-body').innerHTML=skel();
     smLoad(true);
     clearInterval(SM.timer);
-    SM.timer=setInterval(function(){ if(SM.open && !document.hidden) smLoad(); },15000);
+    SM.timer=setInterval(function(){ if(SM.open && !document.hidden) smLoad(); },60000);
   }
   function smClose(){ SM.open=false; clearInterval(SM.timer); SM.timer=null; SM.moving=null; SM.dest=''; $('sm-bg').classList.remove('on'); $('sc-bg').classList.remove('on'); }
   document.addEventListener('visibilitychange', function(){ if(SM.open && !document.hidden) smLoad(); });
