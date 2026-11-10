@@ -448,14 +448,11 @@ main .ty-chem{border-left:5px solid var(--ty-chem)}main .ty-kit{border-left:5px 
   .srow{display:flex;align-items:stretch;gap:8px;margin-bottom:7px}
   .srow .sgrid{flex:1;min-width:0}
   .rl{flex:none;width:22px;display:grid;place-items:center;font-family:var(--serif);font-weight:700;font-size:19px;color:var(--gold-d)}
-  .tier-ctl{display:flex;align-items:center;gap:6px;margin:0 0 10px;font-size:12.5px;color:var(--muted)}
-  .tier-ctl button{padding:4px 10px;border-radius:99px;border:1px solid var(--line);background:transparent;color:var(--muted);font:600 12.5px 'Sarabun',sans-serif;cursor:pointer;width:auto;margin:0;box-shadow:none}
-  .tier-ctl button.on{background:var(--navy-royal);border-color:var(--navy-royal);color:#fff}
   .bay{padding:2px 0}
   .brow{display:flex;gap:8px;margin-bottom:14px;align-items:flex-start}
   .brow .rl{width:18px;margin-top:2px;background:none;border:0;height:auto;font-family:'Sarabun',sans-serif;font-size:15px;font-weight:700;color:var(--muted)}
   .bsecs{flex:1;min-width:0;display:grid;gap:10px}
-  .bsec{min-width:0}
+  .bsec{min-width:0;display:flex;flex-direction:column;justify-content:flex-end}
   .bst{display:grid;gap:4px}
   .bplank{margin-top:5px;padding-top:4px;border-top:1.5px solid var(--line);font-size:11px;font-weight:600;letter-spacing:.3px;text-align:center;color:var(--muted)}
   .scell.bcell{aspect-ratio:auto;height:40px;border-radius:8px;border-width:1px;padding:0 2px;gap:1px;background:transparent;border-color:var(--line);box-shadow:none}
@@ -1546,7 +1543,6 @@ function snWatch(id, getSeq){
   })();
 
   /* ---------- ผังที่จัดเก็บ (Shelf Map) ---------- */
-  var TIERS={}; try{ TIERS=JSON.parse(localStorage.getItem('tiers1')||'{}')||{}; }catch(e){}
   var SM={data:null,sig:'',q:'',timer:null,open:false,cell:'',moving:null,dest:'',idx:{},ts:null};
   function smKey(s){ return String(s||'').toUpperCase().replace(/\s+/g,''); }
   function smStamp(){ var d=SM.ts; if(!d) return; var p=function(n){return n<10?'0'+n:n;}; $('sm-ts').textContent='อัปเดตล่าสุด '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds())+' · อัตโนมัติทุก 15 วินาที'; }
@@ -1576,17 +1572,17 @@ function snWatch(id, getSeq){
       return {k:k,cls:cls,html:function(style,bin){ if(bin) return '<button type="button" class="scell bcell '+cls+'" data-k="'+esc(k)+'" aria-label="ช่อง '+esc(c.loc)+(n?' มี '+n+' รายการ':' ว่าง')+'"><b>'+esc(c.col.split('-')[1])+'</b><i>'+(n?esc(first):'ว่าง')+'</i>'+(n>1?'<em>+'+(n-1)+'</em>':'')+'</button>'; return '<button type="button" class="scell '+cls+'" data-k="'+esc(k)+'"'+(style?' style="'+style+'"':'')+' aria-label="ช่อง '+esc(c.loc)+(n?' มี '+n+' รายการ':' ว่าง')+'"><b>'+esc(c.slot)+'</b><i>'+esc(first)+'</i>'+(n>1?'<em>+'+(n-1)+'</em>':'')+'</button>'; }};
     }
     function binShelf(cs,gname){
-      var no=(gname.match(/\d+/)||[''])[0], by={}, rows={}, secs={}, mb=0;
+      var no=(gname.match(/\d+/)||[''])[0], by={}, rows={}, secs={}, mb=0, smax={};
       cs.forEach(function(c){
         var m=c.col.split('-'), r=c.row, s=Number(m[0]), b=Number(m[1]);
-        (by[r]=by[r]||{})[s+'-'+b]=c; rows[r]=1; secs[s]=1; if(b>mb) mb=b;
+        (by[r]=by[r]||{})[s+'-'+b]=c; rows[r]=1; secs[s]=1; if(b>mb) mb=b; if(b>(smax[r+'-'+s]||0)) smax[r+'-'+s]=b;
       });
-      var rl=Object.keys(rows).sort(function(a,b){return a<b?1:-1;}), sl=Object.keys(secs).map(Number).sort(function(a,b){return a-b;}), per=TIERS[gname]||((mb%4===0&&mb%3!==0)?4:3), ns=Math.max(1,Math.ceil(mb/per));
-      var cur=TIERS[gname]||0, ctl='<div class="tier-ctl"><span>ลิ้นชักต่อกอง</span>'+[['0','อัตโนมัติ'],['3','3 ชั้น'],['4','4 ชั้น']].map(function(o){ return '<button type="button" data-tier="'+o[0]+'" data-g="'+esc(gname)+'" class="'+(String(cur)===o[0]?'on':'')+'">'+o[1]+'</button>'; }).join('')+'</div>';
-      return ctl+'<div class="bay">'+rl.map(function(r){
+      var rl=Object.keys(rows).sort(function(a,b){return a<b?1:-1;}), sl=Object.keys(secs).map(Number).sort(function(a,b){return a-b;});
+      return '<div class="bay">'+rl.map(function(r){
         return '<div class="brow"><span class="rl">'+esc(r)+'</span><div class="bsecs" style="grid-template-columns:repeat('+sl.length+',minmax(0,1fr))">'+sl.map(function(s){
-          var cellsH='';
+          var cellsH='', n=smax[r+'-'+s]||0, per=n===4?4:3, ns=Math.max(1,Math.ceil(n/per));
           for(var t=per;t>=1;t--) for(var k=0;k<ns;k++){
+            if(n<per&&t>n) continue;
             var c=by[r][s+'-'+(k*per+t)];
             if(!c){ cellsH+='<span class="bcell none"></span>'; continue; }
             var ch=cellHtml(c); cellsH+=ch.html('', true);
@@ -1707,8 +1703,6 @@ function snWatch(id, getSeq){
   $('sm-re').addEventListener('click', function(){ smLoad(true); });
   $('sm-q').addEventListener('input', function(){ SM.q=this.value; smRender(); });
   $('sm-body').addEventListener('click', function(e){
-    var tb=e.target.closest('[data-tier]');
-    if(tb){ var g=tb.dataset.g, v=Number(tb.dataset.tier); if(v) TIERS[g]=v; else delete TIERS[g]; try{ localStorage.setItem('tiers1',JSON.stringify(TIERS)); }catch(err){} smRender(); return; }
     var b=e.target.closest('.scell'); if(!b) return;
     var k=b.dataset.k;
     if(SM.moving){
