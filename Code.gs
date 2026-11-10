@@ -76,6 +76,7 @@ function doGet() {
 const LINE_CHANNEL_ID = '2012314415';
 const API_FUNCS_ = {
   getShelfMap: getShelfMap,
+  moveCell: moveCell,
   addShelfSlots: addShelfSlots,
   removeShelfSlot: removeShelfSlot,
   fillShelfGaps: fillShelfGaps,
@@ -1510,6 +1511,22 @@ function moveLocation(p) {
     log_('ย้ายที่จัดเก็บ', lot.doc, [lot.part, lot.serial ? 'S/N ' + lot.serial : '', (lot.loc || '(ว่าง)') + ' → ' + loc].filter(Boolean).join(' | '), p.by);
     rebuildStock_();
     return { ok: true, from: lot.loc, to: loc };
+  });
+}
+
+/** ย้ายพัสดุทั้งหมดในช่องหนึ่งไปอีกช่อง (หน้าผังที่จัดเก็บ) */
+function moveCell(p) {
+  return withLock_(() => {
+    const from = str_(p.from), to = str_(p.to);
+    if (!from) throw new Error('ไม่ระบุช่องต้นทาง');
+    if (!to) throw new Error('กรุณาระบุช่องปลายทาง');
+    if (shelfKey_(from) === shelfKey_(to)) throw new Error('ช่องต้นทางและปลายทางเป็นช่องเดียวกัน');
+    const lots = computeLots_().filter(l => l.remain > 0 && shelfKey_(l.loc) === shelfKey_(from));
+    if (!lots.length) throw new Error('ช่อง ' + from + ' ไม่มีพัสดุแล้ว (อาจมีคนย้ายไปก่อน) กรุณารีเฟรช');
+    lots.forEach(l => getSheet_(l.sh || SHEET_RCV).getRange(l.row, rcCol_(RC.LOC)).setNumberFormat('@').setValue(to));
+    log_('ย้ายที่จัดเก็บทั้งช่อง', '', from + ' → ' + to + ' | ' + lots.length + ' รายการ: ' + lots.slice(0, 5).map(l => l.part + (l.serial ? ' S/N ' + l.serial : '')).join(', ') + (lots.length > 5 ? ' ...' : ''), p.by);
+    rebuildStock_();
+    return { ok: true, moved: lots.length, from: from, to: to };
   });
 }
 

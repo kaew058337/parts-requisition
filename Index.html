@@ -1562,14 +1562,20 @@ function snWatch(id, getSeq){
     var m=SM.moving, destC=SM.dest?SM.idx[SM.dest]:null;
     b.hidden=false;
     if(!destC){
-      b.innerHTML='<div>กำลังย้าย <b>'+esc(m.item.name)+'</b> ('+esc(m.item.part)+')'+(m.from?' จาก '+esc(m.from):'')+'<br>แตะช่องปลายทางในผัง (ช่องว่างกะพริบ)</div><div class="acts"><button type="button" class="btn ghost sm" id="sm-mc" style="color:#fff;border-color:#fff">ยกเลิก</button></div>';
+      b.innerHTML='<div>กำลังย้าย '+(m.bulk?'<b>ทั้งช่อง '+esc(m.from)+'</b> ('+m.count+' รายการ)':'<b>'+esc(m.item.name)+'</b> ('+esc(m.item.part)+')'+(m.from?' จาก '+esc(m.from):''))+'<br>แตะช่องปลายทางในผัง (ช่องว่างกะพริบ)</div><div class="acts"><button type="button" class="btn ghost sm" id="sm-mc" style="color:#fff;border-color:#fff">ยกเลิก</button></div>';
     } else {
       var n=destC.items.length;
-      b.innerHTML='<div>ย้าย <b>'+esc(m.item.name)+'</b> → ช่อง <b>'+esc(destC.loc)+'</b>'+(n?'<br>⚠ ช่องนี้มีของอยู่แล้ว '+n+' รายการ (ย้ายรวมกันได้)':'<br>ช่องว่าง')+'</div><div class="acts"><button type="button" class="btn sm" id="sm-mg">ยืนยันย้าย</button><button type="button" class="btn ghost sm" id="sm-mc" style="color:#fff;border-color:#fff">ยกเลิก</button></div>';
+      b.innerHTML='<div>ย้าย '+(m.bulk?'<b>ทั้งช่อง '+esc(m.from)+'</b> ('+m.count+' รายการ)':'<b>'+esc(m.item.name)+'</b>')+' → ช่อง <b>'+esc(destC.loc)+'</b>'+(n?'<br>⚠ ช่องนี้มีของอยู่แล้ว '+n+' รายการ (ย้ายรวมกันได้)':'<br>ช่องว่าง')+'</div><div class="acts"><button type="button" class="btn sm" id="sm-mg">ยืนยันย้าย</button><button type="button" class="btn ghost sm" id="sm-mc" style="color:#fff;border-color:#fff">ยกเลิก</button></div>';
     }
   }
   function smStartMove(item,from,dest){
     SM.moving={item:item,from:from||''}; SM.dest=dest||'';
+    $('sc-bg').classList.remove('on'); SM.cell='';
+    smRender();
+    $('sm-bar').scrollIntoView({block:'nearest'});
+  }
+  function smStartBulk(c){
+    SM.moving={bulk:true,from:c.loc,count:c.items.length,item:null}; SM.dest='';
     $('sc-bg').classList.remove('on'); SM.cell='';
     smRender();
     $('sm-bar').scrollIntoView({block:'nearest'});
@@ -1579,8 +1585,8 @@ function snWatch(id, getSeq){
     if(!state.by){ askBy(function(){ smDoMove(btn); }); return; }
     var m=SM.moving, c=SM.idx[SM.dest]; if(!m||!c) return;
     busy(btn,true);
-    run('moveLocation',[{seq:m.item.seq,location:c.loc,by:state.by}]).then(function(res){
-      toast(res.same?'อยู่ช่องนี้อยู่แล้ว':'ย้ายแล้ว → '+res.to);
+    (m.bulk?run('moveCell',[{from:m.from,to:c.loc,by:state.by}]):run('moveLocation',[{seq:m.item.seq,location:c.loc,by:state.by}])).then(function(res){
+      toast(m.bulk?'ย้ายทั้งช่อง '+res.moved+' รายการ → '+res.to:(res.same?'อยู่ช่องนี้อยู่แล้ว':'ย้ายแล้ว → '+res.to));
       SM.moving=null; SM.dest=''; SM.sig='';
       loadStock(); return smLoad(true);
     }).catch(function(e){ toast(e.message,true); }).then(function(){ busy(btn,false); });
@@ -1596,6 +1602,7 @@ function snWatch(id, getSeq){
       return '<div class="sc-it"><div class="n">'+esc(i.name)+'</div><div class="meta">'+esc(i.part)+(i.serial?' · S/N '+esc(i.serial):'')+' · จำนวน '+fmtNum(i.qty)+' '+esc(i.unit)+(i.type?' · '+esc(i.type):'')+(i.kit?' · <b>'+esc(i.kit)+'</b>':'')+'<br>'+esc(i.doc)+'</div><div class="acts"><button type="button" class="btn ghost sm" data-ce="'+ix+'">แก้ไข</button><button type="button" class="btn sm" data-cm="'+ix+'">ย้ายไปช่องอื่น</button></div></div>';
     }).join('');
     if(!n) h+='<div class="meta" style="margin:6px 0 10px">ช่องนี้ว่าง ไม่มีพัสดุ</div>';
+    if(n>1) h+='<button type="button" class="btn" id="sc-all" style="margin-top:10px;width:100%">ย้ายทั้งช่อง ('+n+' รายการ) ไปที่อื่น</button>';
     h+='<div class="sc-find"><label style="margin-top:0">นำพัสดุอื่นมาวางที่ช่องนี้</label><input id="sc-f" placeholder="ค้นหา P/N · ชื่อ · S/N" autocomplete="off"><div class="sc-res" id="sc-res"></div></div>';
     h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">';
     if(!c.defined) h+='<button type="button" class="btn ghost sm" id="sc-def">เพิ่มช่องนี้เข้าผัง</button>';
@@ -1655,6 +1662,7 @@ function snWatch(id, getSeq){
     var be=e.target.closest('[data-ce]'); if(be){ openEditLot(smLotOf(c.items[Number(be.dataset.ce)],c.loc)); return; }
     var bm=e.target.closest('[data-cm]'); if(bm){ smStartMove(c.items[Number(bm.dataset.cm)],c.loc); return; }
     var bf=e.target.closest('[data-fm]'); if(bf){ var o=SM.found[Number(bf.dataset.fm)]; smStartMove(o.i,o.loc,SM.cell); return; }
+    if(e.target.closest('#sc-all')){ smStartBulk(c); return; }
     var df=e.target.closest('#sc-def'), dl=e.target.closest('#sc-del');
     if(!df && !dl) return;
     if(!state.by){ askBy(function(){ e.target.click(); }); return; }
