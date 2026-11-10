@@ -263,7 +263,9 @@
   input[type=checkbox]:not(.tgl-in):checked::after{transform:translateX(22px)}
   input[type=checkbox]:not(.tgl-in):focus-visible{outline:3px solid rgba(76,141,206,.55);outline-offset:2px}
   input[type=checkbox]:not(.tgl-in):disabled{opacity:.4;cursor:not-allowed}
-  input[data-tgc]{transform:scale(.72);transform-origin:right center;margin-left:-8px}
+  input[type=checkbox][data-tgc]:not(.tgl-in){width:22px !important;height:22px !important;border-radius:7px !important;border:1.5px solid #9db3d1 !important;background:#fff !important;box-shadow:none !important;margin:0 !important}
+  input[type=checkbox][data-tgc]:not(.tgl-in)::after{display:none !important}
+  input[type=checkbox][data-tgc]:not(.tgl-in):checked{background:var(--navy-royal) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center/16px no-repeat !important;border-color:var(--navy-royal) !important}
   #d-bg{z-index:67}
   #ct-bg .sheet,#sn-bg .sheet,#db-bg .sheet{top:0;max-height:none;border-radius:0;max-width:760px;padding-top:calc(16px + env(safe-area-inset-top))}
   #ct-bg .sheet .hd,#sn-bg .sheet .hd,#db-bg .sheet .hd{position:sticky;top:calc(-16px - env(safe-area-inset-top));z-index:2;background:var(--bg);margin:-4px -4px 8px;padding:8px 4px}
@@ -292,6 +294,12 @@
   .tg i{position:absolute;font-style:normal;white-space:nowrap;line-height:5mm}.tg i.c{overflow:hidden;text-overflow:ellipsis}
   .tg i b{margin-right:2.5mm}
   .tg .ln{display:block;white-space:normal;overflow:hidden;text-overflow:clip}
+  .tgbar{position:fixed;left:12px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom));max-width:696px;margin:0 auto;z-index:25;padding:8px 8px 8px 14px;border-radius:14px;background:var(--navy-royal);color:#fff;display:flex;align-items:center;gap:8px;box-shadow:var(--shadow-up)}
+  .tgbar[hidden]{display:none}
+  html[data-theme=dark] .tgbar{background:#1d4a7e}
+  #tg-txt{flex:1;min-width:0;font-size:14px;line-height:1.3}
+  .tgb{flex:none;width:auto !important;min-width:0;height:38px;margin:0;padding:0 14px;border-radius:10px;border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff;font:600 14px 'Sarabun',sans-serif;display:inline-flex;align-items:center;gap:6px;cursor:pointer;box-shadow:none;text-shadow:none}
+  .tgb.pri{background:#fff;color:var(--navy-royal);border-color:#fff}
   .pbtn{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;margin:-3px 0 -3px 5px;padding:0;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--navy-royal);vertical-align:middle;cursor:pointer}
   .pbtn:active{background:var(--line)}
   #print-area{display:none}
@@ -678,7 +686,7 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
         <button class="btn ghost sm" id="k-open" title="รับพัสดุเข้าคลังก่อนมีใบเบิก หรือเพิ่มยอดยกมา" style="margin:0;flex:none;width:auto;min-height:0;padding:5px 11px;font-size:13px;border-radius:12px">+ เพิ่มเข้าคลัง</button>
       </div>
       <div class="tylg" aria-label="สีแถบซ้ายของการ์ด"><span><i style="background:var(--ty-lru)"></i>LRU</span><span><i style="background:var(--ty-sp)"></i>SP</span><span><i style="background:var(--ty-tci)"></i>TCI</span><span><i style="background:var(--ty-chem)"></i>สารเคมี</span><span><i style="background:var(--ty-kit)"></i>ชุด KIT</span></div>
-      <div id="tg-bar" class="sm-bar" hidden><div id="tg-txt"></div><div style="display:flex;gap:8px"><button class="btn" id="tg-go" style="margin:0;flex:1">พิมพ์ป้าย</button><button class="btn ghost" id="tg-clr" style="margin:0">ล้าง</button></div></div>
+      <div id="tg-bar" class="tgbar" hidden><div id="tg-txt"></div><button id="tg-go" class="tgb pri"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/></svg>พิมพ์</button><button id="tg-clr" class="tgb">ล้าง</button></div>
       <div id="k-list"><div class="skl" aria-busy="true" aria-label="กำลังโหลด"><div class="skc"><i class="w1"></i><i class="w2"></i><i class="w3"></i><span><b></b><b></b><b></b></span></div><div class="skc"><i class="w1"></i><i class="w2"></i><i class="w3"></i><span><b></b><b></b><b></b></span></div><div class="skc"><i class="w1"></i><i class="w2"></i><i class="w3"></i><span><b></b><b></b><b></b></span></div></div></div>
     </div>
     <div id="k-loanpane" style="display:none">
@@ -2402,7 +2410,7 @@ function snWatch(id, getSeq){
   function tgBar(){
     var n=Object.keys(TG.sel).length, b=$('tg-bar'); if(!b) return;
     b.hidden=!n;
-    $('tg-txt').textContent='เลือกพิมพ์ป้าย '+n+' ใบ · '+Math.ceil(n/3)+' แผ่น A4';
+    $('tg-txt').textContent='เลือก '+n+' ใบ · '+Math.ceil(n/3)+' แผ่น A4';
   }
   $('k-list').addEventListener('click', function(e){
     var b=e.target.closest('[data-tg]'); if(!b) return;
