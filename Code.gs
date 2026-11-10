@@ -1531,7 +1531,7 @@ function moveCell(p) {
 }
 
 /* ---------- ผังที่จัดเก็บ (Shelf Map) ---------- */
-const SHELF_MAX_SLOTS_ = 600;
+const SHELF_MAX_SLOTS_ = 5000;
 
 /** แยกรหัสที่เก็บ
  *  "1A2"  -> Shelf 1 แถว A ช่อง 2   (shelf = เลขนำหน้า, แถว = ตัวอักษร, ช่อง = เลขท้าย; "7C1-4" -> Shelf 7 แถว C ช่อง 1-4)
