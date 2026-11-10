@@ -256,6 +256,7 @@
   input[type=checkbox]:not(.tgl-in):checked::after{transform:translateX(22px)}
   input[type=checkbox]:not(.tgl-in):focus-visible{outline:3px solid rgba(76,141,206,.55);outline-offset:2px}
   input[type=checkbox]:not(.tgl-in):disabled{opacity:.4;cursor:not-allowed}
+  input[data-tgc]{transform:scale(.72);transform-origin:right center;margin-left:-8px}
   #d-bg{z-index:67}
   #ct-bg .sheet,#sn-bg .sheet,#db-bg .sheet{top:0;max-height:none;border-radius:0;max-width:760px;padding-top:calc(16px + env(safe-area-inset-top))}
   #ct-bg .sheet .hd,#sn-bg .sheet .hd,#db-bg .sheet .hd{position:sticky;top:calc(-16px - env(safe-area-inset-top));z-index:2;background:var(--bg);margin:-4px -4px 8px;padding:8px 4px}
@@ -284,6 +285,8 @@
   .tg i{position:absolute;font-style:normal;white-space:nowrap;line-height:5mm}.tg i.c{overflow:hidden;text-overflow:ellipsis}
   .tg i b{margin-right:2.5mm}
   .tg .ln{display:block;white-space:normal;overflow:hidden;text-overflow:clip}
+  .pbtn{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;margin:-3px 0 -3px 5px;padding:0;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--navy-royal);vertical-align:middle;cursor:pointer}
+  .pbtn:active{background:var(--line)}
   #print-area{display:none}
   @media print{
     html,body{background:#fff}
@@ -2333,12 +2336,12 @@ function snWatch(id, getSeq){
       var lots = g.lots.map(function(l){
         var bits=[];
         if(l.serial) bits.push('S/N <a class="snl" data-sn="'+esc(l.serial)+'">'+esc(l.serial)+'</a>');
-        bits.push('จำนวน '+fmtNum(l.qty));
+        bits.push('จำนวน '+fmtNum(l.qty)+'<button class="pbtn" data-tg="'+l.seq+'" title="พิมพ์ป้ายกำกับพัสดุ" aria-label="พิมพ์ป้ายกำกับพัสดุ"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/></svg></button>');
         if(l.type) bits.push(esc(l.type));
         if(l.location) bits.push(esc(l.location));
         if(l.kit) bits.push('<b>'+esc(l.kit)+'</b>');
         if(l.expire) bits.push('หมดอายุ '+esc(l.expire));
-        return '<div class="meta" style="padding:5px 0;border-top:1px solid var(--line)">'+bits.join(' · ')+'<br>'+(l.docNo==='ยอดยกมา'||l.docNo==='คืนเข้าคลัง'||l.docNo==='รับก่อนเบิก'||l.docNo==='ย้ายจากชุด'?esc(l.docNo)+(l.note?' ('+esc(l.note)+')':''):'เลขเบิก '+esc(l.docNo))+' · รับ '+esc(l.received)+'<div style="display:flex;gap:8px;margin-top:6px">'+(l.free?'<button class="btn sm" data-is="'+l.seq+'">จ่าย</button>':(l.issRow?'<button class="btn sm" data-ix="'+l.seq+'">จ่าย</button>':''))+'<button class="btn ghost sm" data-bl="'+l.seq+'">ยืมออก</button><button class="btn ghost sm" data-ed="'+l.seq+'">แก้ไข</button><button class="btn ghost sm" data-tg="'+l.seq+'">พิมพ์ป้าย</button><label style="display:flex;align-items:center;gap:5px;font-size:13px;margin-left:auto"><input type="checkbox" data-tgc="'+l.seq+'"'+(TG.sel[l.seq]?' checked':'')+'>เลือก</label></div>'+(l.linkNote?'<div style="color:var(--bad);margin-top:4px">⚠ '+esc(l.linkNote)+'</div>':'')+'</div>';
+        return '<div class="meta" style="padding:5px 0;border-top:1px solid var(--line)">'+bits.join(' · ')+'<br>'+(l.docNo==='ยอดยกมา'||l.docNo==='คืนเข้าคลัง'||l.docNo==='รับก่อนเบิก'||l.docNo==='ย้ายจากชุด'?esc(l.docNo)+(l.note?' ('+esc(l.note)+')':''):'เลขเบิก '+esc(l.docNo))+' · รับ '+esc(l.received)+'<div style="display:flex;gap:8px;margin-top:6px">'+(l.free?'<button class="btn sm" data-is="'+l.seq+'">จ่าย</button>':(l.issRow?'<button class="btn sm" data-ix="'+l.seq+'">จ่าย</button>':''))+'<button class="btn ghost sm" data-bl="'+l.seq+'">ยืมออก</button><button class="btn ghost sm" data-ed="'+l.seq+'">แก้ไข</button><label style="display:flex;align-items:center;gap:5px;font-size:13px;margin-left:auto"><input type="checkbox" data-tgc="'+l.seq+'"'+(TG.sel[l.seq]?' checked':'')+'>เลือก</label></div>'+(l.linkNote?'<div style="color:var(--bad);margin-top:4px">⚠ '+esc(l.linkNote)+'</div>':'')+'</div>';
       }).join('');
       return '<div class="card lift'+tyCls(g.lots[0]&&g.lots[0].type, g.lots.some(function(l){return l.kit;}))+'" style="padding:14px 16px">'+
         '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><b>'+esc(g.part||'-')+'</b><span class="chip ok">'+fmtNum(g.qty)+' '+esc(g.unit)+'</span></div>'+
