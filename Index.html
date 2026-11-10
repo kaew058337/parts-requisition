@@ -421,6 +421,9 @@ main .ty-chem{border-left:5px solid var(--ty-chem)}main .ty-kit{border-left:5px 
   .lg.u,.scell.u{background:rgba(212,179,106,.30);border-color:#d4b36a}
   .lg.d,.scell.d{background:rgba(217,119,6,.28);border-color:#d97706}
   .lg.ox{background:transparent;border-style:dashed;border-color:var(--muted)}
+  .srow{display:flex;align-items:stretch;gap:8px;margin-bottom:7px}
+  .srow .sgrid{flex:1;min-width:0}
+  .rl{flex:none;width:22px;display:grid;place-items:center;font-family:var(--serif);font-weight:700;font-size:19px;color:var(--gold-d)}
   .sg{margin:14px 0 4px}
   .sg h4{margin:0 0 8px;font-family:var(--serif);font-size:20px;color:var(--navy-royal);display:flex;align-items:baseline;gap:10px}
   .sg h4 small{font:400 12.5px 'Sarabun',sans-serif;color:var(--muted)}
@@ -920,9 +923,10 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
     <div class="sm-admin">
       <button class="btn ghost sm" id="sm-addtog" type="button">+ เพิ่มช่องในผัง</button>
       <div id="sm-addf" hidden>
-        <div class="row2"><div><label>กลุ่ม / ตู้ / ชั้น</label><input id="sm-g" placeholder="เช่น B2" autocomplete="off" autocapitalize="characters"></div>
-        <div><label>ช่อง ตั้งแต่ – ถึง</label><div class="row2"><input id="sm-a" type="number" inputmode="numeric" min="0" placeholder="1"><input id="sm-b" type="number" inputmode="numeric" min="0" placeholder="12"></div></div></div>
-        <div class="meta" style="margin:6px 0">สร้างช่อง เช่น B2-1 ถึง B2-12 ให้ปรากฏเป็นช่องว่างในผัง (ช่องที่มีอยู่แล้วจะข้าม)</div>
+        <div class="row2"><div><label>Shelf / กลุ่ม</label><input id="sm-g" placeholder="เช่น 1 หรือ B2" autocomplete="off" autocapitalize="characters"></div>
+        <div><label>แถว (ถ้ามี)</label><input id="sm-r" placeholder="เช่น A-D" autocomplete="off" autocapitalize="characters"></div></div>
+        <label>ช่อง ตั้งแต่ – ถึง</label><div class="row2"><input id="sm-a" type="number" inputmode="numeric" min="0" placeholder="1"><input id="sm-b" type="number" inputmode="numeric" min="0" placeholder="4"></div>
+        <div class="meta" style="margin:6px 0">ตัวอย่าง: Shelf 1 แถว A-D ช่อง 1–4 จะได้ 1A1 ถึง 1D4 (ตารางเต็ม) · เว้นแถวว่างไว้เพื่อสร้างแบบ B2-1 ถึง B2-12 · ช่องที่มีอยู่แล้วจะข้าม</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" id="sm-addgo" type="button">เพิ่มช่อง</button><button class="btn ghost sm" id="sm-fill" type="button">เติมช่องที่ขาดอัตโนมัติ</button></div>
       </div>
     </div>
@@ -1043,9 +1047,10 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
     <div class="hd"><b id="x-title">จ่ายพัสดุ</b><button class="x" id="x-x" aria-label="ปิด">×</button></div>
     <div class="info" id="x-info"></div>
     <div class="row2">
+      <div><label>จำนวนที่จ่าย</label><input id="x-qty" type="number" inputmode="decimal" min="0" step="any"><div class="meta" id="x-qhint" style="margin-top:4px"></div></div>
       <div><label>วันที่จ่ายให้ช่าง</label><input id="x-pay" type="date"></div>
-      <div><label>TAIL No.</label><input id="x-tail" autocapitalize="characters"></div>
     </div>
+    <label>TAIL No.</label><input id="x-tail" autocapitalize="characters">
     <label>จ่ายให้ช่าง</label><input id="x-tech" list="techlist" autocomplete="off" placeholder="เลือกหรือพิมพ์ ยศ-ชื่อ นามสกุล">
     <label>หมายเหตุ</label><input id="x-remark">
     <button class="btn" id="x-submit">บันทึกการจ่าย</button>
@@ -1514,19 +1519,31 @@ function snWatch(id, getSeq){
     var q=SM.q.trim().toLowerCase(), st=d.stats, hits=0;
     SM.idx={};
     $('sm-stats').innerHTML='ช่องทั้งหมด <b>'+fmtNum(st.cells)+'</b> · ว่าง <b>'+fmtNum(st.empty)+'</b> · มีของ <b>'+fmtNum(st.used)+'</b>'+(st.unplaced?' · <span style="color:var(--warn)">ยังไม่กำหนดช่อง '+fmtNum(st.unplaced)+'</span>':'');
+    function cellHtml(c){
+      var k=smKey(c.loc); SM.idx[k]=c;
+      var n=c.items.length, cls=n===0?'e':(n>=3?'d':'u');
+      if(!c.defined) cls+=' ox';
+      var hit=smHit(c,q); if(hit) hits++;
+      if(q) cls+=hit?' hit':' dim';
+      if(SM.dest===k) cls+=' dest';
+      var first=n?c.items[0].part:'ว่าง';
+      return {k:k,cls:cls,html:function(style){ return '<button type="button" class="scell '+cls+'" data-k="'+esc(k)+'"'+(style?' style="'+style+'"':'')+' aria-label="ช่อง '+esc(c.loc)+(n?' มี '+n+' รายการ':' ว่าง')+'"><b>'+esc(c.slot)+'</b><i>'+esc(first)+'</i>'+(n>1?'<em>+'+(n-1)+'</em>':'')+'</button>'; }};
+    }
     var html=d.groups.map(function(g){
-      var used=g.cells.filter(function(c){return c.items.length;}).length;
-      var cells=g.cells.map(function(c){
-        var k=smKey(c.loc); SM.idx[k]=c;
-        var n=c.items.length, cls=n===0?'e':(n>=3?'d':'u');
-        if(!c.defined) cls+=' ox';
-        var hit=smHit(c,q); if(hit) hits++;
-        if(q) cls+=hit?' hit':' dim';
-        if(SM.dest===k) cls+=' dest';
-        var first=n?c.items[0].part:'ว่าง';
-        return '<button type="button" class="scell '+cls+'" data-k="'+esc(k)+'" aria-label="ช่อง '+esc(c.loc)+(n?' มี '+n+' รายการ':' ว่าง')+'"><b>'+esc(c.slot)+'</b><i>'+esc(first)+'</i>'+(n>1?'<em>+'+(n-1)+'</em>':'')+'</button>';
-      }).join('');
-      return '<section class="sg"><h4>'+esc(g.name)+' <small>มีของ '+used+' / '+g.cells.length+' ช่อง</small></h4><div class="sgrid">'+cells+'</div></section>';
+      var used=g.cells.filter(function(c){return c.items.length;}).length, body='';
+      if(g.kind==='shelf'){
+        var pure=g.cells.every(function(c){ return /^\d+$/.test(c.col); });
+        var cols=g.cells.map(function(c){ return Number(c.col); }), lo=Math.min.apply(null,cols), hi=Math.max.apply(null,cols);
+        var pos=pure && hi-lo<12, rows=[], byRow={};
+        g.cells.forEach(function(c){ if(!byRow[c.row]){ byRow[c.row]=[]; rows.push(c.row); } byRow[c.row].push(c); });
+        body=rows.map(function(r){
+          var grid=pos?'grid-template-columns:repeat('+(hi-lo+1)+',minmax(0,84px))':'';
+          return '<div class="srow"><span class="rl">'+esc(r)+'</span><div class="sgrid" style="'+grid+'">'+byRow[r].map(function(c){ return cellHtml(c).html(pos?'grid-column:'+(Number(c.col)-lo+1):''); }).join('')+'</div></div>';
+        }).join('');
+      } else {
+        body='<div class="sgrid">'+g.cells.map(function(c){ return cellHtml(c).html(''); }).join('')+'</div>';
+      }
+      return '<section class="sg"><h4>'+esc(g.name)+' <small>มีของ '+used+' / '+g.cells.length+' ช่อง</small></h4>'+body+'</section>';
     }).join('');
     if(!d.groups.length) html='<div class="empty"><div class="ico">▦</div><div class="t">ยังไม่มีช่องในผัง</div><div>กด "+ เพิ่มช่องในผัง" ด้านล่าง หรือกำหนด LOCATION ให้พัสดุก่อน</div></div>';
     $('sm-body').innerHTML=html;
@@ -1649,10 +1666,10 @@ function snWatch(id, getSeq){
   $('sm-addtog').addEventListener('click', function(){ var f=$('sm-addf'); f.hidden=!f.hidden; });
   $('sm-addgo').addEventListener('click', function(){
     if(!state.by){ askBy(function(){ $('sm-addgo').click(); }); return; }
-    var g=$('sm-g').value.trim(), a=$('sm-a').value, b=$('sm-b').value;
+    var g=$('sm-g').value.trim(), a=$('sm-a').value, b=$('sm-b').value, rw=$('sm-r').value.trim();
     if(!g||a===''||b===''){ toast('กรอกกลุ่ม และช่วงช่อง ตั้งแต่–ถึง',true); return; }
     var btn=this; busy(btn,true);
-    run('addShelfSlots',[{group:g,from:a,to:b,by:state.by}]).then(function(r){ toast('เพิ่ม '+r.added+' ช่อง'+(r.skipped?' (ข้ามที่มีแล้ว '+r.skipped+')':'')); SM.sig=''; return smLoad(true); })
+    run('addShelfSlots',[{group:g,rows:rw,from:a,to:b,by:state.by}]).then(function(r){ toast('เพิ่ม '+r.added+' ช่อง'+(r.skipped?' (ข้ามที่มีแล้ว '+r.skipped+')':'')); SM.sig=''; return smLoad(true); })
     .catch(function(e){ toast(e.message,true); }).then(function(){ busy(btn,false); });
   });
   $('sm-fill').addEventListener('click', function(){
@@ -2227,6 +2244,8 @@ function snWatch(id, getSeq){
     $('x-info').innerHTML = '<b>'+esc(r.name)+'</b><br><span class="meta">'+esc(r.part)+(r.serial?' · S/N '+esc(r.serial):'')+(r.type?' · '+esc(r.type):'')+
       ' · จำนวน '+fmtNum(r.qty)+' '+esc(r.unit)+'<br>เครื่อง '+esc(r.machine||'-')+(r.issue?' · '+esc(r.issue):'')+'</span>';
     $('x-pay').value = state.today; $('x-tail').value = r.machine||''; $('x-tech').value=''; $('x-remark').value='';
+    $('x-qty').value = r.qty; $('x-qty').disabled = !!r.serial;
+    $('x-qhint').textContent = r.serial ? 'มี S/N จ่ายได้ทีละ 1 ชิ้น' : 'คงเหลือ '+fmtNum(r.qty)+' '+(r.unit||'')+' (จ่ายบางส่วนได้)';
     $('x-bg').classList.add('on');
   }
   $('x-x').addEventListener('click', function(){ state.fromStock=false; $('x-bg').classList.remove('on'); });
@@ -2234,12 +2253,14 @@ function snWatch(id, getSeq){
   $('x-submit').addEventListener('click', function(){
     if(!state.by){ askBy(function(){ $('x-submit').click(); }); return; }
     var r=state.curI; if(!r) return;
+    var qv=Number($('x-qty').value);
+    if(!(qv>0) || qv>r.qty){ toast('จำนวนที่จ่ายต้องมากกว่า 0 และไม่เกิน '+fmtNum(r.qty),true); return; }
     var btn=$('x-submit'); busy(btn,true);
-    run('submitIssue', [{ row:r.row, seq:r.seq, docNo:r.docNo, payDate:$('x-pay').value, tail:$('x-tail').value,
+    run('submitIssue', [{ row:r.row, seq:r.seq, docNo:r.docNo, qty:qv, payDate:$('x-pay').value, tail:$('x-tail').value,
       tech:$('x-tech').value, remark:$('x-remark').value, by:state.by }])
     .then(function(res){
       $('x-bg').classList.remove('on');
-      toast((res.closed ? 'จ่ายครบ ปิดใบเบิกแล้ว' : 'บันทึกการจ่ายแล้ว')+kitReqNote(res), !!(res.autoReq&&res.autoReq.error));
+      toast((res.closed ? 'จ่ายครบ ปิดใบเบิกแล้ว' : (qv<r.qty ? 'บันทึกการจ่าย '+fmtNum(qv)+' แล้ว เหลือในคลัง '+fmtNum(r.qty-qv) : 'บันทึกการจ่ายแล้ว'))+kitReqNote(res), !!(res.autoReq&&res.autoReq.error));
       loadIssue(); if(state.fromStock){ state.fromStock=false; loadStock(); }
     }).catch(function(e){ toast(e.message,true); }).then(function(){ busy(btn,false); });
   });

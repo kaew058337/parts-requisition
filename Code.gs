@@ -1516,12 +1516,19 @@ function moveLocation(p) {
 /* ---------- ผังที่จัดเก็บ (Shelf Map) ---------- */
 const SHELF_MAX_SLOTS_ = 600;
 
-/** "B2-6" -> { group:'B2', slot:'6' } ; ไม่มีขีด -> กลุ่ม 'อื่น ๆ' */
+/** แยกรหัสที่เก็บ
+ *  "1A2"  -> Shelf 1 แถว A ช่อง 2   (shelf = เลขนำหน้า, แถว = ตัวอักษร, ช่อง = เลขท้าย; "7C1-4" -> Shelf 7 แถว C ช่อง 1-4)
+ *  "B2-6" -> กลุ่ม B2 ช่อง 6 ; อย่างอื่น -> กลุ่ม 'อื่น ๆ' */
 function shelfParse_(loc) {
   const s = str_(loc).replace(/\s+/g, ' ');
+  let m = s.match(/^(\d+)\s*([A-Za-z]{1,2})\s*(\d+)(?:\s*-\s*(\d+))?$/);
+  if (m) {
+    const row = m[2].toUpperCase();
+    return { kind: 'shelf', gkey: 'S:' + Number(m[1]), group: 'Shelf ' + Number(m[1]), row: row, col: m[3] + (m[4] ? '-' + m[4] : ''), slot: row + m[3] + (m[4] ? '-' + m[4] : '') };
+  }
   const i = s.lastIndexOf('-');
-  if (i > 0 && i < s.length - 1) return { group: s.slice(0, i).trim(), slot: s.slice(i + 1).trim() };
-  return { group: 'อื่น ๆ', slot: s };
+  if (i > 0 && i < s.length - 1) { const g = s.slice(0, i).trim(); return { kind: 'dash', gkey: 'G:' + g.toUpperCase(), group: g, row: '', col: '', slot: s.slice(i + 1).trim() }; }
+  return { kind: 'dash', gkey: 'G:อื่น ๆ', group: 'อื่น ๆ', row: '', col: '', slot: s };
 }
 function shelfKey_(loc) { return str_(loc).toUpperCase().replace(/\s+/g, ''); }
 function natCmp_(a, b) {
@@ -1544,7 +1551,7 @@ function getShelfMap() {
   const cells = {};
   const cell = loc => {
     const k = shelfKey_(loc);
-    if (!cells[k]) { const ps = shelfParse_(loc); cells[k] = { loc: str_(loc), group: ps.group, slot: ps.slot, defined: false, note: '', items: [] }; }
+    if (!cells[k]) { const ps = shelfParse_(loc); cells[k] = { loc: str_(loc), ps: ps, defined: false, note: '', items: [] }; }
     return cells[k];
   };
   readShelf_().forEach(o => { const c = cell(o.loc); c.defined = true; c.note = o.note; });
@@ -1556,10 +1563,11 @@ function getShelfMap() {
     if (!str_(l.loc)) unplaced.push(it); else cell(l.loc).items.push(it);
   });
   const groups = {};
-  Object.keys(cells).forEach(k => { const c = cells[k]; (groups[c.group] = groups[c.group] || []).push(c); });
-  const out = Object.keys(groups).sort(natCmp_).map(g => {
-    const cs = groups[g].sort((a, b) => natCmp_(a.slot, b.slot));
-    return { name: g, cells: cs.map(c => ({ loc: c.loc, slot: c.slot, defined: c.defined, note: c.note, items: c.items })) };
+  Object.keys(cells).forEach(k => { const c = cells[k]; (groups[c.ps.gkey] = groups[c.ps.gkey] || { name: c.ps.group, kind: c.ps.kind, cells: [] }).cells.push(c); });
+  const out = Object.keys(groups).sort((a, b) => (groups[a].kind === groups[b].kind ? 0 : groups[a].kind === 'shelf' ? -1 : 1) || natCmp_(a, b)).map(k => {
+    const g = groups[k];
+    const cs = g.cells.sort((a, b) => natCmp_(a.ps.row, b.ps.row) || natCmp_(a.ps.col || a.ps.slot, b.ps.col || b.ps.slot));
+    return { name: g.name, kind: g.kind, cells: cs.map(c => ({ loc: c.loc, slot: c.ps.slot, row: c.ps.row, col: c.ps.col, defined: c.defined, note: c.note, items: c.items })) };
   });
   let total = 0, used = 0;
   out.forEach(g => g.cells.forEach(c => { total++; if (c.items.length) used++; }));
@@ -1573,9 +1581,20 @@ function addShelfSlots(p) {
     if (p.locs && p.locs.length) list = p.locs.map(str_).filter(Boolean);
     else {
       const g = str_(p.group), a = Math.floor(Number(p.from)), b = Math.floor(Number(p.to));
-      if (!g) throw new Error('กรุณาระบุชื่อกลุ่ม/ตู้/ชั้น เช่น B2');
+      if (!g) throw new Error('กรุณาระบุชื่อกลุ่ม/ตู้/ชั้น เช่น B2 หรือหมายเลข Shelf เช่น 1');
       if (!(a >= 0) || !(b >= a)) throw new Error('ช่วงช่องไม่ถูกต้อง (ตั้งแต่ ≤ ถึง)');
-      for (let i = a; i <= b; i++) list.push(g + '-' + i);
+      const rowsTxt = str_(p.rows).toUpperCase().replace(/\s+/g, '');
+      if (rowsTxt) {
+        // Shelf + แถว: เช่น group=1, rows=A-D, 1..4 -> 1A1 ... 1D4
+        let rows = [];
+        const rg = rowsTxt.match(/^([A-Z])-([A-Z])$/);
+        if (rg) { for (let k = rg[1].charCodeAt(0); k <= rg[2].charCodeAt(0); k++) rows.push(String.fromCharCode(k)); }
+        else rows = rowsTxt.split(/[,;]|(?=[A-Z])/).filter(Boolean);
+        if (!rows.length || rows.length > 26) throw new Error('แถวไม่ถูกต้อง เช่น A-D');
+        rows.forEach(r => { for (let i = a; i <= b; i++) list.push(g + r + i); });
+      } else {
+        for (let i = a; i <= b; i++) list.push(g + '-' + i);
+      }
     }
     const have = {}; readShelf_().forEach(o => { have[shelfKey_(o.loc)] = 1; });
     const add = list.filter(l => !have[shelfKey_(l)]);
@@ -1603,10 +1622,22 @@ function removeShelfSlot(p) {
   });
 }
 
-/** สร้างช่องว่างระหว่างเลขต่ำสุด–สูงสุดของแต่ละกลุ่มโดยอัตโนมัติ (เฉพาะกลุ่มที่ช่องเป็นตัวเลข) */
+/** เติมช่องที่ขาดอัตโนมัติ
+ *  กลุ่ม Shelf (1A1…): ทำตารางเต็ม แถวจาก A ถึงแถวสูงสุดที่มี × ช่องจากเลขต่ำสุดถึงสูงสุดของ Shelf นั้น
+ *  กลุ่มแบบขีด (B2-1…): เติมเลขระหว่างต่ำสุด–สูงสุด */
 function fillShelfGaps(p) {
   const map = getShelfMap(), list = [];
   map.groups.forEach(g => {
+    if (g.kind === 'shelf') {
+      const m = g.name.match(/(\d+)/); if (!m) return;
+      const pure = g.cells.filter(c => /^\d+$/.test(c.col));
+      if (!pure.length) return;
+      const cols = pure.map(c => Number(c.col)), lo = Math.min.apply(null, cols), hi = Math.max.apply(null, cols);
+      const codes = g.cells.map(c => c.row.charCodeAt(0)), r0 = Math.min.apply(null, codes), r1 = Math.max.apply(null, codes);
+      if (hi - lo > 60 || r1 - r0 > 25 || g.cells.some(c => c.row.length !== 1)) return;
+      for (let r = r0; r <= r1; r++) for (let i = lo; i <= hi; i++) list.push(m[1] + String.fromCharCode(r) + i);
+      return;
+    }
     const nums = g.cells.filter(c => /^\d+$/.test(c.slot)).map(c => Number(c.slot));
     if (nums.length < 1 || g.name === 'อื่น ๆ') return;
     const lo = Math.min.apply(null, nums), hi = Math.max.apply(null, nums);
