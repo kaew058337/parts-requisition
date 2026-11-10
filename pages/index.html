@@ -285,6 +285,14 @@
   .cx label{margin:8px 0 4px}
   .ct-bar{display:flex;gap:8px;margin:10px 0}
   .ct-bar .btn{margin:0;flex:1}
+  .tg-pg{width:210mm;padding-top:21mm;font-family:'TH Sarabun PSK','THSarabunPSK','TH SarabunPSK','Sarabun',sans-serif;font-size:16pt;color:#000;line-height:1.05}
+  .tg{box-sizing:border-box;width:150mm;height:85mm;margin:0 auto;border:.3mm dashed #777;padding:2.5mm 3mm;display:flex;flex-direction:column}
+  .tg-h{display:flex;justify-content:space-between;align-items:baseline;padding-bottom:1mm}.tg-h b{font-size:18pt}.tg-h span{width:40mm}.tg-f{text-align:right;font-weight:700;white-space:nowrap}
+  .tg-r{display:flex;border:.3mm solid #000;border-top:0;padding:.6mm 1.6mm;flex:1;min-height:0}
+  .tg-h+.tg-r{border-top:.3mm solid #000}
+  .tg-r>div{padding-right:1.5mm}.tg-r b{margin-right:1.2mm;white-space:nowrap}.tg-r>.tg-l{flex:1.2;border-left:.3mm solid #000;padding-left:1.6mm}
+  .tg-r>div:first-child{overflow:hidden}
+  .tg-w{flex:.8}.tg-n{flex:1.4}.tg-last{flex:1.6}
   #print-area{display:none}
   @media print{
     html,body{background:#fff}
@@ -669,6 +677,7 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
         <button class="btn ghost sm" id="k-open" title="รับพัสดุเข้าคลังก่อนมีใบเบิก หรือเพิ่มยอดยกมา" style="margin:0;flex:none;width:auto;min-height:0;padding:5px 11px;font-size:13px;border-radius:12px">+ เพิ่มเข้าคลัง</button>
       </div>
       <div class="tylg" aria-label="สีแถบซ้ายของการ์ด"><span><i style="background:var(--ty-lru)"></i>LRU</span><span><i style="background:var(--ty-sp)"></i>SP</span><span><i style="background:var(--ty-tci)"></i>TCI</span><span><i style="background:var(--ty-chem)"></i>สารเคมี</span><span><i style="background:var(--ty-kit)"></i>ชุด KIT</span></div>
+      <div id="tg-bar" class="sm-bar" hidden><div id="tg-txt"></div><div style="display:flex;gap:8px"><button class="btn" id="tg-go" style="margin:0;flex:1">พิมพ์ป้าย</button><button class="btn ghost" id="tg-clr" style="margin:0">ล้าง</button></div></div>
       <div id="k-list"><div class="skl" aria-busy="true" aria-label="กำลังโหลด"><div class="skc"><i class="w1"></i><i class="w2"></i><i class="w3"></i><span><b></b><b></b><b></b></span></div><div class="skc"><i class="w1"></i><i class="w2"></i><i class="w3"></i><span><b></b><b></b><b></b></span></div><div class="skc"><i class="w1"></i><i class="w2"></i><i class="w3"></i><span><b></b><b></b><b></b></span></div></div></div>
     </div>
     <div id="k-loanpane" style="display:none">
@@ -2310,6 +2319,7 @@ function snWatch(id, getSeq){
     run('getStock').then(function(rows){ state.stk=rows; renderStock(); loadAwaiting(); if(sync===true) loadRecon(); })
       .catch(function(e){ $('k-list').innerHTML='<div class="empty">'+esc(e.message)+'</div>'; });
   }
+  var TG={sel:{}};
   function renderStock(){
     if(!state.stk){ $('k-list').innerHTML=skel(); return; }
     var q=$('k-search').value.trim().toLowerCase();
@@ -2320,7 +2330,7 @@ function snWatch(id, getSeq){
     });
     state.lotMap = {};
     (state.stk||[]).forEach(function(g){ g.lots.forEach(function(l){
-      state.lotMap[l.seq] = { seq:l.seq, part:g.part, name:g.name, unit:g.unit, serial:l.serial, qty:l.qty, type:l.type, location:l.location, kit:l.kit||'', source:l.docNo, issRow:l.issRow, issSeq:l.issSeq, machine:l.machine };
+      state.lotMap[l.seq] = { seq:l.seq, part:g.part, name:g.name, unit:g.unit, serial:l.serial, qty:l.qty, type:l.type, location:l.location, recv:l.recv||'', kit:l.kit||'', source:l.docNo, issRow:l.issRow, issSeq:l.issSeq, machine:l.machine };
     }); });
     var total=0, lots=0; rows.forEach(function(g){ total+=g.qty; lots+=g.lots.length; });
     $('k-sum').textContent = rows.length ? rows.length+' Part number · '+lots+' ล็อต · รวม '+fmtNum(total)+' หน่วย' : '';
@@ -2337,13 +2347,55 @@ function snWatch(id, getSeq){
         if(l.location) bits.push(esc(l.location));
         if(l.kit) bits.push('<b>'+esc(l.kit)+'</b>');
         if(l.expire) bits.push('หมดอายุ '+esc(l.expire));
-        return '<div class="meta" style="padding:5px 0;border-top:1px solid var(--line)">'+bits.join(' · ')+'<br>'+(l.docNo==='ยอดยกมา'||l.docNo==='คืนเข้าคลัง'||l.docNo==='รับก่อนเบิก'||l.docNo==='ย้ายจากชุด'?esc(l.docNo)+(l.note?' ('+esc(l.note)+')':''):'เลขเบิก '+esc(l.docNo))+' · รับ '+esc(l.received)+'<div style="display:flex;gap:8px;margin-top:6px">'+(l.free?'<button class="btn sm" data-is="'+l.seq+'">จ่าย</button>':(l.issRow?'<button class="btn sm" data-ix="'+l.seq+'">จ่าย</button>':''))+'<button class="btn ghost sm" data-bl="'+l.seq+'">ยืมออก</button><button class="btn ghost sm" data-ed="'+l.seq+'">แก้ไข</button></div>'+(l.linkNote?'<div style="color:var(--bad);margin-top:4px">⚠ '+esc(l.linkNote)+'</div>':'')+'</div>';
+        return '<div class="meta" style="padding:5px 0;border-top:1px solid var(--line)">'+bits.join(' · ')+'<br>'+(l.docNo==='ยอดยกมา'||l.docNo==='คืนเข้าคลัง'||l.docNo==='รับก่อนเบิก'||l.docNo==='ย้ายจากชุด'?esc(l.docNo)+(l.note?' ('+esc(l.note)+')':''):'เลขเบิก '+esc(l.docNo))+' · รับ '+esc(l.received)+'<div style="display:flex;gap:8px;margin-top:6px">'+(l.free?'<button class="btn sm" data-is="'+l.seq+'">จ่าย</button>':(l.issRow?'<button class="btn sm" data-ix="'+l.seq+'">จ่าย</button>':''))+'<button class="btn ghost sm" data-bl="'+l.seq+'">ยืมออก</button><button class="btn ghost sm" data-ed="'+l.seq+'">แก้ไข</button><button class="btn ghost sm" data-tg="'+l.seq+'">พิมพ์ป้าย</button><label style="display:flex;align-items:center;gap:5px;font-size:13px;margin-left:auto"><input type="checkbox" data-tgc="'+l.seq+'"'+(TG.sel[l.seq]?' checked':'')+'>เลือก</label></div>'+(l.linkNote?'<div style="color:var(--bad);margin-top:4px">⚠ '+esc(l.linkNote)+'</div>':'')+'</div>';
       }).join('');
       return '<div class="card lift'+tyCls(g.lots[0]&&g.lots[0].type, g.lots.some(function(l){return l.kit;}))+'" style="padding:14px 16px">'+
         '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><b>'+esc(g.part||'-')+'</b><span class="chip ok">'+fmtNum(g.qty)+' '+esc(g.unit)+'</span></div>'+
         '<div style="margin:4px 0 6px">'+esc(g.name)+'</div>'+lots+'</div>';
     }).join('');
   }
+
+  /* ---------- ป้ายกำกับพัสดุดี (แบบ ทอ.๑๔๑ ก.) 15 x 8.5 ซม. : A4 แนวตั้ง 3 ใบ/แผ่น ---------- */
+  function tgDate(){ var d=new Date(); return d.getDate()+' '+TH_MON[d.getMonth()]+' '+(d.getFullYear()+543); }
+  function tagHtml(l,dt){
+    var q=(l.qty===0||l.qty)?fmtNum(l.qty):'';
+    return '<div class="tg"><div class="tg-h"><span></span><b>ป้ายกำกับพัสดุดี</b><span class="tg-f">แบบ ทอ. ๑๔๑ ก.</span></div>'+
+      '<div class="tg-r tg-w"><b>หมายเลข</b> '+esc(l.part)+'</div>'+
+      '<div class="tg-r tg-n"><b>ชื่อและชนิด</b> '+esc(l.name)+'</div>'+
+      '<div class="tg-r"><div style="flex:2.6"><b>หมายเลขอันดับ</b> '+esc(l.serial)+'</div><div class="tg-l"><b>บริษัทสร้าง</b></div></div>'+
+      '<div class="tg-r"><div style="flex:2.6"><b>ส่งตรวจหรือทดลองถ้าเก็บไว้เกินวันที่</b></div><div class="tg-l"><b>จำนวน</b> '+esc(q)+'</div></div>'+
+      '<div class="tg-r"><div style="flex:2.6"><b>ใบสั่งหรือสัญญาหรือเลขงานที่</b></div><div class="tg-l"><b>หน่วยนับ</b> '+esc(l.unit)+'</div></div>'+
+      '<div class="tg-r tg-last"><div style="flex:2.6"><b>วัน เดือน ปี</b> '+esc(dt)+'</div><div class="tg-l"><b>ผู้ตรวจ</b>(ลงชื่อ)<br>'+esc(l.recv)+'</div></div></div>';
+  }
+  function printTags(seqs){
+    var dt=tgDate(), list=seqs.map(function(s){return state.lotMap&&state.lotMap[s];}).filter(Boolean);
+    if(!list.length) return;
+    var pages=[]; for(var i=0;i<list.length;i+=3) pages.push(list.slice(i,i+3));
+    $('print-area').innerHTML=pages.map(function(p,i){
+      return '<div class="tg-pg" style="'+(i?'break-before:page;page-break-before:always':'')+'">'+p.map(function(l){return tagHtml(l,dt);}).join('')+'</div>';
+    }).join('');
+    setPage('A4 portrait','0');
+    document.body.classList.add('printing');
+    var done=function(){ document.body.classList.remove('printing'); window.removeEventListener('afterprint',done); };
+    window.addEventListener('afterprint',done);
+    setTimeout(function(){ try{ window.print(); }catch(err){ done(); toast('เครื่องนี้พิมพ์จากหน้าเว็บไม่ได้ ลองเปิดจากเบราว์เซอร์',true); } },250);
+  }
+  function tgBar(){
+    var n=Object.keys(TG.sel).length, b=$('tg-bar'); if(!b) return;
+    b.hidden=!n;
+    $('tg-txt').textContent='เลือกพิมพ์ป้าย '+n+' ใบ · '+Math.ceil(n/3)+' แผ่น A4';
+  }
+  $('k-list').addEventListener('click', function(e){
+    var b=e.target.closest('[data-tg]'); if(!b) return;
+    printTags([Number(b.dataset.tg)]);
+  });
+  $('k-list').addEventListener('change', function(e){
+    var c=e.target.closest('[data-tgc]'); if(!c) return;
+    if(c.checked) TG.sel[c.dataset.tgc]=1; else delete TG.sel[c.dataset.tgc];
+    tgBar();
+  });
+  $('tg-go').addEventListener('click', function(){ printTags(Object.keys(TG.sel).map(Number)); });
+  $('tg-clr').addEventListener('click', function(){ TG.sel={}; tgBar(); renderStock(); });
   $('k-search').addEventListener('input', renderStock);
   function copyFallback(t){ try{ var ta=document.createElement('textarea'); ta.value=t; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }catch(e){} }
   $('k-list').addEventListener('click', function(e){

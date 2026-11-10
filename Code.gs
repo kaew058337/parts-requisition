@@ -1400,7 +1400,7 @@ function getStock() {
     g.qty += l.remain;
     g.lots.push({
       seq: l.seq, free: l.free, serial: l.serial, qty: l.remain, docNo: l.label, type: l.type, cond: l.cond,
-      location: l.loc, kit: kitOf_(l.v[RC.TAIL]), expire: fmtThai_(l.expire), received: fmtThai_(l.recvDate), note: l.note,
+      location: l.loc, recv: str_(l.v[RC.RECV]), kit: kitOf_(l.v[RC.TAIL]), expire: fmtThai_(l.expire), received: fmtThai_(l.recvDate), note: l.note,
       issRow: l.free ? 0 : l.seq, issSeq: l.free ? 0 : l.seq, linkNote: '',
       machine: l.free ? '' : ((info[l.doc + '|' + l.part] || {}).machine || ''),
       warr: l.serial && isLRU_(l.type) ? (warr_[snKey_(l.serial)] || null) : null
