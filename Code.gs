@@ -20,6 +20,7 @@ const SHEET_KIT = 'FLY AWAY KIT';       // ชีทแสดง/แก้พั
 const SHEET_KITREQ = 'รายการชุด FLY AWAY KIT';   // รายการตายตัวที่แต่ละชุดต้องมี + จำนวน (ผู้ใช้กรอก) ระบบเทียบกับของจริงในชุด
 const SHEET_HOL = 'วันหยุด';              // วันหยุดราชการที่ไม่ส่งสรุปไลน์ (นอกจากเสาร์-อาทิตย์)
 const SHEET_SHELF = 'ผังที่จัดเก็บ';       // รายการช่องจัดเก็บที่กำหนดไว้ (รวมช่องว่าง) ใช้วาดแผนผัง
+const SHEET_MOVE = 'ประวัติการย้าย';   // บันทึกทุกครั้งที่ที่เก็บของพัสดุเปลี่ยน (ย้าย / ย้ายทั้งช่อง / แยกบางส่วน / แก้ไขที่เก็บ)
 const SHEET_RCV2 = 'รับคืนเข้าคลัง';   // ประวัติรับ "คืนเข้าคลัง" แยกจากรับปกติ (โครงสร้างเหมือนชีท รับ)
 const WARRANTY_DAYS = 365;        // ประกัน 1 ปี นับจากวันที่รับ (LRU / LRU(TCI)) ; ของที่เคลมกลับมานับใหม่จากวันที่ได้รับกลับ
 const WARRANTY_SOON_DAYS = 60;    // เตือน "ใกล้หมดประกัน" เมื่อเหลือไม่เกินกี่วัน
@@ -77,6 +78,7 @@ const LINE_CHANNEL_ID = '2012314415';
 const API_FUNCS_ = {
   getShelfMap: getShelfMap,
   moveCell: moveCell,
+  getMoveHistory: getMoveHistory,
   addShelfSlots: addShelfSlots,
   removeShelfSlot: removeShelfSlot,
   fillShelfGaps: fillShelfGaps,
@@ -202,6 +204,7 @@ let MIGRATING_ = false;
 HEADERS[SHEET_SHELF] = ['กลุ่ม (ตู้/ชั้น)', 'ช่อง', 'LOCATION', 'หมายเหตุ'];
 let MIGRATION_NOTE_ = '';
 HEADERS[SHEET_RCV2] = HEADERS[SHEET_RCV];
+HEADERS[SHEET_MOVE] = ['เวลา', 'ผู้ย้าย', 'ประเภท', 'ลำดับรับ', 'Part number', 'ชื่อพัสดุ', 'serial number', 'จำนวน', 'จากที่เก็บ', 'ไปที่เก็บ', 'เลขเอกสารการเบิก'];
 const HDR_STYLE_ = (rg) => rg.setFontWeight('bold').setBackground('#1a56db').setFontColor('#ffffff')
   .setHorizontalAlignment('center').setVerticalAlignment('middle').setWrap(true);
 
@@ -267,6 +270,9 @@ function getSheet_(name) {
       sh.getRange('Q2:Q').setNumberFormat('@');
     } else if (name === SHEET_SHELF) {
       sh.getRange('A2:D').setNumberFormat('@');
+    } else if (name === SHEET_MOVE) {
+      sh.getRange('A2:A').setNumberFormat('dd/mm/yyyy hh:mm:ss');
+      sh.getRange('E2:E').setNumberFormat('@'); sh.getRange('G2:G').setNumberFormat('@'); sh.getRange('I2:K').setNumberFormat('@');
     } else if (name === SHEET_LOG) {
       sh.getRange('A2:A').setNumberFormat('dd/mm/yyyy hh:mm:ss');
       sh.getRange('E2:E').setNumberFormat('@');
@@ -1479,6 +1485,7 @@ function editLot(p) {
     if (locCh) {
       getSheet_(r._sh).getRange(r._row, rcCol_(RC.LOC)).setNumberFormat('@').setValue(newLoc);
       changes.push('ที่เก็บ ' + (oldLoc || '(ว่าง)') + ' → ' + (newLoc || '(ว่าง)'));
+      moveLog_([{ kind: 'แก้ไขที่เก็บ', seq: lot.seq, part: partCh ? newPart : oldPart, name: nameCh ? newName : oldName, sn: snCh ? newSn : oldSn, qty: lot.remain, from: oldLoc, to: newLoc, doc: lot.label }], p.by);
     }
     if (qtyCh) {
       getSheet_(r._sh).getRange(r._row, rcCol_(RC.QTY)).setValue(newRemain + lot.issued + lot.loanOut);
@@ -1500,17 +1507,46 @@ function propagateName_(rcRows, seqs, newName) {
   readLoans_().forEach((lr, j) => { if (seqs[str_(lr[17])] && str_(lr[3]) !== newName) setTxt(loan, j + 2, 4, newName); });
 }
 
+/** บันทึกประวัติการย้าย (ล้มเหลวไม่กระทบงานหลัก) ; rows = [{kind, seq, part, name, sn, qty, from, to, doc}] */
+function moveLog_(rows, by) {
+  try {
+    if (!rows || !rows.length) return;
+    const sh = getSheet_(SHEET_MOVE), start = sh.getLastRow() + 1, now = new Date();
+    const vals = rows.map(r => [now, str_(by) || '(ไม่ระบุ)', r.kind, r.seq, str_(r.part), str_(r.name), str_(r.sn), r.qty, str_(r.from), str_(r.to), str_(r.doc)]);
+    sh.getRange(start, 1, vals.length, 1).setNumberFormat('dd/mm/yyyy hh:mm:ss');
+    sh.getRange(start, 5, vals.length, 1).setNumberFormat('@'); sh.getRange(start, 7, vals.length, 1).setNumberFormat('@'); sh.getRange(start, 9, vals.length, 3).setNumberFormat('@');
+    sh.getRange(start, 1, vals.length, 11).setValues(vals);
+  } catch (e) { /* ignore */ }
+}
+
+/** ย้ายล็อตไปที่จัดเก็บใหม่ ; ใส่ p.qty น้อยกว่าที่เหลือ = ย้ายบางส่วน (แยกแถวรับใหม่ รวมจำนวนรับเท่าเดิม) ; พัสดุมี S/N ย้ายได้ทีละ 1 ชิ้น */
 function moveLocation(p) {
   return withLock_(() => {
     const loc = str_(p.location);
     if (!loc) throw new Error('กรุณาระบุที่จัดเก็บใหม่');
     const lot = computeLots_().filter(l => l.seq === Number(p.seq))[0];
     if (!lot || lot.remain <= 0) throw new Error('ไม่พบพัสดุในคลัง (อาจถูกจ่ายไปแล้ว) กรุณารีเฟรช');
-    if (lot.loc === loc) return { ok: true, from: lot.loc, to: loc, same: true };
-    getSheet_(lot.sh || SHEET_RCV).getRange(lot.row, rcCol_(RC.LOC)).setNumberFormat('@').setValue(loc);
-    log_('ย้ายที่จัดเก็บ', lot.doc, [lot.part, lot.serial ? 'S/N ' + lot.serial : '', (lot.loc || '(ว่าง)') + ' → ' + loc].filter(Boolean).join(' | '), p.by);
+    if (shelfKey_(lot.loc) === shelfKey_(loc)) return { ok: true, from: lot.loc, to: loc, same: true };
+    const qty = p.qty === undefined || p.qty === '' || p.qty === null ? lot.remain : num_(p.qty);
+    if (!(qty > 0) || qty > lot.remain) throw new Error('จำนวนที่ย้ายไม่ถูกต้อง (เหลือ ' + lot.remain + ')');
+    if (lot.serial && qty !== lot.remain) throw new Error('พัสดุที่มี S/N ย้ายได้ทั้งชิ้นเท่านั้น');
+    const sh = getSheet_(lot.sh || SHEET_RCV);
+    let newSeq = 0;
+    if (qty === lot.remain) {
+      sh.getRange(lot.row, rcCol_(RC.LOC)).setNumberFormat('@').setValue(loc);
+    } else {
+      // แยกบางส่วน: ลดจำนวนแถวเดิม (ที่เก็บเดิม) + เพิ่มแถวใหม่ลอกข้อมูลเดิม ที่เก็บใหม่ ; จำนวนรับรวมเท่าเดิม
+      sh.getRange(lot.row, rcCol_(RC.QTY)).setValue(lot.qty - qty);
+      const nv = lot.v.slice(0, 25);
+      newSeq = nextRcvSeq_();
+      nv[RC.SEQ] = newSeq; nv[RC.QTY] = qty; nv[RC.LOC] = loc; nv[RC.TOTAL] = ''; nv[RC.OVER] = '';
+      nv[RC.NOTE] = [str_(lot.note), 'แยกจากลำดับรับ ' + lot.seq].filter(Boolean).join(' | ');
+      appendRcv_(nv);
+    }
+    log_('ย้ายที่จัดเก็บ', lot.doc, [lot.part, lot.serial ? 'S/N ' + lot.serial : '', qty !== lot.remain ? 'x' + qty + ' จาก ' + lot.remain : '', (lot.loc || '(ว่าง)') + ' → ' + loc].filter(Boolean).join(' | '), p.by);
+    moveLog_([{ kind: newSeq ? 'แยกบางส่วน' : 'ย้าย', seq: newSeq || lot.seq, part: lot.part, name: lot.name, sn: lot.serial, qty: qty, from: lot.loc, to: loc, doc: lot.label }], p.by);
     rebuildStock_();
-    return { ok: true, from: lot.loc, to: loc };
+    return { ok: true, from: lot.loc, to: loc, moved: qty, split: !!newSeq, newSeq: newSeq };
   });
 }
 
@@ -1524,10 +1560,36 @@ function moveCell(p) {
     const lots = computeLots_().filter(l => l.remain > 0 && shelfKey_(l.loc) === shelfKey_(from));
     if (!lots.length) throw new Error('ช่อง ' + from + ' ไม่มีพัสดุแล้ว (อาจมีคนย้ายไปก่อน) กรุณารีเฟรช');
     lots.forEach(l => getSheet_(l.sh || SHEET_RCV).getRange(l.row, rcCol_(RC.LOC)).setNumberFormat('@').setValue(to));
-    log_('ย้ายที่จัดเก็บทั้งช่อง', '', from + ' → ' + to + ' | ' + lots.length + ' รายการ: ' + lots.slice(0, 5).map(l => l.part + (l.serial ? ' S/N ' + l.serial : '')).join(', ') + (lots.length > 5 ? ' ...' : ''), p.by);
+    log_('ย้ายที่จัดเก็บทั้งช่อง', '', from + ' → ' + to + ' | ' + lots.length + ' รายการ: ' + lots.slice(0, 5).map(l => l.part + (l.serial ? ' S/N ' + l.serial : '')).join(', ') + (lots.length > 5 ? ' …' : ''), p.by);
+    moveLog_(lots.map(l => ({ kind: 'ย้ายทั้งช่อง', seq: l.seq, part: l.part, name: l.name, sn: l.serial, qty: l.remain, from: l.loc, to: to, doc: l.label })), p.by);
     rebuildStock_();
     return { ok: true, moved: lots.length, from: from, to: to };
   });
+}
+
+/** ประวัติการย้าย (ใหม่สุดก่อน) ; กรองด้วย loc (เป็นต้นทางหรือปลายทาง) / part (+serial) / seq ; limit ค่าเริ่มต้น 80 */
+function getMoveHistory(p) {
+  p = p || {};
+  const sh = getSheet_(SHEET_MOVE), last = sh.getLastRow();
+  if (last < 2) return [];
+  const maxRead = 3000, first = Math.max(2, last - maxRead + 1);
+  const rows = sh.getRange(first, 1, last - first + 1, HEADERS[SHEET_MOVE].length).getValues();
+  const key = p.loc ? shelfKey_(p.loc) : '', part = str_(p.part).toUpperCase(), sn = snKey_(p.serial), seq = Number(p.seq) || 0;
+  const limit = Math.min(Number(p.limit) || 80, 300), out = [];
+  for (let i = rows.length - 1; i >= 0 && out.length < limit; i--) {
+    const r = rows[i];
+    if (key && shelfKey_(r[8]) !== key && shelfKey_(r[9]) !== key) continue;
+    if (part && str_(r[4]).toUpperCase() !== part) continue;
+    if (sn && snKey_(r[6]) !== sn) continue;
+    if (seq && !part && Number(r[3]) !== seq) continue;
+    const d = r[0];
+    out.push({
+      t: d instanceof Date ? fmtThai_(d) + ' ' + Utilities.formatDate(d, TZ, 'HH:mm') : str_(d),
+      by: str_(r[1]), kind: str_(r[2]), seq: Number(r[3]) || 0, part: str_(r[4]), name: str_(r[5]), serial: str_(r[6]),
+      qty: num_(r[7]), from: str_(r[8]), to: str_(r[9]), doc: str_(r[10])
+    });
+  }
+  return out;
 }
 
 /* ---------- ผังที่จัดเก็บ (Shelf Map) ---------- */

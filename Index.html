@@ -483,6 +483,16 @@ main .ty-chem{border-left:5px solid var(--ty-chem)}main .ty-kit{border-left:5px 
   .sm-bar .btn{padding:9px 14px}
   .sm-admin{margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
   .sm-admin #sm-addf{margin-top:10px}
+  .mh-it{padding:10px 0;border-top:1px solid var(--line)}
+  .mh-it:first-child{border-top:0}
+  .mh-top{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;color:var(--muted)}
+  .mh-k{font-weight:700;color:var(--navy-royal)}
+  html[data-theme=dark] .mh-k{color:#9cc4f5}
+  .mh-n{font-weight:600;margin:2px 0}
+  .mh-mv{font-size:14px}.mh-mv b{font-weight:700}
+  .mh-mv .ar{color:var(--muted);margin:0 6px}
+  .sm-bar .mq{display:inline-flex;align-items:center;gap:8px;margin:8px 0 0;font-size:14px;color:#fff !important;opacity:1 !important}
+  .sm-bar .mq input{width:72px;height:34px;border-radius:8px;border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.12);color:#fff;text-align:center;font:600 15px 'Sarabun',sans-serif;padding:0 6px}
   .sc-it{border-top:1px solid var(--line);padding:10px 0}
   .sc-it:first-child{border-top:0}
   .sc-it .n{font-weight:600}
@@ -630,6 +640,7 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
   <button class="dr-it dr-in" id="his-btn" style="--i:5"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>ประวัติ<span class="ex"><svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8M10 6H5a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1v-5"/></svg></span></button>
   <button class="dr-it dr-in" id="sn-btn" style="--i:6"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.2-4.2"/></svg>ประวัติ S/N · ประกัน · เคลม<span class="ex"><svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8M10 6H5a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1v-5"/></svg></span></button>
   <button class="dr-it dr-in" id="shelf-btn" style="--i:2"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>ผังที่จัดเก็บ</button>
+  <button class="dr-it dr-in" id="mh-btn" style="--i:2"><svg viewBox="0 0 24 24"><path d="M7 7h11l-3-3M17 17H6l3 3"/><path d="M18 7v0M6 17v0"/></svg>ประวัติการย้ายที่เก็บ</button>
   <button class="dr-it dr-in" id="dup-btn" style="--i:7"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/></svg>ตรวจ S/N ซ้ำ</button>
   <button class="dr-it dr-in" id="ex-btn" style="--i:7"><svg viewBox="0 0 24 24"><path d="M12 4v11"/><path d="M7 11l5 5 5-5"/><path d="M4 20h16"/></svg>ส่งออกรายงาน<span class="ex"><svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8M10 6H5a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1v-5"/></svg></span></button>
   <div class="dr-sec dr-in" style="--i:8">ระบบ</div>
@@ -1161,6 +1172,14 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
 </div>
 
 <!-- ===== sheet: ตรวจ S/N ซ้ำทั้งชีท ===== -->
+<div class="sheet-bg" id="mh-bg">
+  <div class="sheet">
+    <div class="hd"><b id="mh-title">ประวัติการย้ายที่เก็บ</b><button class="x" id="mh-x" aria-label="ปิด">×</button></div>
+    <input class="search" id="mh-q" type="search" placeholder="ค้นหา P/N · ชื่อ · S/N · ช่อง · ผู้ย้าย" autocomplete="off" style="margin:10px 0">
+    <div id="mh-list"></div>
+  </div>
+</div>
+
 <div class="sheet-bg" id="dup-bg">
   <div class="sheet">
     <div class="hd"><b>ตรวจ S/N ซ้ำทั้งชีท</b><button class="x" id="dup-x" aria-label="ปิด">×</button></div>
@@ -1623,13 +1642,17 @@ function snWatch(id, getSeq){
   function smBar(){
     var b=$('sm-bar');
     if(!SM.moving){ b.hidden=true; b.innerHTML=''; return; }
-    var m=SM.moving, destC=SM.dest?SM.idx[SM.dest]:null;
+    var m=SM.moving, destC=SM.dest?SM.idx[SM.dest]:null, mq='';
+    if(m.item && !m.item.serial && m.item.qty>1){
+      if(!(m.qty>0)||m.qty>m.item.qty) m.qty=m.item.qty;
+      mq='<br><label class="mq">จำนวนที่ย้าย <input id="sm-qty" type="number" inputmode="decimal" min="1" max="'+m.item.qty+'" value="'+m.qty+'"> จาก '+fmtNum(m.item.qty)+' '+esc(m.item.unit||'')+'</label>';
+    }
     b.hidden=false;
     if(!destC){
-      b.innerHTML='<div>กำลังย้าย '+(m.bulk?'<b>ทั้งช่อง '+esc(m.from)+'</b> ('+m.count+' รายการ)':'<b>'+esc(m.item.name)+'</b> ('+esc(m.item.part)+')'+(m.from?' จาก '+esc(m.from):''))+'<br>แตะช่องปลายทางในผัง (ช่องว่างกะพริบ)</div><div class="acts"><button type="button" class="btn ghost sm" id="sm-mc" style="color:#fff;border-color:#fff">ยกเลิก</button></div>';
+      b.innerHTML='<div>กำลังย้าย '+(m.bulk?'<b>ทั้งช่อง '+esc(m.from)+'</b> ('+m.count+' รายการ)':'<b>'+esc(m.item.name)+'</b> ('+esc(m.item.part)+')'+(m.from?' จาก '+esc(m.from):''))+'<br>แตะช่องปลายทางในผัง (ช่องว่างกะพริบ)'+mq+'</div><div class="acts"><button type="button" class="btn ghost sm" id="sm-mc" style="color:#fff;border-color:#fff">ยกเลิก</button></div>';
     } else {
       var n=destC.items.length;
-      b.innerHTML='<div>ย้าย '+(m.bulk?'<b>ทั้งช่อง '+esc(m.from)+'</b> ('+m.count+' รายการ)':'<b>'+esc(m.item.name)+'</b>')+' → ช่อง <b>'+esc(destC.loc)+'</b>'+(n?'<br>⚠ ช่องนี้มีของอยู่แล้ว '+n+' รายการ (ย้ายรวมกันได้)':'<br>ช่องว่าง')+'</div><div class="acts"><button type="button" class="btn sm" id="sm-mg">ยืนยันย้าย</button><button type="button" class="btn ghost sm" id="sm-mc" style="color:#fff;border-color:#fff">ยกเลิก</button></div>';
+      b.innerHTML='<div>ย้าย '+(m.bulk?'<b>ทั้งช่อง '+esc(m.from)+'</b> ('+m.count+' รายการ)':'<b>'+esc(m.item.name)+'</b>')+' → ช่อง <b>'+esc(destC.loc)+'</b>'+(n?'<br>⚠ ช่องนี้มีของอยู่แล้ว '+n+' รายการ (ย้ายรวมกันได้)':'<br>ช่องว่าง')+mq+'</div><div class="acts"><button type="button" class="btn sm" id="sm-mg">ยืนยันย้าย</button><button type="button" class="btn ghost sm" id="sm-mc" style="color:#fff;border-color:#fff">ยกเลิก</button></div>';
     }
   }
   function smStartMove(item,from,dest){
@@ -1649,8 +1672,14 @@ function snWatch(id, getSeq){
     if(!state.by){ askBy(function(){ smDoMove(btn); }); return; }
     var m=SM.moving, c=SM.idx[SM.dest]; if(!m||!c) return;
     busy(btn,true);
-    (m.bulk?run('moveCell',[{from:m.from,to:c.loc,by:state.by}]):run('moveLocation',[{seq:m.item.seq,location:c.loc,by:state.by}])).then(function(res){
-      toast(m.bulk?'ย้ายทั้งช่อง '+res.moved+' รายการ → '+res.to:(res.same?'อยู่ช่องนี้อยู่แล้ว':'ย้ายแล้ว → '+res.to));
+    var mqv=null;
+    if(!m.bulk && m.item && !m.item.serial && m.item.qty>1){
+      mqv=Number(m.qty);
+      if(!(mqv>0) || mqv>m.item.qty){ busy(btn,false); toast('จำนวนที่ย้ายต้องอยู่ระหว่าง 1 ถึง '+fmtNum(m.item.qty),true); return; }
+    }
+    var part=mqv!==null && mqv<m.item.qty;
+    (m.bulk?run('moveCell',[{from:m.from,to:c.loc,by:state.by}]):run('moveLocation',[{seq:m.item.seq,location:c.loc,qty:part?mqv:undefined,by:state.by}])).then(function(res){
+      toast(m.bulk?'ย้ายทั้งช่อง '+res.moved+' รายการ → '+res.to:(res.same?'อยู่ช่องนี้อยู่แล้ว':(res.split?'ย้าย '+fmtNum(res.moved)+' ชิ้น → '+res.to+' (เหลือที่เดิม '+fmtNum(m.item.qty-res.moved)+')':'ย้ายแล้ว → '+res.to)));
       SM.moving=null; SM.dest=''; SM.sig='';
       loadStock(); return smLoad(true);
     }).catch(function(e){ toast(e.message,true); }).then(function(){ busy(btn,false); });
@@ -1663,12 +1692,12 @@ function snWatch(id, getSeq){
     var n=c.items.length, h='';
     h+='<div style="margin-bottom:8px"><span class="chip '+(n?'warn':'ok')+'">'+(n?'มีของ '+n+' รายการ':'ว่าง')+'</span>'+(c.defined?'':' <span class="chip info">ไม่อยู่ในผังที่กำหนด</span>')+'</div>';
     h+=c.items.map(function(i,ix){
-      return '<div class="sc-it"><div class="n">'+esc(i.name)+'</div><div class="meta">'+esc(i.part)+(i.serial?' · S/N '+esc(i.serial):'')+' · จำนวน '+fmtNum(i.qty)+' '+esc(i.unit)+(i.type?' · '+esc(i.type):'')+(i.kit?' · <b>'+esc(i.kit)+'</b>':'')+'<br>'+esc(i.doc)+'</div><div class="acts"><button type="button" class="btn ghost sm" data-ce="'+ix+'">แก้ไข</button><button type="button" class="btn sm" data-cm="'+ix+'">ย้ายไปช่องอื่น</button></div></div>';
+      return '<div class="sc-it"><div class="n">'+esc(i.name)+'</div><div class="meta">'+esc(i.part)+(i.serial?' · S/N '+esc(i.serial):'')+' · จำนวน '+fmtNum(i.qty)+' '+esc(i.unit)+(i.type?' · '+esc(i.type):'')+(i.kit?' · <b>'+esc(i.kit)+'</b>':'')+'<br>'+esc(i.doc)+'</div><div class="acts"><button type="button" class="btn ghost sm" data-ce="'+ix+'">แก้ไข</button><button type="button" class="btn sm" data-cm="'+ix+'">ย้ายไปช่องอื่น</button><button type="button" class="btn ghost sm" data-ch="'+ix+'">ประวัติ</button></div></div>';
     }).join('');
     if(!n) h+='<div class="meta" style="margin:6px 0 10px">ช่องนี้ว่าง ไม่มีพัสดุ</div>';
     if(n>1) h+='<button type="button" class="btn" id="sc-all" style="margin-top:10px;width:100%">ย้ายทั้งช่อง ('+n+' รายการ) ไปที่อื่น</button>';
     h+='<div class="sc-find"><label style="margin-top:0">นำพัสดุอื่นมาวางที่ช่องนี้</label><input id="sc-f" placeholder="ค้นหา P/N · ชื่อ · S/N" autocomplete="off"><div class="sc-res" id="sc-res"></div></div>';
-    h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">';
+    h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px"><button type="button" class="btn ghost sm" id="sc-hist">ประวัติของช่องนี้</button>';
     if(!c.defined) h+='<button type="button" class="btn ghost sm" id="sc-def">เพิ่มช่องนี้เข้าผัง</button>';
     if(c.defined && !n) h+='<button type="button" class="btn ghost sm" id="sc-del" style="color:var(--bad)">ลบช่องนี้ออกจากผัง</button>';
     h+='</div>';
@@ -1684,6 +1713,30 @@ function snWatch(id, getSeq){
     SM.found=out.slice(0,8);
     box.innerHTML=SM.found.length?SM.found.map(function(o,ix){ return '<button type="button" data-fm="'+ix+'">'+esc(o.i.name)+'<small>'+esc(o.i.part)+(o.i.serial?' · S/N '+esc(o.i.serial):'')+' · อยู่ที่ '+(o.loc?esc(o.loc):'(ยังไม่กำหนด)')+'</small></button>'; }).join(''):'<div class="meta">ไม่พบ</div>';
   }
+
+  /* ---------- ประวัติการย้ายที่เก็บ ---------- */
+  var MH={rows:[],filter:null};
+  function mhRender(){
+    var q=$('mh-q').value.trim().toLowerCase(), rows=MH.rows.filter(function(r){
+      return !q || (r.part+' '+r.name+' '+r.serial+' '+r.from+' '+r.to+' '+r.by+' '+r.kind+' '+r.doc).toLowerCase().indexOf(q)>=0; });
+    $('mh-list').innerHTML=rows.length?rows.map(function(r){
+      return '<div class="mh-it"><div class="mh-top"><span class="mh-k">'+esc(r.kind)+'</span><span>'+esc(r.t)+' · '+esc(r.by)+'</span></div>'+
+        '<div class="mh-n">'+esc(r.name||r.part)+'</div>'+
+        '<div class="meta">'+esc(r.part)+(r.serial?' · S/N '+esc(r.serial):'')+' · จำนวน '+fmtNum(r.qty)+'</div>'+
+        '<div class="mh-mv"><b>'+esc(r.from||'(ไม่ระบุ)')+'</b><span class="ar">→</span><b>'+esc(r.to||'(ไม่ระบุ)')+'</b></div></div>';
+    }).join(''):emp('search','ยังไม่มีประวัติการย้าย','เมื่อมีการย้ายหรือแก้ที่เก็บ จะแสดงที่นี่ (เริ่มบันทึกตั้งแต่เวอร์ชันนี้)','');
+  }
+  function mhOpen(filter,title){
+    MH.filter=filter||{}; MH.rows=[]; $('mh-q').value='';
+    $('mh-title').textContent=title||'ประวัติการย้ายที่เก็บ';
+    $('mh-bg').classList.add('on'); $('mh-list').innerHTML=skel();
+    run('getMoveHistory',[Object.assign({limit:150},MH.filter)]).then(function(r){ MH.rows=r||[]; mhRender(); })
+      .catch(function(e){ $('mh-list').innerHTML='<div class="meta" style="color:var(--bad)">โหลดไม่ได้ — '+esc(e.message)+'</div>'; });
+  }
+  $('mh-btn').addEventListener('click', function(){ mhOpen({}); });
+  $('mh-x').addEventListener('click', function(){ $('mh-bg').classList.remove('on'); });
+  $('mh-bg').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('on'); });
+  $('mh-q').addEventListener('input', mhRender);
   function smOpen(){
     SM.open=true; SM.moving=null; SM.dest=''; SM.cell='';
     $('sm-bg').classList.add('on');
@@ -1709,6 +1762,7 @@ function snWatch(id, getSeq){
     }
     SM.cell=k; smCell(); $('sc-bg').classList.add('on');
   });
+  $('sm-bar').addEventListener('input', function(e){ if(e.target.id==='sm-qty' && SM.moving) SM.moving.qty=e.target.value; });
   $('sm-bar').addEventListener('click', function(e){
     if(e.target.closest('#sm-mc')) smCancelMove();
     var g=e.target.closest('#sm-mg'); if(g) smDoMove(g);
@@ -1724,6 +1778,8 @@ function snWatch(id, getSeq){
   $('sc-body').addEventListener('click', function(e){
     var c=SM.idx[SM.cell]; if(!c) return;
     var be=e.target.closest('[data-ce]'); if(be){ openEditLot(smLotOf(c.items[Number(be.dataset.ce)],c.loc)); return; }
+    var bh=e.target.closest('[data-ch]'); if(bh){ var hi=c.items[Number(bh.dataset.ch)]; mhOpen({part:hi.part,serial:hi.serial},'ประวัติ '+hi.part+(hi.serial?' · S/N '+hi.serial:'')); return; }
+    if(e.target.closest('#sc-hist')){ mhOpen({loc:c.loc},'ประวัติช่อง '+c.loc); return; }
     var bm=e.target.closest('[data-cm]'); if(bm){ smStartMove(c.items[Number(bm.dataset.cm)],c.loc); return; }
     var bf=e.target.closest('[data-fm]'); if(bf){ var o=SM.found[Number(bf.dataset.fm)]; smStartMove(o.i,o.loc,SM.cell); return; }
     if(e.target.closest('#sc-all')){ smStartBulk(c); return; }
