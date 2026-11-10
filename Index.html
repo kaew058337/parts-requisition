@@ -493,6 +493,59 @@ main .ty-chem{border-left:5px solid var(--ty-chem)}main .ty-kit{border-left:5px 
   .mh-mv .ar{color:var(--muted);margin:0 6px}
   .sm-bar .mq{display:inline-flex;align-items:center;gap:8px;margin:8px 0 0;font-size:14px;color:#fff !important;opacity:1 !important}
   .sm-bar .mq input{width:72px;height:34px;border-radius:8px;border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.12);color:#fff;text-align:center;font:600 15px 'Sarabun',sans-serif;padding:0 6px}
+  /* ---- Performance & KPI ---- */
+  .kp{--ok:#17995a;--warn:#d98f12;--bad:#d24545}
+  .kp-sub{font-size:13px;color:var(--muted);margin:-2px 0 10px}
+  .kp-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin:6px 0 14px}
+  .kp-nav b{min-width:150px;text-align:center;font-size:17px;color:var(--navy-royal)}
+  .kp-nav button{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:#fff;color:var(--navy-royal);font-size:22px;line-height:1;padding:0;cursor:pointer;box-shadow:none;margin:0}
+  html[data-theme=dark] .kp-nav button{background:#18263a}
+  .kp-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .kp-c{background:#fff;border:1px solid var(--line);border-radius:18px;padding:14px;position:relative;overflow:hidden;break-inside:avoid}
+  html[data-theme=dark] .kp-c{background:#18263a;border-color:#2b3b52}
+  .kp-c .t{font-size:12.5px;color:var(--muted);font-weight:600}
+  .kp-c .v{font-size:32px;font-weight:700;line-height:1.15;margin:4px 0 2px;color:var(--navy-royal)}
+  html[data-theme=dark] .kp-c .v{color:#e8eef7}
+  .kp-c .v small{font-size:15px;font-weight:600;margin-left:3px;color:var(--muted)}
+  .kp-c .s{font-size:12.5px;color:var(--muted);line-height:1.4}
+  .kp-c.ok .v{color:var(--ok)}.kp-c.warn .v{color:var(--warn)}.kp-c.bad .v{color:var(--bad)}
+  .kp-c.ok::before,.kp-c.warn::before,.kp-c.bad::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:4px;border-radius:0 4px 4px 0;background:currentColor}
+  .kp-c.ok{color:var(--ok)}.kp-c.warn{color:var(--warn)}.kp-c.bad{color:var(--bad)}
+  .kp-c .t,.kp-c .s{color:var(--muted)}
+  .kp-ring{position:absolute;right:10px;top:38px;width:46px;height:46px}
+  .kp-h{font-weight:700;color:var(--navy-royal);margin:18px 0 8px;font-size:15px;display:flex;justify-content:space-between;align-items:baseline}
+  html[data-theme=dark] .kp-h{color:#cfe0f6}
+  .kp-h small{font-weight:500;color:var(--muted);font-size:12px}
+  .kp-chips{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .kp-chip{background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px 8px;text-align:center}
+  html[data-theme=dark] .kp-chip{background:#18263a;border-color:#2b3b52}
+  .kp-chip b{display:block;font-size:20px;color:var(--navy-royal)}
+  html[data-theme=dark] .kp-chip b{color:#e8eef7}
+  .kp-chip span{font-size:11.5px;color:var(--muted);line-height:1.3;display:block}
+  .kp-bar{display:flex;height:16px;border-radius:99px;overflow:hidden;background:#e8e3d6}
+  .kp-bar i{display:block;height:100%}
+  .kp-leg{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px;font-size:12.5px;color:var(--muted)}
+  .kp-leg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+  .kp-hb{display:grid;grid-template-columns:minmax(0,1fr) 38px;gap:4px 8px;align-items:center;font-size:13px;margin:6px 0}
+  .kp-hb .nm{grid-column:1/-1;display:flex;justify-content:space-between;gap:8px}
+  .kp-hb .tr{height:9px;border-radius:99px;background:#e8e3d6;overflow:hidden}
+  .kp-hb .tr i{display:block;height:100%;border-radius:99px;background:var(--navy-royal)}
+  .kp-hb .nn{text-align:right;font-weight:700;color:var(--navy-royal)}
+  .kp-li{padding:10px 0;border-top:1px solid var(--line);font-size:13.5px}
+  .kp-li:first-child{border-top:0}
+  .kp-li .a{display:flex;justify-content:space-between;gap:8px;font-weight:600}
+  .kp-li .a em{font-style:normal;color:var(--bad);white-space:nowrap}
+  .kp-li .m{color:var(--muted);font-size:12.5px;margin-top:2px}
+  .kp-note{font-size:12px;color:var(--muted);line-height:1.55;margin-top:16px;padding:12px;border-radius:12px;background:rgba(30,64,140,.06)}
+  .kp-acts{display:flex;gap:10px;margin-top:18px}.kp-acts .btn{flex:1;margin:0}
+  .kp-empty{padding:18px;text-align:center;color:var(--muted);font-size:13.5px}
+  @media print{
+    body.pkp > *:not(#kp-bg){display:none !important}
+    body.pkp #kp-bg{display:block !important;position:static !important;background:#fff !important;-webkit-backdrop-filter:none !important;backdrop-filter:none !important;animation:none !important}
+    body.pkp #kp-bg .sheet{position:static !important;max-height:none !important;overflow:visible !important;box-shadow:none !important;max-width:none !important;border-radius:0 !important;padding:0 !important;background:#fff !important;animation:none !important}
+    body.pkp .kp-noprint{display:none !important}
+    body.pkp .kp-c,body.pkp .kp-chip{box-shadow:none}
+  }
   .sc-it{border-top:1px solid var(--line);padding:10px 0}
   .sc-it:first-child{border-top:0}
   .sc-it .n{font-weight:600}
@@ -634,6 +687,7 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
 <aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-label="เมนู" aria-hidden="true">
   <div class="dr-who dr-in" style="--i:0"><div class="dr-av" id="dr-av">?</div><div style="min-width:0"><b id="dr-name">ยังไม่ได้ตั้งชื่อผู้ใช้</b><small>ผู้ใช้งานปัจจุบัน</small></div><button class="dr-x" id="dr-x" aria-label="ปิดเมนู">×</button></div>
   <button class="dr-it dr-in" id="db-btn" style="--i:1"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>แดชบอร์ด</button>
+  <button class="dr-it dr-in" id="kp-btn" style="--i:1"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/><path d="M13 8l3-3 3 3"/></svg>Performance &amp; KPI</button>
   <div class="dr-sec dr-in" style="--i:1">งานพิเศษ</div>
   <button class="dr-it dr-in" id="cnt-btn" style="--i:3"><svg viewBox="0 0 24 24"><path d="M9 11l2 2 4-4"/><rect x="4" y="4" width="16" height="16" rx="3"/></svg>ตรวจนับพัสดุ<span class="ex"><svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8M10 6H5a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1v-5"/></svg></span></button>
   <div class="dr-sec dr-in" style="--i:4">ข้อมูล</div>
@@ -1164,6 +1218,16 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
 </div>
 
 <!-- ===== sheet: Dashboard ===== -->
+<div class="sheet-bg" id="kp-bg">
+  <div class="sheet kp">
+    <div class="hd"><b>Performance &amp; KPI</b><button class="x kp-noprint" id="kp-x" aria-label="ปิด">×</button></div>
+    <div class="kp-sub">วัดประสิทธิภาพการทำงานร่วมกับ TAI · ประกอบรายงานประจำเดือน</div>
+    <div class="kp-nav kp-noprint"><button type="button" id="kp-prev" aria-label="เดือนก่อน">‹</button><b id="kp-mon"></b><button type="button" id="kp-next" aria-label="เดือนถัดไป">›</button></div>
+    <div id="kp-body"></div>
+    <div class="kp-acts kp-noprint"><button type="button" class="btn" id="kp-print">พิมพ์ / บันทึก PDF</button><button type="button" class="btn ghost" id="kp-csv">ดาวน์โหลด CSV</button></div>
+  </div>
+</div>
+
 <div class="sheet-bg" id="db-bg">
   <div class="sheet">
     <div class="hd"><b>แดชบอร์ด</b><button class="x" id="db-x" aria-label="ปิด">×</button></div>
@@ -1714,6 +1778,99 @@ function snWatch(id, getSeq){
     box.innerHTML=SM.found.length?SM.found.map(function(o,ix){ return '<button type="button" data-fm="'+ix+'">'+esc(o.i.name)+'<small>'+esc(o.i.part)+(o.i.serial?' · S/N '+esc(o.i.serial):'')+' · อยู่ที่ '+(o.loc?esc(o.loc):'(ยังไม่กำหนด)')+'</small></button>'; }).join(''):'<div class="meta">ไม่พบ</div>';
   }
 
+
+  /* ---------- Performance & KPI ---------- */
+  var KP={ym:'',data:null}, KP_TARGET=90;
+  var TH_MONL=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+  function kpMonthLabel(ym){ var p=ym.split('-'); return TH_MONL[Number(p[1])-1]+' '+(Number(p[0])+543); }
+  function kpShift(ym,d){ var p=ym.split('-'), dt=new Date(Number(p[0]),Number(p[1])-1+d,1); return dt.getFullYear()+'-'+('0'+(dt.getMonth()+1)).slice(-2); }
+  function kpTone(v){ if(v===null||v===undefined) return ''; return v>=KP_TARGET?'ok':(v>=75?'warn':'bad'); }
+  function kpRing(v,tone){
+    var r=22, c=2*Math.PI*r, p=v===null?0:Math.max(0,Math.min(100,v)), col={ok:'#17995a',warn:'#d98f12',bad:'#d24545'}[tone]||'#9aa7ba';
+    return '<svg class="kp-ring" width="56" height="56" viewBox="0 0 56 56"><circle cx="28" cy="28" r="'+r+'" fill="none" stroke="#e8e3d6" stroke-width="6"/><circle cx="28" cy="28" r="'+r+'" fill="none" stroke="'+col+'" stroke-width="6" stroke-linecap="round" stroke-dasharray="'+(c*p/100).toFixed(1)+' '+c.toFixed(1)+'" transform="rotate(-90 28 28)"/></svg>';
+  }
+  function kpTrend(t){
+    var W=340,H=150,pl=8,pr=8,pt=14,pb=26, n=t.length, gw=(W-pl-pr)/n, mx=Math.max(1,Math.max.apply(null,t.map(function(x){return Math.max(x.raised,x.completed);}))), ch=H-pt-pb, s='';
+    t.forEach(function(x,i){
+      var cx=pl+gw*i+gw/2, bw=Math.min(16,gw/3.2), h1=ch*x.raised/mx, h2=ch*x.completed/mx;
+      s+='<rect x="'+(cx-bw-1)+'" y="'+(pt+ch-h1)+'" width="'+bw+'" height="'+h1+'" rx="3" fill="#2f5fa8" opacity=".85"/>';
+      s+='<rect x="'+(cx+1)+'" y="'+(pt+ch-h2)+'" width="'+bw+'" height="'+h2+'" rx="3" fill="#d4b36a"/>';
+      s+='<text x="'+cx+'" y="'+(H-8)+'" text-anchor="middle" font-size="11" fill="#7b8798">'+TH_MON[x.m]+'</text>';
+    });
+    var pts=t.map(function(x,i){ return x.otd===null?null:[pl+gw*i+gw/2, pt+ch*(1-x.otd/100), x.otd]; });
+    var d='', prev=false;
+    pts.forEach(function(p){ if(!p){ prev=false; return; } d+=(prev?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1); prev=true; });
+    s+='<path d="'+d+'" fill="none" stroke="#17995a" stroke-width="2.2" stroke-linejoin="round"/>';
+    pts.forEach(function(p){ if(p) s+='<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="3.6" fill="#fff" stroke="#17995a" stroke-width="2"/><text x="'+p[0].toFixed(1)+'" y="'+(p[1]-7).toFixed(1)+'" text-anchor="middle" font-size="10.5" font-weight="700" fill="#17995a">'+Math.round(p[2])+'</text>'; });
+    return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="แนวโน้ม 6 เดือน">'+s+'</svg>'+
+      '<div class="kp-leg"><span><i style="background:#2f5fa8"></i>เปิดใบเบิก</span><span><i style="background:#d4b36a"></i>ได้รับครบ</span><span><i style="background:#17995a"></i>ส่งตรงเวลา (%)</span></div>';
+  }
+  function kpHB(rows,fmtv){
+    if(!rows.length) return '<div class="kp-empty">ไม่มีข้อมูล</div>';
+    var mx=Math.max.apply(null,rows.map(function(r){return r.n;}));
+    return rows.map(function(r){ return '<div class="kp-hb"><div class="nm"><span>'+esc(r.k)+'</span><span style="color:var(--muted)">'+(fmtv?fmtv(r):'')+'</span></div><div class="tr"><i style="width:'+Math.max(4,r.n/mx*100)+'%"></i></div><div class="nn">'+r.n+'</div></div>'; }).join('');
+  }
+  function kpList(rows,empty){
+    return rows.length?rows.map(function(r){ return '<div class="kp-li"><div class="a"><span>'+esc(r.part)+' · '+esc(r.name)+'</span><em>เกิน '+r.days+' วัน</em></div><div class="m">ใบเบิก '+esc(r.doc)+' · เบิก '+esc(r.req)+' · กำหนด '+esc(r.due)+(r.urg?' · '+esc(r.urg):'')+(r.tai?' · TAI: '+esc(r.tai):'')+(r.po?' · PO '+esc(r.po):'')+'</div></div>'; }).join(''):'<div class="kp-empty">'+empty+'</div>';
+  }
+  function kpRender(){
+    var d=KP.data, m=d.month, b=d.backlog, tone=kpTone(m.otd), a=b.aging, tot=Math.max(1,b.open);
+    var f=function(v,u){ return v===null||v===undefined?'<small>—</small>':v+(u?'<small>'+u+'</small>':''); };
+    var h='<div class="kp-grid">'+
+      '<div class="kp-c '+tone+'">'+kpRing(m.otd,tone)+'<div class="t">ส่งตรงเวลา (OTD)</div><div class="v">'+f(m.otd,'%')+'</div><div class="s">'+(m.dueCount?'ครบกำหนดเดือนนี้ '+m.dueCount+' รายการ · ทัน '+m.onTime+'<br>เป้าหมาย '+KP_TARGET+'%':'ไม่มีรายการครบกำหนดในเดือนนี้')+'</div></div>'+
+      '<div class="kp-c"><div class="t">ระยะเวลาส่งมอบเฉลี่ย</div><div class="v">'+f(m.leadAvg,'วัน')+'</div><div class="s">'+(m.completed?'ได้รับครบ '+m.completed+' รายการ<br>กลาง '+m.leadMed+' · นานสุด '+m.leadMax+' วัน':'ยังไม่มีรายการที่ได้รับครบในเดือนนี้')+'</div></div>'+
+      '<div class="kp-c '+(b.overdue?'bad':'ok')+'"><div class="t">ค้างเลยกำหนด (ตอนนี้)</div><div class="v">'+b.overdue+'<small>รายการ</small></div><div class="s">จากที่ค้างทั้งหมด '+b.open+' · AOG/ด่วน '+b.aog+(b.etaPassed?'<br>เลยวันนำส่งที่ TAI แจ้ง '+b.etaPassed:'')+'</div></div>'+
+      '<div class="kp-c '+(m.lateCount?'warn':'')+'"><div class="t">ส่งช้า (ที่ครบในเดือนนี้)</div><div class="v">'+m.lateCount+'<small>รายการ</small></div><div class="s">'+(m.lateAvg!==null?'ช้าเฉลี่ย '+m.lateAvg+' วัน':'ไม่มีรายการส่งช้า')+'</div></div></div>';
+    h+='<div class="kp-h">ภาพรวมเดือนนี้</div><div class="kp-chips">'+
+      '<div class="kp-chip"><b>'+m.raised+'</b><span>เปิดใบเบิกใหม่</span></div>'+
+      '<div class="kp-chip"><b>'+m.received+'</b><span>รับเข้าคลัง (ล็อต)</span></div>'+
+      '<div class="kp-chip"><b>'+m.issued+'</b><span>จ่ายออก (ครั้ง)</span></div>'+
+      '<div class="kp-chip"><b>'+(m.dwellAvg===null?'—':m.dwellAvg)+'</b><span>วันเฉลี่ย รับ→จ่าย</span></div>'+
+      '<div class="kp-chip"><b>'+m.claimSent+' / '+m.claimBack+'</b><span>เคลม ส่ง / ได้คืน<br>ค้าง '+b.claimOpen+(m.claimAvg!==null?' · เฉลี่ย '+m.claimAvg+' วัน':'')+'</span></div>'+
+      '<div class="kp-chip"><b>'+(m.cntAcc===null?'—':m.cntAcc+'%')+'</b><span>ตรวจนับตรงระบบ<br>'+(m.cntLines?m.cntOk+'/'+m.cntLines+' รายการ':'ไม่มีการตรวจนับ')+'</span></div></div>';
+    h+='<div class="kp-h">แนวโน้ม 6 เดือน<small>ถึง '+esc(kpMonthLabel(d.ym))+'</small></div><div class="kp-c">'+kpTrend(d.trend)+'</div>';
+    h+='<div class="kp-h">อายุงานค้าง<small>นับจากวันที่เบิก · '+b.open+' รายการ</small></div><div class="kp-c">'+
+      (b.open?'<div class="kp-bar"><i style="width:'+a.a0/tot*100+'%;background:#17995a"></i><i style="width:'+a.a31/tot*100+'%;background:#d4b36a"></i><i style="width:'+a.a61/tot*100+'%;background:#e08a2e"></i><i style="width:'+a.a91/tot*100+'%;background:#d24545"></i></div>'+
+      '<div class="kp-leg"><span><i style="background:#17995a"></i>0–30 วัน '+a.a0+'</span><span><i style="background:#d4b36a"></i>31–60 วัน '+a.a31+'</span><span><i style="background:#e08a2e"></i>61–90 วัน '+a.a61+'</span><span><i style="background:#d24545"></i>เกิน 90 วัน '+a.a91+'</span></div>':'<div class="kp-empty">ไม่มีใบเบิกค้าง</div>')+'</div>';
+    h+='<div class="kp-h">สถานะจาก TAI<small>เฉพาะรายการที่ยังค้าง</small></div><div class="kp-c">'+kpHB(d.tai)+'</div>';
+    h+='<div class="kp-h">ส่งตรงเวลา แยกตามความเร่งด่วน</div><div class="kp-c">'+kpHB(d.byUrg,function(r){ return r.ok+'/'+r.n+' ทัน ('+r.otd+'%)'; })+'</div>';
+    h+='<div class="kp-h">ส่งตรงเวลา แยกตามประเภทพัสดุ</div><div class="kp-c">'+kpHB(d.byType,function(r){ return r.ok+'/'+r.n+' ทัน ('+r.otd+'%)'; })+'</div>';
+    h+='<div class="kp-h">ค้างเลยกำหนดนานที่สุด<small>ณ '+esc(d.asOf)+'</small></div><div class="kp-c">'+kpList(d.topOverdue,'ไม่มีรายการค้างเลยกำหนด')+'</div>';
+    h+='<div class="kp-h">ส่งช้ามากที่สุด (ที่ครบในเดือนนี้)</div><div class="kp-c">'+kpList(d.topLate,'ไม่มีรายการส่งช้า')+'</div>';
+    h+='<div class="kp-note"><b>นิยามตัวชี้วัด</b><br>กำหนดส่ง = วันที่เบิก + 30 วัน (AOG/ด่วน 7 วัน) · “ครบ” = รับครบจำนวนที่เบิก (วันครบ = วันรับล่าสุดที่ทำให้ครบ) · <b>OTD</b> = ในรายการที่ครบกำหนดส่งภายในเดือน สัดส่วนที่ส่งทันกำหนด (รายการที่เลยกำหนดแล้วยังไม่ครบ นับเป็นไม่ทัน) · ระยะเวลาส่งมอบ = วันที่เบิก → วันที่ได้รับครบ · ไม่นับใบเบิกที่ยกเลิก<br>จัดทำ ณ '+esc(d.asOf)+'</div>';
+    $('kp-body').innerHTML=h;
+  }
+  function kpLoad(ym){
+    KP.ym=ym||KP.ym||''; $('kp-body').innerHTML=skel();
+    run('getKpi',[{ym:KP.ym}]).then(function(d){ KP.data=d; KP.ym=d.ym; $('kp-mon').textContent=kpMonthLabel(d.ym); kpRender(); })
+      .catch(function(e){ $('kp-body').innerHTML='<div class="kp-empty" style="color:var(--bad)">โหลดไม่ได้ — '+esc(e.message)+'</div>'; });
+  }
+  function kpCsv(){
+    var d=KP.data; if(!d) return;
+    var m=d.month, rows=[['ตัวชี้วัด','ค่า','หมายเหตุ'],
+      ['เดือน',kpMonthLabel(d.ym),''],['ส่งตรงเวลา (OTD) %',m.otd===null?'':m.otd,'ครบกำหนดในเดือน '+m.dueCount+' ทัน '+m.onTime],
+      ['ระยะเวลาส่งมอบเฉลี่ย (วัน)',m.leadAvg===null?'':m.leadAvg,'กลาง '+(m.leadMed===null?'':m.leadMed)+' นานสุด '+(m.leadMax===null?'':m.leadMax)],
+      ['ส่งช้า (รายการ)',m.lateCount,'ช้าเฉลี่ย '+(m.lateAvg===null?'':m.lateAvg)+' วัน'],['เปิดใบเบิกใหม่',m.raised,''],['ได้รับครบ',m.completed,''],
+      ['รับเข้าคลัง (ล็อต)',m.received,''],['จ่ายออก (ครั้ง)',m.issued,''],['วันเฉลี่ย รับ→จ่าย',m.dwellAvg===null?'':m.dwellAvg,''],
+      ['เคลมส่ง / ได้คืน',m.claimSent+' / '+m.claimBack,'ค้าง '+d.backlog.claimOpen],['ตรวจนับตรงระบบ %',m.cntAcc===null?'':m.cntAcc,m.cntOk+'/'+m.cntLines],
+      ['ค้างทั้งหมด (ตอนนี้)',d.backlog.open,'เลยกำหนด '+d.backlog.overdue+' AOG/ด่วน '+d.backlog.aog],[],
+      ['ค้างเลยกำหนด: ใบเบิก','Part','ชื่อ','ความเร่งด่วน','วันที่เบิก','กำหนดส่ง','เกินกำหนด (วัน)','สถานะ TAI','PO TAI']];
+    d.topOverdue.forEach(function(r){ rows.push([r.doc,r.part,r.name,r.urg,r.req,r.due,r.days,r.tai,r.po]); });
+    var csv='﻿'+rows.map(function(r){ return r.map(function(c){ c=String(c===undefined?'':c); return /[",\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c; }).join(','); }).join('\r\n');
+    var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})); a.download='KPI-'+d.ym+'.csv'; document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },500);
+  }
+  $('kp-btn').addEventListener('click', function(){ $('kp-bg').classList.add('on'); kpLoad(KP.ym||''); });
+  $('kp-x').addEventListener('click', function(){ $('kp-bg').classList.remove('on'); });
+  $('kp-bg').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('on'); });
+  $('kp-prev').addEventListener('click', function(){ if(KP.ym) kpLoad(kpShift(KP.ym,-1)); });
+  $('kp-next').addEventListener('click', function(){ if(KP.ym) kpLoad(kpShift(KP.ym,1)); });
+  $('kp-csv').addEventListener('click', kpCsv);
+  $('kp-print').addEventListener('click', function(){
+    setPage('A4 portrait','10mm'); document.body.classList.add('pkp');
+    var done=function(){ document.body.classList.remove('pkp'); window.removeEventListener('afterprint',done); };
+    window.addEventListener('afterprint',done);
+    setTimeout(function(){ try{ window.print(); }catch(err){ done(); toast('เครื่องนี้พิมพ์จากหน้าเว็บไม่ได้ ลองเปิดจากเบราว์เซอร์',true); } },250);
+  });
   /* ---------- ประวัติการย้ายที่เก็บ ---------- */
   var MH={rows:[],filter:null};
   function mhRender(){

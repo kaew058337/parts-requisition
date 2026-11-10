@@ -79,6 +79,7 @@ const API_FUNCS_ = {
   getShelfMap: getShelfMap,
   moveCell: moveCell,
   getMoveHistory: getMoveHistory,
+  getKpi: getKpi,
   addShelfSlots: addShelfSlots,
   removeShelfSlot: removeShelfSlot,
   fillShelfGaps: fillShelfGaps,
@@ -1590,6 +1591,123 @@ function getMoveHistory(p) {
     });
   }
   return out;
+}
+
+
+/* ---------- แดชบอร์ด Performance & KPI (การทำงานร่วมกับ TAI / รายงานประจำเดือน) ----------
+ *  นิยาม (ใช้ตรงกับระบบ): กำหนดส่ง = วันที่เบิก + 30 วัน (AOG/ด่วน 7 วัน) ; ใบเบิก 1 บรรทัด = 1 Part ในใบเบิก ;
+ *  "ครบ" = รับครบจำนวนเบิก (วันครบ = วันที่รับล่าสุดที่ทำให้ครบ) ; ส่งทัน = วันครบ ≤ กำหนดส่ง
+ *  OTD (ตัวหลัก) = ในบรรทัดที่ครบกำหนดส่งภายในเดือน : สัดส่วนที่ส่งทัน (ที่ยังไม่ครบหลังกำหนด นับเป็นไม่ทัน) */
+function kpiDay_(d) { return d instanceof Date ? new Date(d.getFullYear(), d.getMonth(), d.getDate()) : null; }
+function kpiDiff_(a, b) { return Math.round((a.getTime() - b.getTime()) / 86400000); }
+function kpiInM_(d, y, m) { return d instanceof Date && d.getFullYear() === y && d.getMonth() === m; }
+function kpiAvg_(a) { return a.length ? Math.round(a.reduce((s, x) => s + x, 0) / a.length * 10) / 10 : null; }
+function kpiMed_(a) { if (!a.length) return null; const s = a.slice().sort((x, y) => x - y), k = Math.floor(s.length / 2); return s.length % 2 ? s[k] : Math.round((s[k - 1] + s[k]) / 2 * 10) / 10; }
+
+/** คำนวณ KPI จากข้อมูลดิบ (แยกจากการอ่านชีทเพื่อทดสอบได้) */
+function kpiCompute_(D, y, m, today) {
+  const T = kpiDay_(today);
+  // 1) บรรทัดใบเบิก + การรับ
+  const got = {};
+  D.rcv.forEach(r => {
+    if (!str_(r[RC.DOC]) || (str_(r[RC.SRC]) || SRC_REQ) !== SRC_REQ) return;
+    const k = pad_(r[RC.DOC], 9) + '|' + str_(r[RC.PART]);
+    (got[k] = got[k] || []).push({ d: kpiDay_(r[RC.RDATE]), q: num_(r[RC.QTY]) });
+  });
+  const lines = [];
+  D.req.forEach(r => {
+    if (!isValidReqRow_(r) || isCancelled_(r[7])) return;
+    const rd = kpiDay_(r[6]); if (!rd) return;
+    const k = pad_(r[1], 9) + '|' + str_(r[2]), qty = num_(r[4]);
+    const ev = (got[k] || []).filter(x => x.d).sort((a, b) => a.d - b.d);
+    let acc = 0, doneDate = null;
+    ev.forEach(x => { acc += x.q; if (!doneDate && acc >= qty) doneDate = x.d; });
+    if (isPaid_(r[7]) && !doneDate) doneDate = kpiDay_(r[7]) || null;   // ใบเบิกที่ปิดแล้วแต่ไม่พบรายการรับ
+    const due = kpiDay_(dueDate_(r[6], r[9]));
+    lines.push({
+      doc: pad_(r[1], 9), part: str_(r[2]), name: str_(r[3]), qty: qty, type: str_(r[14]), urg: str_(r[9]), reqDate: rd, due: due, done: doneDate,
+      recv: acc, tai: str_(r[17]), po: str_(r[19]), eta: parseThaiShortDate_(r[21]), aog: urgencyDays_(r[9]) === 7
+    });
+  });
+  const isLate = l => l.done ? l.done > l.due : T > l.due;
+  function monthStats(yy, mm) {
+    const raised = lines.filter(l => kpiInM_(l.reqDate, yy, mm));
+    const dueIn = lines.filter(l => kpiInM_(l.due, yy, mm));
+    const onTime = dueIn.filter(l => l.done && l.done <= l.due).length;
+    const completed = lines.filter(l => kpiInM_(l.done, yy, mm));
+    const lead = completed.map(l => kpiDiff_(l.done, l.reqDate));
+    const lateDays = completed.filter(l => l.done > l.due).map(l => kpiDiff_(l.done, l.due));
+    return {
+      raised: raised.length, dueCount: dueIn.length, onTime: onTime,
+      otd: dueIn.length ? Math.round(onTime / dueIn.length * 1000) / 10 : null,
+      completed: completed.length, leadAvg: kpiAvg_(lead), leadMed: kpiMed_(lead), leadMax: lead.length ? Math.max.apply(null, lead) : null,
+      lateCount: completed.filter(l => l.done > l.due).length, lateAvg: kpiAvg_(lateDays),
+      _completed: completed, _dueIn: dueIn
+    };
+  }
+  const cur = monthStats(y, m);
+  // 2) แนวโน้ม 6 เดือน (สิ้นสุดเดือนที่เลือก)
+  const trend = [];
+  for (let i = 5; i >= 0; i--) {
+    const dt = new Date(y, m - i, 1), s = monthStats(dt.getFullYear(), dt.getMonth());
+    trend.push({ y: dt.getFullYear(), m: dt.getMonth(), raised: s.raised, completed: s.completed, otd: s.otd, dueCount: s.dueCount, leadAvg: s.leadAvg });
+  }
+  // 3) งานค้างปัจจุบัน
+  const open = lines.filter(l => !l.done);
+  const aging = { a0: 0, a31: 0, a61: 0, a91: 0 };
+  open.forEach(l => { const a = kpiDiff_(T, l.reqDate); if (a <= 30) aging.a0++; else if (a <= 60) aging.a31++; else if (a <= 90) aging.a61++; else aging.a91++; });
+  const overdue = open.filter(l => T > l.due).map(l => Object.assign({ days: kpiDiff_(T, l.due) }, l)).sort((a, b) => b.days - a.days);
+  const taiMap = {};
+  open.forEach(l => { const k = l.tai || 'ยังไม่มีข้อมูลจาก TAI'; taiMap[k] = (taiMap[k] || 0) + 1; });
+  const fmt = d => d ? fmtThai_(d) : '';
+  const brief = l => ({ doc: l.doc, part: l.part, name: l.name, urg: l.urg, due: fmt(l.due), req: fmt(l.reqDate), days: l.days || 0, tai: l.tai, po: l.po, eta: fmt(l.eta) });
+  // 4) แยกตามประเภท/ความเร่งด่วน (ของบรรทัดที่ครบกำหนดในเดือน)
+  const bd = key => {
+    const o = {};
+    cur._dueIn.forEach(l => { const k = l[key] || 'ไม่ระบุ'; (o[k] = o[k] || { n: 0, ok: 0 }); o[k].n++; if (l.done && l.done <= l.due) o[k].ok++; });
+    return Object.keys(o).map(k => ({ k: k, n: o[k].n, ok: o[k].ok, otd: Math.round(o[k].ok / o[k].n * 1000) / 10 })).sort((a, b) => b.n - a.n);
+  };
+  // 5) รับ -> จ่าย (วันที่พัสดุอยู่ในคลังก่อนถูกใช้) ของล็อตที่รับในเดือน
+  const firstIss = {};
+  D.iss.forEach(r => { const k = Number(r[IS.RSEQ]), d = kpiDay_(r[IS.DATE]); if (k && d && (!firstIss[k] || d < firstIss[k])) firstIss[k] = d; });
+  const dwell = [];
+  D.rcv.forEach(r => { const d = kpiDay_(r[RC.RDATE]), s = Number(r[RC.SEQ]); if (d && kpiInM_(d, y, m) && firstIss[s]) dwell.push(Math.max(0, kpiDiff_(firstIss[s], d))); });
+  const issuedMonth = D.iss.filter(r => kpiInM_(r[IS.DATE], y, m)).length;
+  const receivedMonth = D.rcv.filter(r => kpiInM_(r[RC.RDATE], y, m)).length;
+  // 6) เคลม
+  const claimSent = D.claim.filter(r => kpiInM_(r[5], y, m)), claimBack = D.claim.filter(r => kpiInM_(r[9], y, m));
+  const claimDays = D.claim.filter(r => r[5] instanceof Date && r[9] instanceof Date && kpiInM_(r[9], y, m)).map(r => kpiDiff_(kpiDay_(r[9]), kpiDay_(r[5])));
+  const claimOpen = D.claim.filter(r => str_(r[0]) && !(r[9] instanceof Date)).length;
+  // 7) ตรวจนับ
+  const cnt = D.cnt.filter(r => kpiInM_(r[1], y, m));
+  const cntOk = cnt.filter(r => num_(r[11]) === 0).length;
+  return {
+    ym: y + '-' + String(m + 1).padStart(2, '0'), asOf: fmt(T),
+    month: {
+      raised: cur.raised, dueCount: cur.dueCount, onTime: cur.onTime, otd: cur.otd, completed: cur.completed, leadAvg: cur.leadAvg, leadMed: cur.leadMed, leadMax: cur.leadMax,
+      lateCount: cur.lateCount, lateAvg: cur.lateAvg, received: receivedMonth, issued: issuedMonth, dwellAvg: kpiAvg_(dwell),
+      claimSent: claimSent.length, claimBack: claimBack.length, claimAvg: kpiAvg_(claimDays),
+      cntLines: cnt.length, cntOk: cntOk, cntAcc: cnt.length ? Math.round(cntOk / cnt.length * 1000) / 10 : null
+    },
+    trend: trend,
+    backlog: { open: open.length, overdue: overdue.length, aog: open.filter(l => l.aog).length, aging: aging, claimOpen: claimOpen,
+      etaPassed: open.filter(l => l.eta && T > kpiDay_(l.eta)).length },
+    tai: Object.keys(taiMap).map(k => ({ k: k, n: taiMap[k] })).sort((a, b) => b.n - a.n),
+    byType: bd('type'), byUrg: bd('urg'),
+    topOverdue: overdue.slice(0, 8).map(brief),
+    topLate: cur._completed.filter(l => l.done > l.due).map(l => Object.assign({ days: kpiDiff_(l.done, l.due) }, l)).sort((a, b) => b.days - a.days).slice(0, 8).map(brief)
+  };
+}
+
+/** ข้อมูล KPI ของเดือนที่เลือก (p.ym = 'YYYY-MM' ค.ศ. ; ไม่ระบุ = เดือนปัจจุบัน) */
+function getKpi(p) {
+  p = p || {};
+  const t = parseDate_(todayStr_());
+  let y = t.getFullYear(), m = t.getMonth();
+  const mm = String(p.ym || '').match(/^(\d{4})-(\d{2})$/);
+  if (mm) { y = Number(mm[1]); m = Number(mm[2]) - 1; }
+  const rd = name => { const sh = getSheet_(name), last = sh.getLastRow(); return last >= 2 ? sh.getRange(2, 1, last - 1, HEADERS[name].length).getValues() : []; };
+  return kpiCompute_({ req: rd(SHEET_REQ), rcv: readRcv_(), iss: readIss_(), claim: rd(SHEET_CLAIM), cnt: rd(SHEET_CNT) }, y, m, t);
 }
 
 /* ---------- ผังที่จัดเก็บ (Shelf Map) ---------- */
