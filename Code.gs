@@ -114,6 +114,7 @@ const API_FUNCS_ = {
   getReturnable: getReturnable,
   getIssuedSerials: getIssuedSerials,
   getStock: getStock,
+  searchParts: searchParts,
   issueFromLot: issueFromLot,
   moveLocation: moveLocation,
   editLot: editLot,
@@ -1414,6 +1415,126 @@ function getStock() {
     });
   });
   return Object.keys(groups).sort().map(k => groups[k]);
+}
+
+/* ---------- ค้นหาพัสดุ (P/N · ชื่อ · S/N) : มีของ / มีในระบบแต่ไม่มีของคงคลัง / ไม่พบ ---------- */
+function srchN_(x) { return str_(x).toUpperCase().replace(/[^0-9A-Z฀-๿]/g, ''); }
+
+/**
+ * ค้นพัสดุจากทุกแหล่งที่ระบบรู้จัก (ใบเบิก/รับ/คืน/จ่าย) ไม่ใช่เฉพาะของที่อยู่ในคลัง
+ * p.q = ข้อความค้น (หลายคำ = ต้องตรงทุกคำ ; ตรงบางส่วนได้ ; P/N ไม่สนขีด/ช่องว่าง) ; p.limit = จำนวนผลสูงสุด (ค่าเริ่มต้น 8)
+ * คืน { q, total, results:[{ part,name,unit,status:'stock'|'nostock', qty, lots:[{serial,qty,loc,cond,kit}],
+ *        lastRecv,lastIssue,lastIssueTo, serialsOut:[{serial,date,tech,doc}], pending:[{doc,remain,tai}], snHit }] }
+ */
+function searchParts(p) {
+  const q = str_(p && p.q), limit = Math.max(1, Math.min(30, Number(p && p.limit) || 8));
+  const toks = q.split(/\s+/).filter(Boolean).slice(0, 6).map(t => ({ l: t.toLowerCase(), n: srchN_(t) }));
+  if (!toks.length) return { q: q, total: 0, results: [] };
+  const E = {};
+  const ent = (part, name, unit) => {
+    part = str_(part); name = str_(name);
+    const k = part ? srchN_(part) || part : 'N:' + name.toLowerCase();
+    const e = E[k] || (E[k] = { part: part, name: '', unit: '', status: 'nostock', qty: 0, lots: [], lastRecvD: null, lastIssueD: null, lastIssueTo: '', serialsOut: [], pending: [], serials: {} });
+    if (!e.name && name) e.name = name;
+    if (!e.unit && unit) e.unit = str_(unit);
+    return e;
+  };
+  getParts_().forEach(x => ent(x.part, x.name, x.unit));
+  computeLots_().forEach(l => {
+    const e = ent(l.part, l.name, l.unit);
+    if (l.recvDate && (!e.lastRecvD || l.recvDate > e.lastRecvD)) e.lastRecvD = l.recvDate;
+    if (l.serial) e.serials[snKey_(l.serial)] = 1;
+    if (l.remain > 0) {
+      e.status = 'stock'; e.qty += l.remain;
+      e.lots.push({ serial: l.serial, qty: l.remain, loc: l.loc, cond: l.cond, kit: kitOf_(l.v[RC.TAIL]) });
+    }
+  });
+  readIss_().forEach(r => {
+    if (!str_(r[IS.PART]) && !str_(r[IS.NAME])) return;
+    const e = ent(r[IS.PART], r[IS.NAME], r[IS.UNIT]), d = r[IS.DATE] instanceof Date ? r[IS.DATE] : null;
+    if (d && (!e.lastIssueD || d >= e.lastIssueD)) { e.lastIssueD = d; e.lastIssueTo = str_(r[IS.TECH]); }
+    const sn = str_(r[IS.SN]);
+    if (sn) { e.serials[snKey_(sn)] = 1; e.serialsOut.push({ serial: sn, date: fmtThai_(d), tech: str_(r[IS.TECH]), doc: docStr_(r[IS.DOC]), d: d }); }
+  });
+  getPendingReceive().forEach(x => {
+    const e = ent(x.part, x.name, x.unit);
+    e.pending.push({ doc: x.docNo, remain: x.remain, tai: x.tai ? x.tai.label : '' });
+  });
+  const hits = [];
+  Object.keys(E).forEach(k => {
+    const e = E[k], sns = Object.keys(e.serials);
+    const hayL = (e.part + ' ' + e.name + ' ' + sns.join(' ')).toLowerCase(), hayN = srchN_(e.part) + ' ' + srchN_(e.name) + ' ' + sns.map(srchN_).join(' ');
+    if (!toks.every(t => hayL.indexOf(t.l) >= 0 || (t.n.length >= 2 && hayN.indexOf(t.n) >= 0))) return;
+    e.snHit = toks.some(t => t.n.length >= 2 && sns.some(s => srchN_(s).indexOf(t.n) >= 0) && srchN_(e.part).indexOf(t.n) < 0);
+    // เรียงความตรง: P/N ตรงเป๊ะก่อน, มีของก่อน
+    const exact = toks.length === 1 && srchN_(e.part) === toks[0].n ? 0 : 1;
+    hits.push({ e: e, rank: exact * 2 + (e.status === 'stock' ? 0 : 1) });
+  });
+  hits.sort((a, b) => (a.rank - b.rank) || (a.e.part < b.e.part ? -1 : a.e.part > b.e.part ? 1 : 0));
+  const results = hits.slice(0, limit).map(h => {
+    const e = h.e, out = e.serialsOut.filter(s => !e.lots.some(l => snKey_(l.serial) === snKey_(s.serial)));
+    out.sort((a, b) => (b.d || 0) - (a.d || 0));
+    return { part: e.part, name: e.name, unit: e.unit, status: e.status, qty: e.qty, lots: e.lots,
+      lastRecv: fmtThai_(e.lastRecvD), lastIssue: fmtThai_(e.lastIssueD), lastIssueTo: e.lastIssueTo,
+      serialsOut: out.slice(0, 5).map(s => ({ serial: s.serial, date: s.date, tech: s.tech, doc: s.doc })), pending: e.pending.slice(0, 5), snHit: !!e.snHit };
+  });
+  return { q: q, total: hits.length, results: results };
+}
+
+/** ข้อความตอบไลน์จากผลค้นหา (ข้อความธรรมดา) */
+function lineSearchText_(res) {
+  if (!res.results.length) return '❌ ไม่พบ "' + res.q + '" ในระบบ\nลองพิมพ์เพียงบางส่วนของ P/N หรือชื่อ (ไม่ต้องใส่ขีด/ช่องว่าง)';
+  const L = [];
+  res.results.forEach(r => {
+    const head = (r.part || '(ไม่มี P/N)') + (r.name ? ' · ' + r.name : '');
+    if (r.status === 'stock') {
+      L.push('✅ ' + head, 'คงเหลือ ' + r.qty + (r.unit ? ' ' + r.unit : ''));
+      r.lots.slice(0, 6).forEach(l => L.push('  • ' + (l.loc || 'ยังไม่ระบุที่เก็บ') + (l.serial ? ' · S/N ' + l.serial : ' · ' + l.qty + ' ชิ้น') + (l.kit ? ' · ' + l.kit : '') + (l.cond ? ' · ' + l.cond : '')));
+      if (r.lots.length > 6) L.push('  … อีก ' + (r.lots.length - 6) + ' ล็อต');
+    } else {
+      L.push('⚪ ' + head, 'มีในระบบ แต่ไม่มีของคงคลัง');
+      const h = [];
+      if (r.lastRecv) h.push('รับล่าสุด ' + r.lastRecv);
+      if (r.lastIssue) h.push('จ่ายล่าสุด ' + r.lastIssue + (r.lastIssueTo ? ' (' + r.lastIssueTo + ')' : ''));
+      if (h.length) L.push('  ' + h.join(' · '));
+    }
+    r.pending.forEach(x => L.push('  ⏳ รอรับตามใบเบิก ' + x.doc + ' เหลือ ' + x.remain + (x.tai ? ' · TAI: ' + x.tai : '')));
+    if (r.snHit || (r.status !== 'stock' && r.serialsOut.length)) r.serialsOut.slice(0, 3).forEach(s => L.push('  ↗ S/N ' + s.serial + ' จ่ายออกแล้ว ' + s.date + (s.tech ? ' (' + s.tech + ')' : '') + (s.doc ? ' · ' + s.doc : '')));
+    L.push('');
+  });
+  if (res.total > res.results.length) L.push('พบทั้งหมด ' + res.total + ' รายการ แสดง ' + res.results.length + ' — พิมพ์ให้เจาะจงขึ้นเพื่อดูที่เหลือ');
+  return L.join('\n').trim();
+}
+
+/** แชทส่วนตัวกับบอต: ข้อความใด ๆ = ค้นพัสดุ ; "/id" = ขอรหัสไลน์ของตัวเอง (ใช้ตั้งสิทธิ์) ; ผู้ที่ไม่อยู่ในรายชื่ออนุญาตจะค้นไม่ได้ */
+function handleLineText_(ev) {
+  const src = ev.source || {}, text = str_(ev.message && ev.message.text);
+  if (src.type && src.type !== 'user') return;               // ตอบเฉพาะแชทส่วนตัว (ไม่ตอบในกลุ่ม)
+  if (!text) return;
+  const uid = src.userId || '';
+  if (/^\/id$/i.test(text)) return lineReply_(ev.replyToken, 'รหัสไลน์ของคุณ:\n' + uid + '\n\nส่งรหัสนี้ให้ผู้ดูแลระบบเพื่อเพิ่มสิทธิ์ค้นหา');
+  const allow = (lineProps_().getProperty('LINE_SEARCH_USERS') || '').split(',').map(x => x.trim()).filter(Boolean);
+  if (!uid || allow.indexOf(uid) < 0) return lineReply_(ev.replyToken, 'ยังไม่ได้รับสิทธิ์ค้นหา\nพิมพ์ /id เพื่อรับรหัสของคุณ แล้วส่งให้ผู้ดูแลระบบ');
+  let msg;
+  try { msg = lineSearchText_(searchParts({ q: text })); }
+  catch (err) { msg = '⚠️ ค้นหาไม่สำเร็จ: ' + err.message; }
+  lineReply_(ev.replyToken, msg);
+}
+
+/** เมนู: เพิ่ม/ลบผู้ใช้ไลน์ที่ค้นหาพัสดุได้ (รหัสได้จากการที่ผู้ใช้พิมพ์ /id ในแชทกับบอต) */
+function lineSearchUsers() {
+  const ui = lineUi_(); if (!ui) throw new Error('ใช้จากเมนูในชีทเท่านั้น');
+  const p = lineProps_(), cur = (p.getProperty('LINE_SEARCH_USERS') || '').split(',').map(x => x.trim()).filter(Boolean);
+  const r = ui.prompt('ผู้ใช้ที่ค้นพัสดุทางไลน์ได้', 'รหัสที่อนุญาตตอนนี้: ' + (cur.length ? '\n' + cur.join('\n') : 'ยังไม่มี') + '\n\nวางรหัส (ขึ้นต้นด้วย U) ที่ผู้ใช้ได้จากการพิมพ์ /id ในแชทกับบอต\n— หลายคนคั่นด้วยจุลภาค\n— ใส่ - หน้ารหัสเพื่อลบ เช่น -Uabc...\n— ใส่ CLEAR เพื่อล้างทั้งหมด', ui.ButtonSet.OK_CANCEL);
+  if (r.getSelectedButton() !== ui.Button.OK) return;
+  let list = cur.slice();
+  str_(r.getResponseText()).split(/[,\s]+/).filter(Boolean).forEach(x => {
+    if (/^clear$/i.test(x)) list = [];
+    else if (x.charAt(0) === '-') list = list.filter(y => y !== x.slice(1));
+    else if (list.indexOf(x) < 0) list.push(x);
+  });
+  p.setProperty('LINE_SEARCH_USERS', list.join(','));
+  ui.alert('บันทึกแล้ว: อนุญาต ' + list.length + ' คน');
 }
 
 /* ---------- ย้ายที่จัดเก็บ (LOCATION) ---------- */
@@ -3347,6 +3468,7 @@ function onOpen() {
       .addItem('สร้างรายการตายตัวของชุด (จากของที่มีอยู่)', 'seedKitSpec')
       .addSeparator()
       .addItem('ตั้งค่าบอตไลน์', 'lineSetup')
+      .addItem('ผู้ใช้ที่ค้นพัสดุทางไลน์ได้', 'lineSearchUsers')
       .addItem('ตรวจ webhook ไลน์ (หารหัสกลุ่ม)', 'lineWebhookCheck')
       .addItem('เปิด/ปิด ตอบกลับเมื่อรับไฟล์ Excel ในกลุ่ม', 'lineToggleFileReply')
       .addItem('ดูตัวอย่างข้อความแจ้งด่วนไลน์', 'linePreview')
@@ -4218,6 +4340,7 @@ function lineWebhook_(e, body) {
       const src = ev.source || {};
       const id = src.groupId || src.roomId || '';
       if (id) lineProps_().setProperty('LINE_LAST_GROUP', id);
+      if (ev.type === 'message' && ev.message && ev.message.type === 'text') { try { handleLineText_(ev); } catch (e3) { lineFileLog_('ค้นหาพัง: ' + e3.message); } }
       if (ev.type === 'message' && ev.message && ev.message.type === 'file') { try { handleLineFile_(ev); } catch (e2) { lineFileLog_('พัง: ' + e2.message); } }
     });
   } catch (err) { /* ไม่ทำอะไร */ }

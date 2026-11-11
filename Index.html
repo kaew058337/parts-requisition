@@ -2581,6 +2581,22 @@ function snWatch(id, getSeq){
       .catch(function(e){ $('k-list').innerHTML='<div class="empty">'+esc(e.message)+'</div>'; });
   }
   var TG={sel:{}};
+  function kNoneHtml(v){ return emp('search','ไม่พบ “'+esc(v)+'” ในคลัง','ตรวจตัวสะกด หรือลองค้นด้วย Serial / LOCATION','<button class="btn" id="k-line" style="margin-top:14px;max-width:320px">ส่งหมายเลขนี้ทางไลน์</button><div class="meta" style="margin-top:8px">จะเปิดไลน์ให้เลือกแชตหรือกลุ่มที่จะส่ง (บนคอมพิวเตอร์จะคัดลอกข้อความไว้ให้วางด้วย)</div>'); }
+  /* ค้นในคลังไม่พบ แต่ระบบรู้จัก (เคยเบิก/รับ/จ่าย) -> แจ้งว่า "มีในระบบ แต่ไม่มีของคงคลัง" */
+  function kKnownHtml(r){
+    var h='<div class="meta" style="margin:4px 2px 10px">ไม่มีของคงคลังที่ตรงกับ “'+esc(r.q)+'” แต่พบในระบบ '+r.total+' รายการ</div>';
+    h+=r.results.map(function(x){
+      var b=[];
+      if(x.lastRecv) b.push('รับล่าสุด '+esc(x.lastRecv));
+      if(x.lastIssue) b.push('จ่ายล่าสุด '+esc(x.lastIssue)+(x.lastIssueTo?' ('+esc(x.lastIssueTo)+')':''));
+      var pend=x.pending.map(function(p){ return '<div class="meta">⏳ รอรับตามใบเบิก '+esc(p.doc)+' เหลือ '+fmtNum(p.remain)+(p.tai?' · TAI: '+esc(p.tai):'')+'</div>'; }).join('');
+      var so=x.serialsOut.slice(0,3).map(function(s){ return '<div class="meta">↗ S/N '+esc(s.serial)+' จ่ายออกแล้ว '+esc(s.date)+(s.tech?' ('+esc(s.tech)+')':'')+'</div>'; }).join('');
+      return '<div class="card" style="opacity:.96"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div><b>'+esc(x.part||'(ไม่มี P/N)')+'</b><div>'+esc(x.name)+'</div></div><span class="chip" style="white-space:nowrap;background:#eceff4;color:#5b6678;border-radius:99px;padding:3px 10px;font-size:12px">ไม่มีของคงคลัง</span></div>'+
+        '<div class="meta" style="margin-top:6px">มีพัสดุตัวนี้ในระบบ แต่ตอนนี้ไม่มีของในคลัง</div>'+(b.length?'<div class="meta">'+b.join(' · ')+'</div>':'')+pend+so+'</div>';
+    }).join('');
+    if(r.total>r.results.length) h+='<div class="meta" style="text-align:center;margin:8px 0">แสดง '+r.results.length+' จาก '+r.total+' รายการ — พิมพ์ให้เจาะจงขึ้นเพื่อดูที่เหลือ</div>';
+    return h;
+  }
   function renderStock(){
     if(!state.stk){ $('k-list').innerHTML=skel(); return; }
     var q=$('k-search').value.trim().toLowerCase();
@@ -2596,7 +2612,16 @@ function snWatch(id, getSeq){
     var total=0, lots=0; rows.forEach(function(g){ total+=g.qty; lots+=g.lots.length; });
     $('k-sum').textContent = rows.length ? rows.length+' Part number · '+lots+' ล็อต · รวม '+fmtNum(total)+' หน่วย' : '';
     if(!rows.length && q && (state.stk||[]).length){
-      $('k-list').innerHTML=emp('search','ไม่พบ “'+esc($('k-search').value.trim())+'” ในคลัง','ตรวจตัวสะกด หรือลองค้นด้วย Serial / LOCATION','<button class="btn" id="k-line" style="margin-top:14px;max-width:320px">ส่งหมายเลขนี้ทางไลน์</button><div class="meta" style="margin-top:8px">จะเปิดไลน์ให้เลือกแชตหรือกลุ่มที่จะส่ง (บนคอมพิวเตอร์จะคัดลอกข้อความไว้ให้วางด้วย)</div>'); return;
+      var qq=$('k-search').value.trim();
+      $('k-list').innerHTML=skel();
+      clearTimeout(renderStock.t);
+      renderStock.t=setTimeout(function(){
+        run('searchParts',[{q:qq}]).then(function(r){
+          if($('k-search').value.trim()!==qq) return;
+          $('k-list').innerHTML = r.results.length ? kKnownHtml(r) : kNoneHtml(qq);
+        }).catch(function(){ if($('k-search').value.trim()===qq) $('k-list').innerHTML=kNoneHtml(qq); });
+      },350);
+      return;
     }
     if(!rows.length){ $('k-list').innerHTML=(state.stk||[]).length?emp('search','ไม่พบรายการที่ค้นหา'):emp('box','ยังไม่มีพัสดุในคลัง','พัสดุจะเข้าคลังเมื่อบันทึกรับ และออกเมื่อจ่าย'); return; }
     $('k-list').innerHTML = rows.map(function(g){
