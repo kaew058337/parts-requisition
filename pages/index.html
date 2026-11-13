@@ -770,7 +770,7 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
         <button class="btn ghost sm" id="k-aw" title="พัสดุที่รับก่อนเบิกและยังไม่มีใบเบิก" style="display:none;margin:0;flex:none;width:auto;min-height:0;padding:5px 11px;font-size:13px;border-radius:12px">รอใบเบิก</button>
         <button class="btn ghost sm" id="k-open" title="รับพัสดุเข้าคลังก่อนมีใบเบิก หรือเพิ่มยอดยกมา" style="margin:0;flex:none;width:auto;min-height:0;padding:5px 11px;font-size:13px;border-radius:12px">+ เพิ่มเข้าคลัง</button>
       </div>
-      <div class="tylg" aria-label="สีแถบซ้ายของการ์ด"><span><i style="background:var(--ty-lru)"></i>LRU</span><span><i style="background:var(--ty-sp)"></i>SP</span><span><i style="background:var(--ty-tci)"></i>TCI</span><span><i style="background:var(--ty-chem)"></i>สารเคมี</span><span><i style="background:var(--ty-kit)"></i>ชุด KIT</span></div>
+
       <div id="tg-bar" class="tgbar" hidden><div id="tg-txt"></div><button id="tg-go" class="tgb pri"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/></svg>พิมพ์</button><button id="tg-clr" class="tgb">ล้าง</button></div>
       <div id="k-list"><div class="skl" aria-busy="true" aria-label="กำลังโหลด"><div class="skc"><i class="w1"></i><i class="w2"></i><i class="w3"></i><span><b></b><b></b><b></b></span></div><div class="skc"><i class="w1"></i><i class="w2"></i><i class="w3"></i><span><b></b><b></b><b></b></span></div><div class="skc"><i class="w1"></i><i class="w2"></i><i class="w3"></i><span><b></b><b></b><b></b></span></div></div></div>
     </div>
@@ -1371,7 +1371,7 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
 var EMP_ICO={box:'<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/>',search:'<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.2-4.2"/>',inbox:'<path d="M4 13l2.5-8h11L20 13v6H4z"/><path d="M4 13h5l1 2h4l1-2h5"/>',check:'<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 9.5"/>',doc:'<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h5M10 16h5"/>',swap:'<path d="M7 4L3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'};
 function emp(ico,title,hint,extra){ return '<div class="empty emp"><div class="emp-i"><svg viewBox="0 0 24 24">'+(EMP_ICO[ico]||EMP_ICO.box)+'</svg></div><b>'+title+'</b>'+(hint?'<span>'+hint+'</span>':'')+(extra||'')+'</div>'; }
 function skel(){ return '<div class="skl" aria-busy="true" aria-label="กำลังโหลด"><div class="skc"><i class="w1"></i><i class="w2"></i><i class="w3"></i><span><b></b><b></b><b></b></span></div><div class="skc"><i class="w1"></i><i class="w2"></i><i class="w3"></i><span><b></b><b></b><b></b></span></div><div class="skc"><i class="w1"></i><i class="w2"></i><i class="w3"></i><span><b></b><b></b><b></b></span></div></div>'; }
-function tyCls(t,kit){ if(kit) return ' ty-kit'; t=String(t||''); if(t.indexOf('TCI')>=0) return ' ty-tci'; if(t.indexOf('LRU')===0) return ' ty-lru'; if(t.indexOf('SP')===0) return ' ty-sp'; if(t.indexOf('สารเคมี')===0) return ' ty-chem'; return ''; }
+function tyCls(t,kit){ return ''; }  /* ไม่แสดงแถบสีประเภทพัสดุอีกต่อไป */
 
 /* ===== เช็ค S/N ซ้ำทันทีตอนพิมพ์ ===== */
 function snWatch(id, getSeq){
