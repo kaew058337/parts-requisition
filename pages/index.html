@@ -695,6 +695,7 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
   <div class="dr-who dr-in" style="--i:0"><div class="dr-av" id="dr-av">?</div><div style="min-width:0"><b id="dr-name">ยังไม่ได้ตั้งชื่อผู้ใช้</b><small>ผู้ใช้งานปัจจุบัน</small></div><button class="dr-x" id="dr-x" aria-label="ปิดเมนู">×</button></div>
   <button class="dr-it dr-in" id="db-btn" style="--i:1"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>แดชบอร์ด</button>
   <button class="dr-it dr-in" id="kp-btn" style="--i:1"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/><path d="M13 8l3-3 3 3"/></svg>Performance &amp; KPI</button>
+  <button class="dr-it dr-in" id="hl-btn" style="--i:1"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>สุขภาพระบบ</button>
   <div class="dr-sec dr-in" style="--i:1">งานพิเศษ</div>
   <button class="dr-it dr-in" id="cnt-btn" style="--i:3"><svg viewBox="0 0 24 24"><path d="M9 11l2 2 4-4"/><rect x="4" y="4" width="16" height="16" rx="3"/></svg>ตรวจนับพัสดุ<span class="ex"><svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8M10 6H5a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1v-5"/></svg></span></button>
   <div class="dr-sec dr-in" style="--i:4">ข้อมูล</div>
@@ -1225,6 +1226,14 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
 </div>
 
 <!-- ===== sheet: Dashboard ===== -->
+<div class="sheet-bg" id="hl-bg">
+  <div class="sheet">
+    <div class="hd"><b>สุขภาพระบบ</b><button class="x" id="hl-x" aria-label="ปิด">×</button></div>
+    <div class="kp-sub" style="font-size:13px;color:var(--muted);margin:-2px 0 10px">ดูว่าระบบเริ่มโตเกินกว่า Google Sheets จะรองรับสบายหรือยัง</div>
+    <div id="hl-body"></div>
+  </div>
+</div>
+
 <div class="sheet-bg" id="kp-bg">
   <div class="sheet kp">
     <div class="hd"><b>Performance &amp; KPI</b><button class="x kp-noprint" id="kp-x" aria-label="ปิด">×</button></div>
@@ -1786,6 +1795,30 @@ function snWatch(id, getSeq){
   }
 
 
+
+  /* ---------- สุขภาพระบบ ---------- */
+  function hlLoad(){
+    $('hl-body').innerHTML=skel();
+    run('getSystemHealth',[]).then(function(d){
+      var col={ok:'#17995a',warn:'#d98f12',bad:'#d24545'}, msg={
+        ok:'ปกติ — ยังไม่จำเป็นต้องย้ายฐานข้อมูล',
+        warn:'เริ่มโต — ยังใช้ได้ แต่ควรเฝ้าดู และเริ่มเตรียมแผนย้าย',
+        bad:'ใกล้ถึงขีดจำกัด — ควรพิจารณาย้ายฐานข้อมูลหรือปรับปรุงความเร็ว'};
+      var sec=(d.ms/1000).toFixed(1);
+      var h='<div style="border:1px solid var(--line);border-left:5px solid '+col[d.level]+';border-radius:14px;padding:14px;margin-bottom:12px"><b style="color:'+col[d.level]+'">'+msg[d.level]+'</b><div class="meta" style="margin-top:4px">ตรวจ ณ '+esc(d.asOf)+'</div></div>'+
+        '<div class="kp-chips" style="margin-bottom:12px">'+
+        '<div class="kp-chip"><b style="color:'+col[d.timeLevel]+'">'+sec+' วิ</b><span>เวลาคำนวณคลัง<br>(ปกติ &lt; 2 วิ)</span></div>'+
+        '<div class="kp-chip"><b style="color:'+col[d.rowLevel]+'">'+fmtNum(d.ledger)+'</b><span>แถวสมุดรับ-จ่าย<br>(ปกติ &lt; 8,000)</span></div>'+
+        '<div class="kp-chip"><b>'+fmtNum(d.lots)+'</b><span>ล็อตทั้งหมด<br>ที่คำนวณ</span></div></div>'+
+        '<div class="kp-h" style="margin-top:6px">จำนวนแถวแยกตามชีท</div><div class="kp-c">'+
+        d.sheets.map(function(s){ return '<div class="kp-li" style="display:flex;justify-content:space-between"><span>'+esc(s.name)+'</span><b>'+fmtNum(s.rows)+'</b></div>'; }).join('')+'</div>'+
+        '<div class="kp-note">เวลาคำนวณคลังเป็นตัวชี้วัดหลัก เพราะระบบคำนวณคลังใหม่จากสมุดรับ-จ่ายทุกครั้งที่เปิดหน้าจอ ถ้าเกิน 5 วินาทีต่อเนื่อง หรือสมุดเกิน 20,000 แถว ถึงเวลาปรับปรุงหรือย้ายฐานข้อมูล · ตัวเลขนี้วัดจากการเรียกครั้งนี้ อาจผันผวนตามภาระของ Google ณ เวลานั้น ควรลองหลายครั้ง</div>';
+      $('hl-body').innerHTML=h;
+    }).catch(function(e){ $('hl-body').innerHTML='<div class="kp-empty" style="color:var(--bad)">โหลดไม่ได้ — '+esc(e.message)+'</div>'; });
+  }
+  $('hl-btn').addEventListener('click', function(){ $('hl-bg').classList.add('on'); hlLoad(); });
+  $('hl-x').addEventListener('click', function(){ $('hl-bg').classList.remove('on'); });
+  $('hl-bg').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('on'); });
   /* ---------- Performance & KPI ---------- */
   var KP={ym:'',data:null};
   var TH_MONL=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];

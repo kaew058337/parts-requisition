@@ -80,6 +80,7 @@ const API_FUNCS_ = {
   moveCell: moveCell,
   getMoveHistory: getMoveHistory,
   getKpi: getKpi,
+  getSystemHealth: getSystemHealth,
   addShelfSlots: addShelfSlots,
   removeShelfSlot: removeShelfSlot,
   fillShelfGaps: fillShelfGaps,
@@ -1415,6 +1416,19 @@ function getStock() {
     });
   });
   return Object.keys(groups).sort().map(k => groups[k]);
+}
+
+/* ---------- ตรวจสุขภาพระบบ: ระบบเริ่มโตเกินกว่า Google Sheets จะรับไหวหรือยัง ---------- */
+function getSystemHealth() {
+  const rowsOf = n => { const sh = SpreadsheetApp.getActive().getSheetByName(n); return sh ? Math.max(0, sh.getLastRow() - 1) : 0; };
+  const names = [SHEET_REQ, SHEET_RCV, SHEET_RCV2, SHEET_ISS, SHEET_LOAN, SHEET_CLAIM, SHEET_CNT, SHEET_MOVE, SHEET_LOG];
+  const sheets = names.map(n => ({ name: n, rows: rowsOf(n) }));
+  const ledger = rowsOf(SHEET_RCV) + rowsOf(SHEET_RCV2) + rowsOf(SHEET_ISS);
+  const t0 = Date.now(); const lots = computeLots_(); const ms = Date.now() - t0;   // เวลาคำนวณคลังจากสมุดรับ-จ่าย (หัวใจของระบบ)
+  const timeLevel = ms < 2000 ? 'ok' : ms < 5000 ? 'warn' : 'bad';
+  const rowLevel = ledger < 8000 ? 'ok' : ledger < 20000 ? 'warn' : 'bad';
+  const rank = { ok: 0, warn: 1, bad: 2 }, level = rank[timeLevel] >= rank[rowLevel] ? timeLevel : rowLevel;
+  return { asOf: fmtThai_(new Date()), sheets: sheets, ledger: ledger, lots: lots.length, ms: ms, timeLevel: timeLevel, rowLevel: rowLevel, level: level };
 }
 
 /* ---------- ค้นหาพัสดุ (P/N · ชื่อ · S/N) : มีของ / มีในระบบแต่ไม่มีของคงคลัง / ไม่พบ ---------- */
