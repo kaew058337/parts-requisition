@@ -21,6 +21,7 @@ const SHEET_KITREQ = 'รายการชุด FLY AWAY KIT';   // ราย�
 const SHEET_HOL = 'วันหยุด';              // วันหยุดราชการที่ไม่ส่งสรุปไลน์ (นอกจากเสาร์-อาทิตย์)
 const SHEET_SHELF = 'ผังที่จัดเก็บ';       // รายการช่องจัดเก็บที่กำหนดไว้ (รวมช่องว่าง) ใช้วาดแผนผัง
 const SHEET_MOVE = 'ประวัติการย้าย';   // บันทึกทุกครั้งที่ที่เก็บของพัสดุเปลี่ยน (ย้าย / ย้ายทั้งช่อง / แยกบางส่วน / แก้ไขที่เก็บ)
+const SHEET_CXL = 'รายการที่ยกเลิก';   // ที่เก็บหลักฐานทุกรายการ รับ/จ่าย/ส่งคืน ที่ถูกยกเลิก (ไม่ถูกล้างอัตโนมัติ)
 const SHEET_RCV2 = 'รับคืนเข้าคลัง';   // ประวัติรับ "คืนเข้าคลัง" แยกจากรับปกติ (โครงสร้างเหมือนชีท รับ)
 const WARRANTY_DAYS = 365;        // ประกัน 1 ปี นับจากวันที่รับ (LRU / LRU(TCI)) ; ของที่เคลมกลับมานับใหม่จากวันที่ได้รับกลับ
 const WARRANTY_SOON_DAYS = 60;    // เตือน "ใกล้หมดประกัน" เมื่อเหลือไม่เกินกี่วัน
@@ -52,6 +53,7 @@ const HEADERS = {
   [SHEET_RCVR]: ['ยศ-ชื่อ นามสกุล'],
   [SHEET_LOAN]: ['เลขที่ยืม', 'วันที่ยืม', 'Part number', 'ชื่อพัสดุ', 'serial number', 'ประเภทพัสดุ', 'จำนวน', 'หน่วยนับ', 'จำนวนคงค้าง', 'ผู้ยืม', 'ประเภทผู้ยืม', 'เหตุผล/เครื่อง', 'กำหนดคืน', 'สถานะ', 'วันที่ปิด', 'วิธีปิด', 'เลขเบิกอ้างอิง', 'ลำดับล็อต (อ้างอิง)', 'หมายเหตุ', 'คืนเข้าคลังแล้ว (จำนวน)'],
   [SHEET_LOG]: ['เวลา', 'ผู้ใช้งาน', 'อีเมล', 'การกระทำ', 'เลขเอกสารการเบิก', 'รายละเอียด'],
+  [SHEET_CXL]: ['เวลา', 'ผู้ยกเลิก', 'ประเภท', 'ลำดับ', 'เลขเอกสาร', 'Part number', 'ชื่อพัสดุ', 'serial number', 'จำนวน', 'เหตุผล', 'ข้อมูลเดิม (ไว้กู้คืนด้วยมือ)'],
   [SHEET_KIT]: ['ลำดับรับ', 'ชุด (TAIL No.)', 'Part number', 'ชื่อพัสดุ', 'serial number', 'ประเภทพัสดุ', 'จำนวน', 'หน่วยนับ', 'คงเหลือในชุด', 'COND', 'LOCATION', 'หมดอายุ', 'วันที่รับ', 'เลขเอกสารการเบิก', 'สถานะ', 'หมายเหตุ'],
   [SHEET_KITREQ]: ['Part number', 'ชื่อพัสดุ', 'ประเภทพัสดุ', 'ต้องมีใน KIT 1', 'ต้องมีใน KIT 2', 'มีอยู่ KIT 1', 'มีอยู่ KIT 2', 'สถานะ'],
   [SHEET_HOL]: ['วันที่ (วว/ดด/ปปปป)', 'ชื่อวันหยุด'],
@@ -81,6 +83,7 @@ const API_FUNCS_ = {
   getMoveHistory: getMoveHistory,
   getKpi: getKpi,
   getSystemHealth: getSystemHealth,
+  cancelEntry: cancelEntry,
   addShelfSlots: addShelfSlots,
   removeShelfSlot: removeShelfSlot,
   fillShelfGaps: fillShelfGaps,
@@ -276,6 +279,9 @@ function getSheet_(name) {
     } else if (name === SHEET_MOVE) {
       sh.getRange('A2:A').setNumberFormat('dd/mm/yyyy hh:mm:ss');
       sh.getRange('E2:E').setNumberFormat('@'); sh.getRange('G2:G').setNumberFormat('@'); sh.getRange('I2:K').setNumberFormat('@');
+    } else if (name === SHEET_CXL) {
+      sh.getRange('A2:A').setNumberFormat('dd/mm/yyyy hh:mm:ss');
+      sh.getRange('E2:F').setNumberFormat('@'); sh.getRange('H2:H').setNumberFormat('@');
     } else if (name === SHEET_LOG) {
       sh.getRange('A2:A').setNumberFormat('dd/mm/yyyy hh:mm:ss');
       sh.getRange('E2:E').setNumberFormat('@');
@@ -702,13 +708,15 @@ function withLock_(fn) {
   try { return fn(); } finally { lock.releaseLock(); }
 }
 
+/** เลขลำดับสูงสุดที่เคยใช้ (กันเลขซ้ำหลังยกเลิกแถวท้ายสุด ไม่ให้ลำดับเก่าไปปนกับประวัติการย้าย/ป้าย) */
+function seqFloorOf_(key) { try { return Number(PropertiesService.getDocumentProperties().getProperty('seqfloor:' + key)) || 0; } catch (e) { return 0; } }
+function seqFloorSet_(key, n) { try { if (n > seqFloorOf_(key)) PropertiesService.getDocumentProperties().setProperty('seqfloor:' + key, String(n)); } catch (e) { /* ข้าม */ } }
+
 function nextSeq_(sh) {
   const last = sh.getLastRow();
-  if (last < 2) return 1;
-  const v = sh.getRange(2, 1, last - 1, 1).getValues();
   let max = 0;
-  v.forEach(r => { const n = Number(r[0]); if (n > max) max = n; });
-  return max + 1;
+  if (last >= 2) sh.getRange(2, 1, last - 1, 1).getValues().forEach(r => { const n = Number(r[0]); if (n > max) max = n; });
+  return Math.max(max, seqFloorOf_(sh.getName())) + 1;
 }
 
 /** หมายเลขการเบิก 9 หลัก: ลำดับ(3) + วัน(2) + เดือน(2) + ปี พ.ศ. 2 หลักท้าย(2) ; ลำดับเริ่มใหม่ทุกเดือน */
@@ -1000,7 +1008,7 @@ function nextRcvSeq_() {
     if (last < 2) return;
     sh.getRange(2, 1, last - 1, 1).getValues().forEach(r => { const n = Number(r[0]); if (n > max) max = n; });
   });
-  return max + 1;
+  return Math.max(max, seqFloorOf_('rcv')) + 1;
 }
 
 /** ย้ายแถวเดิมที่ แหล่งที่มา = คืนเข้าคลัง จากชีท รับ ไปชีท รับคืนเข้าคลัง (ทำครั้งเดียว) */
@@ -3142,6 +3150,7 @@ const TCI_TYPES = ['LRU(TCI)', 'SP(TCI)'];
  * alerts = สิ่งที่ต้องลงมือ ; cards = ตัวเลขสรุป ; recent = ความเคลื่อนไหวล่าสุด
  */
 function getDashboard(month) {
+  purgeLog_();
   const today = parseDate_(todayStr_());
   const ym = /^\d{4}-\d{2}$/.test(str_(month)) ? str_(month) : todayStr_().substr(0, 7);
   const req = getSheet_(SHEET_REQ), rl = req.getLastRow();
@@ -3214,6 +3223,7 @@ function getDashboard(month) {
 /* ---------- API: ประวัติ ---------- */
 
 function getHistory(kind, limit) {
+  if (kind === 'log') purgeLog_();
   const name = { req: SHEET_REQ, rcv: SHEET_RCV, rcv2: SHEET_RCV2, iss: SHEET_ISS, ret: SHEET_RET, log: SHEET_LOG }[kind];
   if (!name) throw new Error('ไม่รู้จักชีท');
   const sh = getSheet_(name);
@@ -3243,6 +3253,187 @@ function getHistory(kind, limit) {
     paid: items.map(x => x.paid),
     skipped: skipped
   };
+}
+
+/* ---------- ยกเลิกรายการ รับ / จ่าย / ส่งคืน ---------- */
+
+/** เก็บหลักฐานรายการที่ยกเลิก (ไม่ถูกล้างอัตโนมัติ เหมือนบันทึกการใช้งาน) */
+function cxlRecord_(kind, seq, doc, part, name, sn, qty, reason, by, snapshot) {
+  try {
+    const sh = getSheet_(SHEET_CXL), r = sh.getLastRow() + 1;
+    sh.getRange(r, 4, 1, 5).setNumberFormat('@');
+    sh.getRange(r, 1, 1, 11).setValues([[new Date(), str_(by) || '(ไม่ระบุ)', kind, seq, doc, part, name, sn, qty, reason,
+      JSON.stringify(snapshot, (k, v) => (k === '_sh' || k === '_row') ? undefined : v)]]);
+  } catch (e) { /* ไม่ให้กระทบงานหลัก */ }
+}
+
+const KIND_TH_ = { rcv: 'รับ', rcv2: 'รับคืนเข้าคลัง', iss: 'จ่าย', ret: 'ส่งคืน' };
+
+/**
+ * ยกเลิกรายการที่บันทึกผิด : p = { kind: 'rcv'|'rcv2'|'iss'|'ret', seq, reason, by }
+ * ลบแถวออกจากสมุด (ยอดคลัง/สถานะใบเบิก คำนวณใหม่ให้เอง) และเก็บหลักฐานไว้ในชีท "รายการที่ยกเลิก" + บันทึกการใช้งาน
+ * ถ้ามีรายการอื่นที่พึ่งพารายการนี้อยู่ (เช่น รับแล้วถูกจ่ายไปแล้ว) จะไม่ยอมยกเลิก และบอกว่าต้องยกเลิกอะไรก่อน
+ */
+function cancelEntry(p) {
+  return withLock_(() => {
+    const kind = str_(p.kind), seq = Number(p.seq), reason = str_(p.reason);
+    if (!reason) throw new Error('กรุณาระบุเหตุผลที่ยกเลิก');
+    if (!seq) throw new Error('ไม่พบลำดับของรายการ');
+    let res;
+    if (kind === 'iss') res = cancelIssue_(seq, reason, p.by);
+    else if (kind === 'rcv' || kind === 'rcv2') res = cancelReceive_(seq, reason, p.by);
+    else if (kind === 'ret') res = cancelReturn_(seq, reason, p.by);
+    else throw new Error('ไม่รู้จักประเภทรายการ');
+    rebuildStock_();
+    return res;
+  });
+}
+
+function cancelIssue_(seq, reason, by) {
+  const sh = getSheet_(SHEET_ISS), last = sh.getLastRow();
+  const vals = last >= 2 ? sh.getRange(2, 1, last - 1, HEADERS[SHEET_ISS].length).getValues() : [];
+  const i = vals.findIndex(r => Number(r[IS.SEQ]) === seq);
+  if (i < 0) throw new Error('ไม่พบรายการจ่ายลำดับที่ ' + seq + ' (อาจถูกยกเลิกไปแล้ว)');
+  const r = vals[i], doc = docStr_(r[IS.DOC]);
+  if (!isTechIssue_(r) && doc !== DIRECT) {
+    throw new Error(doc === ADJ_DOC ? 'รายการนี้เกิดจากการปรับยอดตรวจนับ ยกเลิกตรงนี้ไม่ได้ (ให้ตรวจนับใหม่)'
+      : 'รายการนี้เป็นการโอนเข้าใบเบิก ให้ยกเลิกที่ประวัติ "รับ" ของใบเบิกนั้นแทน');
+  }
+  const back = returnedMap_()[seq] || 0;
+  if (back > 0) throw new Error('รายการจ่ายนี้มีการคืนเข้าคลังแล้ว ' + back + ' ชิ้น ต้องยกเลิกรายการ "รับคืนเข้าคลัง" นั้นก่อน');
+  const lot = findLot_(r[IS.RSEQ]);
+  if (!lot) throw new Error('ไม่พบล็อตต้นทางของรายการจ่ายนี้ จึงคืนของเข้าคลังให้ไม่ได้');
+  cxlRecord_('จ่าย', seq, doc, str_(r[IS.PART]), str_(r[IS.NAME]), str_(r[IS.SN]), num_(r[IS.QTY]), reason, by, r);
+  sh.deleteRow(i + 2);
+  seqFloorSet_(SHEET_ISS, seq);
+  log_('ยกเลิกการจ่าย', doc, [str_(r[IS.PART]), str_(r[IS.NAME]), 'x' + num_(r[IS.QTY]), str_(r[IS.SN]) ? 'S/N ' + str_(r[IS.SN]) : '',
+    'ช่าง ' + str_(r[IS.TECH]), 'เหตุผล: ' + reason].filter(Boolean).join(' | '), by);
+  const kit = kitOf_(lot.v[RC.TAIL]);
+  return { ok: true, msg: 'ยกเลิกการจ่ายแล้ว พัสดุกลับเข้าคลัง' + (lot.loc ? ' (' + lot.loc + ')' : '') +
+    (kit ? ' · ใบเบิกทดแทน ' + kit + ' ที่ออกอัตโนมัติยังอยู่ ถ้าไม่ต้องการให้ยกเลิกใบเบิกนั้นเอง' : '') };
+}
+
+function cancelReceive_(seq, reason, by) {
+  const R = readRcv_(), r = R.filter(x => Number(x[RC.SEQ]) === seq)[0];
+  if (!r) throw new Error('ไม่พบรายการรับลำดับที่ ' + seq + ' (อาจถูกยกเลิกไปแล้ว)');
+  const lot = computeLots_().filter(l => l.seq === seq)[0];
+  const unit = str_(r[RC.UNIT]), doc = docStr_(r[RC.DOC]), src = str_(r[RC.SRC]) || SRC_REQ, note = str_(r[RC.NOTE]);
+  if (lot && lot.issued > 0) throw new Error('รายการนี้จ่ายออกไปแล้ว ' + lot.issued + ' ' + unit + ' ต้องยกเลิกรายการ "จ่าย" ก่อน');
+  if (lot && (lot.loanOut > 0 || lot.loanOpen > 0)) throw new Error('พัสดุนี้ถูกยืมออกจากคลังอยู่ ต้องรับคืนการยืมก่อน');
+  if (readLoans_().some(l => Number(l[17]) === seq)) throw new Error('พัสดุล็อตนี้มีประวัติการยืม จึงยกเลิกไม่ได้');
+  if (/^แยกจากลำดับรับ/.test(note) || note.indexOf('| แยกจากลำดับรับ') >= 0) throw new Error('รายการนี้เกิดจากการแยก/ย้ายบางส่วน ยกเลิกแล้วจำนวนจะหาย ให้ย้ายกลับแทน');
+  const childRe = new RegExp('แยกจากลำดับรับ ' + seq + '(\\D|$)');
+  if (R.some(x => Number(x[RC.SEQ]) !== seq && childRe.test(str_(x[RC.NOTE])))) throw new Error('มีรายการที่ถูกแยกออกไปจากล็อตนี้ ต้องย้ายกลับหรือยกเลิกรายการนั้นก่อน');
+  if (src === SRC_REQ && doc && readLoans_().some(l => str_(l[15]) === LOAN_USED && str_(l[16]).split(/[,\s]+/).indexOf(doc) >= 0)) {
+    throw new Error('รายการรับนี้ใช้ปิดการยืมของใบเบิก ' + doc + ' ยกเลิกไม่ได้');
+  }
+  const qty = num_(r[RC.QTY]), sn = str_(r[RC.SN]), part = str_(r[RC.PART]);
+  let xferRemoved = false, retRemoved = false;
+
+  /* 1) รับที่โอนมาจากล็อตในคลัง -> ลบแถวโอนออกใน จ่าย เพื่อคืนของให้ล็อตเดิม */
+  if (src === SRC_REQ && Number(r[RC.REF])) {
+    const ish = getSheet_(SHEET_ISS), il = ish.getLastRow();
+    if (il >= 2) {
+      const iv = ish.getRange(2, 1, il - 1, HEADERS[SHEET_ISS].length).getValues();
+      for (let k = iv.length - 1; k >= 0; k--) {
+        const x = iv[k];
+        if (Number(x[IS.RSEQ]) === Number(r[RC.REF]) && docStr_(x[IS.DOC]) === doc && !isTechIssue_(x) && num_(x[IS.QTY]) === qty && str_(x[IS.NOTE]).indexOf(XFER_NOTE) === 0) {
+          cxlRecord_('จ่าย(โอนเข้าใบเบิก)', Number(x[IS.SEQ]), doc, str_(x[IS.PART]), str_(x[IS.NAME]), str_(x[IS.SN]), num_(x[IS.QTY]), reason, by, x);
+          ish.deleteRow(k + 2); seqFloorSet_(SHEET_ISS, Number(x[IS.SEQ])); xferRemoved = true; break;
+        }
+      }
+    }
+  }
+  /* 2) รับคืนเข้าคลัง -> ลบแถวใน ส่งคืน ที่บันทึกคู่กันไว้ด้วย */
+  if (src === SRC_RET) {
+    const rsh = getSheet_(SHEET_RET), rl = rsh.getLastRow();
+    if (rl >= 2) {
+      const rv = rsh.getRange(2, 1, rl - 1, HEADERS[SHEET_RET].length).getValues();
+      for (let k = rv.length - 1; k >= 0; k--) {
+        const x = rv[k];
+        if (str_(x[10]) === note && str_(x[1]) === part && str_(x[4]) === sn && num_(x[3]) === qty) {
+          cxlRecord_('ส่งคืน(คู่กับรับคืนเข้าคลัง)', Number(x[0]), str_(x[12]), str_(x[1]), str_(x[2]), str_(x[4]), num_(x[3]), reason, by, x);
+          rsh.deleteRow(k + 2); seqFloorSet_(SHEET_RET, Number(x[0])); retRemoved = true; break;
+        }
+      }
+    }
+  }
+  cxlRecord_(KIND_TH_[src === SRC_RET ? 'rcv2' : 'rcv'], seq, doc || src, part, str_(r[RC.NAME]), sn, qty, reason, by, r);
+  getSheet_(r._sh).deleteRow(r._row);
+  seqFloorSet_('rcv', seq);
+
+  /* 3) รับตามใบเบิก -> ใบเบิกกลับเป็น ค้างจ่าย ถ้ารับไม่ครบแล้ว */
+  let reopened = false;
+  if (src === SRC_REQ && doc) {
+    const req = getSheet_(SHEET_REQ), rl2 = req.getLastRow();
+    if (rl2 >= 2) {
+      const all = req.getRange(2, 1, rl2 - 1, 8).getValues(), done = receivedMap_()[doc + '|' + part] || 0;
+      for (let k = 0; k < all.length; k++) {
+        if (pad_(all[k][1], 9) === doc && str_(all[k][2]) === part) {
+          if (all[k][7] instanceof Date && done < num_(all[k][4])) { req.getRange(k + 2, 8).setNumberFormat('General').setValue(UNPAID); reopened = true; }
+          break;
+        }
+      }
+    }
+  }
+  log_(src === SRC_RET ? 'ยกเลิกการรับคืนเข้าคลัง' : 'ยกเลิกการรับ', doc, [part, str_(r[RC.NAME]), 'x' + qty, sn ? 'S/N ' + sn : '', src !== SRC_REQ ? '(' + src + ')' : '',
+    xferRemoved ? 'คืนยอดให้ล็อตเดิม' : '', reopened ? 'ใบเบิกกลับเป็นค้างรับ' : '', 'เหตุผล: ' + reason].filter(Boolean).join(' | '), by);
+  return { ok: true, msg: 'ยกเลิกการรับแล้ว' + (reopened ? ' · ใบเบิก ' + doc + ' กลับเป็น "ค้างจ่าย" (รอรับ)' : '') +
+    (xferRemoved ? ' · คืนจำนวนให้ล็อตเดิมในคลังแล้ว' : '') + (retRemoved ? ' · รายการส่งคืนคู่กันถูกยกเลิกด้วย' : '') };
+}
+
+function cancelReturn_(seq, reason, by) {
+  const sh = getSheet_(SHEET_RET), last = sh.getLastRow();
+  const vals = last >= 2 ? sh.getRange(2, 1, last - 1, HEADERS[SHEET_RET].length).getValues() : [];
+  const i = vals.findIndex(r => Number(r[0]) === seq);
+  if (i < 0) throw new Error('ไม่พบรายการส่งคืนลำดับที่ ' + seq + ' (อาจถูกยกเลิกไปแล้ว)');
+  const r = vals[i], note = str_(r[10]);
+  if (note.indexOf('คืนจากใบเบิก') === 0) {   // แถวที่เกิดจาก "คืนเข้าคลัง" : ยกเลิกผ่านรายการรับคืนเข้าคลังคู่กัน (ลบทั้งสองฝั่ง)
+    const pair = readRcv_().filter(x => str_(x[RC.SRC]) === SRC_RET && str_(x[RC.NOTE]) === note && str_(x[RC.PART]) === str_(r[1]) && str_(x[RC.SN]) === str_(r[4]) && num_(x[RC.QTY]) === num_(r[3]))[0];
+    if (pair) return cancelReceive_(Number(pair[RC.SEQ]), reason, by);
+  }
+  cxlRecord_('ส่งคืน', seq, str_(r[12]), str_(r[1]), str_(r[2]), str_(r[4]), num_(r[3]), reason, by, r);
+  sh.deleteRow(i + 2);
+  seqFloorSet_(SHEET_RET, seq);
+  log_('ยกเลิกการส่งคืน', '', [str_(r[12]), str_(r[1]), str_(r[2]), 'x' + num_(r[3]), str_(r[4]) ? 'S/N ' + str_(r[4]) : '', 'เหตุผล: ' + reason].filter(Boolean).join(' | '), by);
+  return { ok: true, msg: 'ยกเลิกรายการส่งคืนแล้ว' };
+}
+
+/* ---------- ล้างบันทึกการใช้งานที่เก่ากว่า 7 วันอัตโนมัติ ---------- */
+const LOG_KEEP_DAYS = 7;
+/** ลบแถวใน "บันทึกการใช้งาน" ที่เก่ากว่า LOG_KEEP_DAYS วัน ; ทำวันละครั้ง (เรียกจากหน้าหลัก/ประวัติ/สำรองรายวัน) ; force=true ทำทันที ; คืนจำนวนแถวที่ลบ */
+function purgeLog_(force) {
+  try {
+    const props = PropertiesService.getDocumentProperties(), today = Utilities.formatDate(new Date(), TZ, 'yyyyMMdd');
+    if (!force && props.getProperty('logpurge') === today) return 0;
+    const lock = LockService.getScriptLock();
+    if (!lock.tryLock(3000)) return 0;                         // กันชนกับการบันทึกที่กำลังเกิดขึ้น (ไว้ลองใหม่ครั้งหน้า)
+    try { return purgeLogRows_(props, today); } finally { lock.releaseLock(); }
+  } catch (e) { return 0; }
+}
+function purgeLogRows_(props, today) {
+  {
+    props.setProperty('logpurge', today);
+    const sh = getSheet_(SHEET_LOG), last = sh.getLastRow();
+    if (last < 2) return 0;
+    const cutoff = new Date(Date.now() - LOG_KEEP_DAYS * 86400000), old = [];
+    sh.getRange(2, 1, last - 1, 1).getValues().forEach((r, i) => { if (r[0] instanceof Date && r[0] < cutoff) old.push(i + 2); });
+    if (!old.length) return 0;
+    if (sh.getMaxRows() <= last) sh.insertRowAfter(last);     // กันลบจนไม่เหลือแถวที่ไม่ถูกตรึง
+    let end = old.length - 1;
+    while (end >= 0) {                                         // ลบเป็นช่วงต่อเนื่อง จากล่างขึ้นบน
+      let start = end;
+      while (start > 0 && old[start - 1] === old[start] - 1) start--;
+      sh.deleteRows(old[start], end - start + 1);
+      end = start - 1;
+    }
+    return old.length;
+  }
+}
+/** เมนู: ล้างบันทึกที่เกิน 7 วันตอนนี้ */
+function purgeLogNow() {
+  const n = purgeLog_(true);
+  try { SpreadsheetApp.getUi().alert('ล้างบันทึกการใช้งานที่เก่ากว่า ' + LOG_KEEP_DAYS + ' วันแล้ว ' + n + ' แถว'); } catch (e) { /* ไม่ได้เรียกจากเมนู */ }
 }
 
 /* ---------- เคลียร์ข้อมูล และนำเข้ายอดยกมาจำนวนมาก (รันจากเมนู Apps Script เท่านั้น) ---------- */
@@ -3483,6 +3674,7 @@ function onOpen() {
       .addSeparator()
       .addItem('ตั้งค่าบอตไลน์', 'lineSetup')
       .addItem('ผู้ใช้ที่ค้นพัสดุทางไลน์ได้', 'lineSearchUsers')
+      .addItem('ล้างบันทึกการใช้งานที่เกิน 7 วันตอนนี้', 'purgeLogNow')
       .addItem('ตรวจ webhook ไลน์ (หารหัสกลุ่ม)', 'lineWebhookCheck')
       .addItem('เปิด/ปิด ตอบกลับเมื่อรับไฟล์ Excel ในกลุ่ม', 'lineToggleFileReply')
       .addItem('ดูตัวอย่างข้อความแจ้งด่วนไลน์', 'linePreview')
@@ -4422,6 +4614,7 @@ function backupFolder_() {
 
 /** สำเนาไฟล์สเปรดชีตนี้ลงโฟลเดอร์สำรอง แล้วล้างฉบับเก่าตามกติกา ; คืน {name, url, removed} */
 function backupNow_() {
+  purgeLog_();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const folder = backupFolder_();
   const stamp = Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH.mm');

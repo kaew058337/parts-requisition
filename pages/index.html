@@ -3343,6 +3343,10 @@ function snWatch(id, getSeq){
       else if(k==='ret'){ btns='<div style="display:flex;gap:8px;margin-top:10px"><button class="btn ghost sm" data-pr="'+ri+'">พิมพ์ใบส่งคืน</button></div>'; chip = r[12] ? '<span class="chip ok">'+esc(r[12])+'</span>' : ''; }
       else if(k==='rcv'||k==='rcv2'){ var srcv=r[d.headers.indexOf('แหล่งที่มา')]; chip='<span class="chip '+(x.paid?'ok':'')+'">'+(x.paid?'จ่ายให้ช่างแล้ว':(srcv&&srcv!=='ใบเบิก'?esc(srcv):'รับแล้ว รอจ่ายให้ช่าง'))+'</span>'; }
       else if(k==='iss'){ chip=x.paid?'<span class="chip ok">จ่ายให้ช่างแล้ว</span>':'<span class="chip">โอนเข้าใบเบิก</span>'; }
+      if(k==='rcv'||k==='rcv2'||k==='ret'||(k==='iss' && (x.paid || r[iDoc]==='จ่ายตรง'))){
+        var cb='<button class="btn ghost danger sm" data-ce="'+ri+'">ยกเลิกรายการนี้</button>';
+        btns = btns ? btns.replace(/<\/div>$/, cb+'</div>') : '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">'+cb+'</div>';
+      }
       var kv = d.headers.map(function(hd,i){
         var v = hd==='ความเร่งด่วน' ? urg(r[i]) : r[i];
         return v!=='' ? '<span>'+esc(hd)+'</span><span>'+esc(v)+'</span>' : '';
@@ -3390,16 +3394,41 @@ function snWatch(id, getSeq){
 
   function openCancel(r){
     if(!r) return;
-    state.curC = r;
+    state.curC = r; state.curCE = null;
+    $('cx-submit').textContent='ยืนยันยกเลิกใบเบิก';
     $('cx-title').textContent = 'ยกเลิกใบเบิก · '+r[1];
     $('cx-info').innerHTML = '<b>'+esc(r[3])+'</b><br><span class="meta">'+esc(r[2])+' · จำนวน '+esc(r[4])+' '+esc(r[5])+' · เครื่อง '+esc(r[8])+'</span>';
     $('cx-reason').value='';
+    $('cx-bg').classList.add('on');
+  }
+  /* ยกเลิกรายการ รับ / จ่าย / ส่งคืน จากหน้าประวัติ */
+  function openCancelEntry(r){
+    if(!r) return;
+    var hd=state.histData.headers, k=state.hist, ix=function(n){ return hd.indexOf(n); };
+    var ni=ix('ชื่อพัสดุ')>=0?ix('ชื่อพัสดุ'):ix('ชื่อ'), sni=ix('serial number')>=0?ix('serial number'):ix('serial number ส่งคืน');
+    var T={rcv:'ยกเลิกการรับ',rcv2:'ยกเลิกการรับคืนเข้าคลัง',iss:'ยกเลิกการจ่าย',ret:'ยกเลิกการส่งคืน'}[k];
+    var E={rcv:'พัสดุจะถูกถอนออกจากคลัง และถ้ารับตามใบเบิก ใบเบิกจะกลับเป็น “ค้างจ่าย” (รอรับ) · ใช้ได้เมื่อยังไม่ได้จ่ายออก',
+           rcv2:'พัสดุที่คืนเข้าคลังจะถูกถอนออก และรายการส่งคืนคู่กันถูกลบด้วย · ใช้ได้เมื่อยังไม่ได้จ่ายออกอีก',
+           iss:'พัสดุจะกลับเข้าคลังตามเดิม',
+           ret:'ลบรายการส่งคืนนี้ออกจากประวัติ'}[k];
+    state.curC=null; state.curCE={kind:k, seq:r[0]};
+    $('cx-title').textContent=T+' · #'+r[0];
+    $('cx-info').innerHTML='<b>'+esc(r[ni])+'</b><br><span class="meta">'+esc(r[ix('Part number')])+(sni>=0&&r[sni]?' · S/N '+esc(r[sni]):'')+' · จำนวน '+esc(r[ix('จำนวน')])+'</span><div class="meta" style="margin-top:6px">'+E+'<br>ระบบเก็บหลักฐานไว้ในชีท “รายการที่ยกเลิก”</div>';
+    $('cx-reason').value='';
+    $('cx-submit').textContent='ยืนยัน'+T;
     $('cx-bg').classList.add('on');
   }
   $('cx-x').addEventListener('click', function(){ $('cx-bg').classList.remove('on'); });
   $('cx-bg').addEventListener('click', function(ev){ if(ev.target===this) this.classList.remove('on'); });
   $('cx-submit').addEventListener('click', function(){
     if(!state.by){ askBy(function(){ $('cx-submit').click(); }); return; }
+    if(state.curCE){
+      var ce=state.curCE, btn0=$('cx-submit'); busy(btn0,true);
+      run('cancelEntry', [{ kind:ce.kind, seq:ce.seq, reason:$('cx-reason').value, by:state.by }])
+        .then(function(res){ $('cx-bg').classList.remove('on'); toast((res&&res.msg)||'ยกเลิกแล้ว'); loadHistory(); boot(); })
+        .catch(function(e){ toast(e.message,true); }).then(function(){ busy(btn0,false); });
+      return;
+    }
     var r=state.curC; if(!r) return;
     var btn=$('cx-submit'); busy(btn,true);
     run('cancelRequisition', [{ docNo:r[1], reason:$('cx-reason').value, by:state.by }])
@@ -3410,6 +3439,7 @@ function snWatch(id, getSeq){
     }).catch(function(e){ toast(e.message,true); }).then(function(){ busy(btn,false); });
   });
   $('h-list').addEventListener('click', function(e){
+    var ce = e.target.closest('button[data-ce]'); if(ce){ openCancelEntry(state.histRows[Number(ce.dataset.ce)]); return; }
     var be = e.target.closest('button[data-ed]'); if(be){ openEdit(state.histRows[Number(be.dataset.ed)]); return; }
     var bc = e.target.closest('button[data-cx]'); if(bc){ openCancel(state.histRows[Number(bc.dataset.cx)]); return; }
     var bp = e.target.closest('button[data-pr]');
