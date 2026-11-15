@@ -84,6 +84,9 @@ const API_FUNCS_ = {
   getKpi: getKpi,
   getSystemHealth: getSystemHealth,
   cancelEntry: cancelEntry,
+  getAwaitingDoc: getAwaitingDoc,
+  getDocInfo: getDocInfo,
+  saveDocInfo: saveDocInfo,
   addShelfSlots: addShelfSlots,
   removeShelfSlot: removeShelfSlot,
   fillShelfGaps: fillShelfGaps,
@@ -3156,6 +3159,7 @@ function getDashboard(month) {
   const req = getSheet_(SHEET_REQ), rl = req.getLastRow();
   const reqRows = rl >= 2 ? req.getRange(2, 1, rl - 1, 23).getValues().filter(isValidReqRow_) : [];
   const got = receivedMap_(), lots = computeLots_();
+  const docWaitList = awaitingDocFrom_(lots, today);
   const rcvDate = {}, issuedBy = {};
   readRcv_().forEach(r => {
     if ((str_(r[RC.SRC]) || SRC_REQ) !== SRC_REQ || !(r[RC.RDATE] instanceof Date)) return;
@@ -3214,7 +3218,7 @@ function getDashboard(month) {
   return {
     month: ym, tci: tci, tciSum: sum, kits: computeKitStatus_(lots).kits,
     alerts: { pending: pend, pendingAog: pendAog, pendingOverdue: pendOver, recvNotIssued: recvNotIssued.length,
-      awaiting: getAwaitingReq().length, warrSoon: warrSoon, loansOverdue: loans.length, tciLate: tciLate, tciSoon: tciSoon },
+      awaiting: getAwaitingReq().length, docWait: docWaitList.length, docWaitDays: docWaitList.length ? docWaitList[0].days : 0, warrSoon: warrSoon, loansOverdue: loans.length, tciLate: tciLate, tciSoon: tciSoon },
     cards: { monthReq: monthReq, monthDone: monthDone, stockLots: stockLots.length, claimsOpen: claimsOpen },
     recent: recent
   };
@@ -3253,6 +3257,64 @@ function getHistory(kind, limit) {
     paid: items.map(x => x.paid),
     skipped: skipped
   };
+}
+
+/* ---------- รับแล้วแต่ยังรอเอกสารจ่ายจาก TAI (card ID ว่าง) : เติมราคา / COND / card ID / หมดอายุ / TCI ภายหลัง ---------- */
+const CARD_NONE_ = '-';   // card ID = "-" แปลว่าปิดรายการ (ไม่มีเอกสาร / ไม่ต้องรอ)
+
+function docRow_(l, today) {
+  const price = l.v[RC.PRICE];
+  return {
+    seq: l.seq, docNo: l.doc, part: l.part, name: l.name, serial: l.serial, type: l.type, unit: l.unit, qty: l.qty, remain: Math.max(l.remain, 0),
+    loc: l.loc, cond: l.cond, price: price === '' || price === null || price === undefined || isNaN(Number(price)) ? '' : Number(price),
+    cardId: str_(l.v[RC.CARD]), tci: str_(l.v[RC.TCI]), expire: l.expire instanceof Date ? Utilities.formatDate(l.expire, TZ, 'yyyy-MM-dd') : '',
+    received: fmtThai_(l.recvDate), days: l.recvDate instanceof Date ? Math.max(0, dayDiff_(l.recvDate, today)) : 0,
+    receiver: str_(l.v[RC.RECV]), inStock: l.remain > 0
+  };
+}
+/** รายการรับตามใบเบิก (ชีท รับ) ที่ card ID ยังว่าง = รอเอกสารจ่ายจาก TAI ; เรียงค้างนานสุดก่อน */
+function awaitingDocFrom_(lots, today) {
+  return lots.filter(l => l.sh === SHEET_RCV && l.src === SRC_REQ && !str_(l.v[RC.CARD])).map(l => docRow_(l, today)).sort((a, b) => (b.days - a.days) || (a.seq - b.seq));
+}
+function getAwaitingDoc() { return awaitingDocFrom_(computeLots_(), parseDate_(todayStr_())); }
+function getDocInfo(seq) {
+  const l = computeLots_().filter(x => x.seq === Number(seq))[0];
+  if (!l) throw new Error('ไม่พบรายการรับลำดับที่ ' + seq);
+  return docRow_(l, parseDate_(todayStr_()));
+}
+
+/**
+ * บันทึกข้อมูลจากเอกสาร TAI : p = { seqs:[ลำดับรับ...], cardId, cond, price, expire:'YYYY-MM-DD', tci, by }
+ * ช่องที่เว้นว่างจะไม่ถูกแก้ ; หลายรายการพร้อมกัน แก้ได้เฉพาะ card ID กับ COND ; card ID = "-" คือปิดรายการ
+ */
+function saveDocInfo(p) {
+  return withLock_(() => {
+    const seqs = (p.seqs || []).map(Number).filter(Boolean);
+    if (!seqs.length) throw new Error('ไม่ได้เลือกรายการ');
+    const card = str_(p.cardId), cond = str_(p.cond), expire = str_(p.expire), tci = str_(p.tci);
+    const hasPrice = p.price !== undefined && p.price !== null && str_(p.price) !== '';
+    if (hasPrice && !(Number(p.price) >= 0)) throw new Error('ราคาต้องเป็นตัวเลขตั้งแต่ 0 ขึ้นไป');
+    if (seqs.length > 1 && (hasPrice || expire || tci)) throw new Error('หลายรายการพร้อมกัน แก้ได้เฉพาะ card ID และ COND (ราคา/หมดอายุ/TCI แก้ทีละรายการ)');
+    if (!card && !cond && !hasPrice && !expire && !tci) throw new Error('ยังไม่ได้กรอกข้อมูลอะไร');
+    const R = readRcv_(), rows = seqs.map(s => {
+      const r = R.filter(x => Number(x[RC.SEQ]) === s)[0];
+      if (!r) throw new Error('ไม่พบรายการรับลำดับที่ ' + s + ' (อาจถูกยกเลิกไปแล้ว)');
+      if (r._sh !== SHEET_RCV || (str_(r[RC.SRC]) || SRC_REQ) !== SRC_REQ) throw new Error('ลำดับที่ ' + s + ' ไม่ใช่รายการรับตามใบเบิก');
+      return r;
+    });
+    rows.forEach(r => {
+      const sh = getSheet_(r._sh);
+      if (card) sh.getRange(r._row, rcCol_(RC.CARD)).setNumberFormat('@').setValue(card);
+      if (cond) sh.getRange(r._row, rcCol_(RC.COND)).setValue(cond);
+      if (hasPrice) sh.getRange(r._row, rcCol_(RC.PRICE)).setNumberFormat('#,##0.00').setValue(Number(p.price));
+      if (expire) sh.getRange(r._row, rcCol_(RC.EXP)).setNumberFormat('dd/mm/yyyy').setValue(parseDate_(expire));
+      if (tci) sh.getRange(r._row, rcCol_(RC.TCI)).setNumberFormat('@').setValue(tci);
+    });
+    const what = [card ? (card === CARD_NONE_ ? 'ปิดรายการ (ไม่มีเอกสาร)' : 'card ID ' + card) : '', cond ? 'COND ' + cond : '', hasPrice ? 'ราคา ' + Number(p.price) : '',
+      expire ? 'หมดอายุ ' + expire : '', tci ? 'TCI ' + tci : ''].filter(Boolean).join(' | ');
+    log_('เติมข้อมูลเอกสาร TAI', rows.length === 1 ? docStr_(rows[0][RC.DOC]) : '', [rows.length === 1 ? str_(rows[0][RC.PART]) + ' ' + str_(rows[0][RC.NAME]) : rows.length + ' รายการ', what].join(' | '), p.by);
+    return { ok: true, count: rows.length };
+  });
 }
 
 /* ---------- ยกเลิกรายการ รับ / จ่าย / ส่งคืน ---------- */

@@ -264,8 +264,11 @@
   input[type=checkbox]:not(.tgl-in):focus-visible{outline:3px solid rgba(76,141,206,.55);outline-offset:2px}
   input[type=checkbox]:not(.tgl-in):disabled{opacity:.4;cursor:not-allowed}
   input[type=checkbox][data-tgc]:not(.tgl-in){width:22px !important;height:22px !important;border-radius:7px !important;border:1.5px solid #9db3d1 !important;background:#fff !important;box-shadow:none !important;margin:0 !important}
+  input[type=checkbox][data-dwc]:not(.tgl-in){width:22px !important;height:22px !important;border-radius:7px !important;border:1.5px solid #9db3d1 !important;background:#fff !important;box-shadow:none !important;margin:0 !important}
   input[type=checkbox][data-tgc]:not(.tgl-in)::after{display:none !important}
+  input[type=checkbox][data-dwc]:not(.tgl-in)::after{display:none !important}
   input[type=checkbox][data-tgc]:not(.tgl-in):checked{background:var(--navy-royal) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center/16px no-repeat !important;border-color:var(--navy-royal) !important}
+  input[type=checkbox][data-dwc]:not(.tgl-in):checked{background:var(--navy-royal) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center/16px no-repeat !important;border-color:var(--navy-royal) !important}
   #d-bg{z-index:67}
   #ct-bg .sheet,#sn-bg .sheet,#db-bg .sheet{top:0;max-height:none;border-radius:0;max-width:760px;padding-top:calc(16px + env(safe-area-inset-top))}
   #ct-bg .sheet .hd,#sn-bg .sheet .hd,#db-bg .sheet .hd{position:sticky;top:calc(-16px - env(safe-area-inset-top));z-index:2;background:var(--bg);margin:-4px -4px 8px;padding:8px 4px}
@@ -500,6 +503,14 @@ main .ty-chem{border-left:5px solid var(--ty-chem)}main .ty-kit{border-left:5px 
   .mh-mv .ar{color:var(--muted);margin:0 6px}
   .sm-bar .mq{display:inline-flex;align-items:center;gap:8px;margin:8px 0 0;font-size:14px;color:#fff !important;opacity:1 !important}
   .sm-bar .mq input{width:72px;height:34px;border-radius:8px;border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.12);color:#fff;text-align:center;font:600 15px 'Sarabun',sans-serif;padding:0 6px}
+  /* ---- รอเอกสาร TAI ---- */
+  .dw-row{display:flex;gap:10px;align-items:flex-start}
+  .dw-row > .dw-ck{padding:4px 2px 0}
+  .dw-row > .dw-bd{flex:1;min-width:0;cursor:pointer}
+  .dw-bar{position:sticky;bottom:0;margin:12px -4px 0;padding:10px 4px calc(10px + env(safe-area-inset-bottom));background:linear-gradient(to top,var(--bg,#f6f3ea) 70%,rgba(246,243,234,0));display:none}
+  .dw-bar.on{display:block}
+  .dw-all{display:flex;align-items:center;gap:10px;margin:2px 2px 10px;font-size:13.5px;color:var(--muted)}
+  html[data-theme=dark] .dw-bar{background:linear-gradient(to top,#0f1b2d 70%,rgba(15,27,45,0))}
   /* ---- Performance & KPI ---- */
   .kp{--ok:#17995a;--warn:#d98f12;--bad:#d24545}
   .kp-sub{font-size:13px;color:var(--muted);margin:-2px 0 10px}
@@ -696,6 +707,7 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
   <button class="dr-it dr-in" id="db-btn" style="--i:1"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>แดชบอร์ด</button>
   <button class="dr-it dr-in" id="kp-btn" style="--i:1"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/><path d="M13 8l3-3 3 3"/></svg>Performance &amp; KPI</button>
   <button class="dr-it dr-in" id="hl-btn" style="--i:1"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>สุขภาพระบบ</button>
+  <button class="dr-it dr-in" id="dw-btn" style="--i:1"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>รอเอกสาร TAI</button>
   <div class="dr-sec dr-in" style="--i:1">งานพิเศษ</div>
   <button class="dr-it dr-in" id="cnt-btn" style="--i:3"><svg viewBox="0 0 24 24"><path d="M9 11l2 2 4-4"/><rect x="4" y="4" width="16" height="16" rx="3"/></svg>ตรวจนับพัสดุ<span class="ex"><svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8M10 6H5a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1v-5"/></svg></span></button>
   <div class="dr-sec dr-in" style="--i:4">ข้อมูล</div>
@@ -1226,6 +1238,35 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
 </div>
 
 <!-- ===== sheet: Dashboard ===== -->
+<div class="sheet-bg" id="dw-bg">
+  <div class="sheet">
+    <div class="hd"><b>รอเอกสาร TAI</b><button class="x" id="dw-x" aria-label="ปิด">×</button></div>
+    <div class="meta" style="margin:-2px 0 10px">พัสดุที่รับตามใบเบิกแล้ว แต่ยังไม่มี card ID จากเอกสารจ่ายของ TAI · แตะรายการเพื่อกรอก ราคา / COND / card ID · ติ๊กหลายรายการเพื่อใส่ card ID เดียวกัน</div>
+    <input class="search" id="dw-q" type="search" placeholder="ค้นหา เลขใบเบิก / Part / ชื่อ / S/N">
+    <label class="dw-all"><input type="checkbox" data-dwc="all" id="dw-all"><span>เลือกทั้งหมดที่แสดง</span></label>
+    <div id="dw-list"></div>
+    <div class="dw-bar" id="dw-bar"><button class="btn" id="dw-go">ใส่ข้อมูลให้ 0 รายการ</button></div>
+  </div>
+</div>
+<div class="sheet-bg" id="df-bg">
+  <div class="sheet">
+    <div class="hd"><b id="df-title">ข้อมูลจากเอกสาร TAI</b><button class="x" id="df-x" aria-label="ปิด">×</button></div>
+    <div class="info" id="df-info"></div>
+    <label>card ID</label><input id="df-card" autocapitalize="characters" autocomplete="off">
+    <div class="row2" id="df-r1">
+      <div><label>ราคา/หน่วย</label><input id="df-price" type="number" inputmode="decimal" min="0" step="0.01"></div>
+      <div><label>COND</label><select id="df-cond"><option value=""></option><option>NE</option><option>NS</option><option>OH</option><option>SV</option><option>RP</option><option>AR</option><option>US</option></select></div>
+    </div>
+    <div class="row2" id="df-r2">
+      <div><label>วันหมดอายุ</label><input id="df-exp" type="date"></div>
+      <div><label>TCI</label><input id="df-tci" autocomplete="off"></div>
+    </div>
+    <div class="meta" id="df-hint" style="margin:6px 2px 10px">กรอกเฉพาะที่มี ช่องที่เว้นว่างจะไม่ถูกแก้ · ใส่ card ID แล้วรายการจะหายจาก “รอเอกสาร”</div>
+    <button class="btn" id="df-save">บันทึก</button>
+    <button class="btn ghost" id="df-none" style="margin-top:8px">ไม่มีเอกสาร / ไม่ต้องรอ (ปิดรายการ)</button>
+  </div>
+</div>
+
 <div class="sheet-bg" id="hl-bg">
   <div class="sheet">
     <div class="hd"><b>สุขภาพระบบ</b><button class="x" id="hl-x" aria-label="ปิด">×</button></div>
@@ -1796,6 +1837,79 @@ function snWatch(id, getSeq){
 
 
 
+
+  /* ---------- รอเอกสาร TAI (เติม ราคา / COND / card ID ภายหลัง) ---------- */
+  var DW={rows:[],sel:{},shown:[],cur:null};
+  function dwLoad(){
+    $('dw-list').innerHTML=skel(); DW.sel={}; dwBar();
+    run('getAwaitingDoc',[]).then(function(rows){ DW.rows=rows; dwRender(); })
+      .catch(function(e){ $('dw-list').innerHTML='<div class="empty">'+esc(e.message)+'</div>'; });
+  }
+  function dwRender(){
+    var q=$('dw-q').value.trim().toLowerCase();
+    DW.shown=DW.rows.filter(function(r){ return !q || (r.docNo+' '+r.part+' '+r.name+' '+r.serial).toLowerCase().indexOf(q)>=0; });
+    if(!DW.shown.length){ $('dw-list').innerHTML=DW.rows.length?emp('search','ไม่พบรายการที่ค้นหา'):emp('doc','ไม่มีรายการที่รอเอกสาร','พัสดุที่รับตามใบเบิกมี card ID ครบแล้ว'); dwBar(); return; }
+    $('dw-list').innerHTML=DW.shown.map(function(r){
+      return '<div class="pcard'+tyCls(r.type)+'"><div class="dw-row"><label class="dw-ck"><input type="checkbox" data-dwc="'+r.seq+'"'+(DW.sel[r.seq]?' checked':'')+'></label>'+
+        '<div class="dw-bd" data-dwo="'+r.seq+'"><div class="t"><span class="doc">'+esc(r.docNo)+'</span><span class="chip">ค้าง '+r.days+' วัน</span></div>'+
+        '<div class="nm">'+esc(r.name)+'</div>'+
+        '<div class="meta">'+esc(r.part)+(r.serial?' · S/N '+esc(r.serial):'')+' · รับ '+fmtNum(r.qty)+' '+esc(r.unit)+' · '+esc(r.received)+'</div>'+
+        '<div class="meta">'+(r.inStock?'อยู่ในคลัง'+(r.loc?' '+esc(r.loc):''):'จ่ายให้ช่างแล้ว')+(r.cond?' · COND '+esc(r.cond):'')+(r.price!==''?' · ราคา '+fmtNum(r.price):'')+'</div></div></div></div>';
+    }).join('');
+    dwBar();
+  }
+  function dwSelCount(){ return Object.keys(DW.sel).length; }
+  function dwBar(){
+    var n=dwSelCount(); $('dw-bar').classList.toggle('on', n>0);
+    $('dw-go').textContent='ใส่ข้อมูลให้ '+n+' รายการ';
+    var all=$('dw-all'); all.checked = DW.shown.length>0 && DW.shown.every(function(r){ return DW.sel[r.seq]; });
+  }
+  function dwForm(seqs, row){
+    var single = seqs.length===1 ? (row || DW.rows.filter(function(r){ return r.seq===seqs[0]; })[0] || null) : null;
+    DW.cur = single; DW.formSeqs = seqs;
+    $('df-title').textContent = single ? 'ข้อมูลจากเอกสาร TAI · '+single.docNo : 'ใส่ข้อมูลให้ '+seqs.length+' รายการ';
+    $('df-info').innerHTML = single ? '<b>'+esc(single.name)+'</b><br><span class="meta">'+esc(single.part)+(single.serial?' · S/N '+esc(single.serial):'')+' · รับ '+fmtNum(single.qty)+' '+esc(single.unit)+'</span>'
+      : '<b>รายการที่เลือก '+seqs.length+' รายการ</b><br><span class="meta">ใส่ card ID / COND เดียวกันให้ทุกรายการ · ราคา วันหมดอายุ และ TCI ให้กรอกทีละรายการ</span>';
+    $('df-card').value = single ? single.cardId : ''; $('df-cond').value = single ? single.cond : ''; $('df-price').value = single && single.price!=='' ? single.price : '';
+    $('df-exp').value = single ? single.expire : ''; $('df-tci').value = single ? single.tci : '';
+    $('df-price').parentNode.style.display = single ? '' : 'none';
+    $('df-r2').style.display = single ? '' : 'none';
+    $('df-r1').style.gridTemplateColumns = single ? '' : '1fr';
+    $('df-bg').classList.add('on');
+  }
+  function dwSave(extra){
+    if(!state.by){ askBy(function(){ dwSave(extra); }); return; }
+    var p={ seqs:DW.formSeqs, cardId:$('df-card').value.trim(), cond:$('df-cond').value, by:state.by };
+    if(DW.cur){ p.price=$('df-price').value; p.expire=$('df-exp').value; p.tci=$('df-tci').value.trim(); }
+    if(extra) p.cardId=extra;
+    var btn=$('df-save'); busy(btn,true);
+    run('saveDocInfo',[p]).then(function(res){
+      $('df-bg').classList.remove('on'); toast('บันทึกข้อมูลแล้ว '+res.count+' รายการ');
+      if($('dw-bg').classList.contains('on')) dwLoad();
+      if(state.hist) { try{ loadHistory(); }catch(e){} }
+      boot();
+    }).catch(function(e){ toast(e.message,true); }).then(function(){ busy(btn,false); });
+  }
+  $('dw-btn').addEventListener('click', function(){ $('dw-bg').classList.add('on'); dwLoad(); });
+  $('dw-x').addEventListener('click', function(){ $('dw-bg').classList.remove('on'); });
+  $('dw-bg').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('on'); });
+  $('dw-q').addEventListener('input', dwRender);
+  $('dw-all').addEventListener('change', function(){
+    var on=this.checked; DW.shown.forEach(function(r){ if(on) DW.sel[r.seq]=1; else delete DW.sel[r.seq]; }); dwRender();
+  });
+  $('dw-list').addEventListener('change', function(e){
+    var c=e.target.closest('[data-dwc]'); if(!c) return;
+    if(c.checked) DW.sel[c.dataset.dwc]=1; else delete DW.sel[c.dataset.dwc]; dwBar();
+  });
+  $('dw-list').addEventListener('click', function(e){
+    var o=e.target.closest('[data-dwo]'); if(!o) return;
+    dwForm([Number(o.dataset.dwo)]);
+  });
+  $('dw-go').addEventListener('click', function(){ var s=Object.keys(DW.sel).map(Number); if(s.length) dwForm(s); });
+  $('df-x').addEventListener('click', function(){ $('df-bg').classList.remove('on'); });
+  $('df-bg').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('on'); });
+  $('df-save').addEventListener('click', function(){ dwSave(''); });
+  $('df-none').addEventListener('click', function(){ dwSave('-'); });
   /* ---------- สุขภาพระบบ ---------- */
   function hlLoad(){
     $('hl-body').innerHTML=skel();
@@ -3341,7 +3455,12 @@ function snWatch(id, getSeq){
         }
       }
       else if(k==='ret'){ btns='<div style="display:flex;gap:8px;margin-top:10px"><button class="btn ghost sm" data-pr="'+ri+'">พิมพ์ใบส่งคืน</button></div>'; chip = r[12] ? '<span class="chip ok">'+esc(r[12])+'</span>' : ''; }
-      else if(k==='rcv'||k==='rcv2'){ var srcv=r[d.headers.indexOf('แหล่งที่มา')]; chip='<span class="chip '+(x.paid?'ok':'')+'">'+(x.paid?'จ่ายให้ช่างแล้ว':(srcv&&srcv!=='ใบเบิก'?esc(srcv):'รับแล้ว รอจ่ายให้ช่าง'))+'</span>'; }
+      else if(k==='rcv'||k==='rcv2'){ var srcv=r[d.headers.indexOf('แหล่งที่มา')]; chip='<span class="chip '+(x.paid?'ok':'')+'">'+(x.paid?'จ่ายให้ช่างแล้ว':(srcv&&srcv!=='ใบเบิก'?esc(srcv):'รับแล้ว รอจ่ายให้ช่าง'))+'</span>';
+        if(k==='rcv' && (!srcv||srcv==='ใบเบิก')){
+          if(!r[d.headers.indexOf('card ID')]) chip+=' <span class="chip warn">รอเอกสาร TAI</span>';
+          btns='<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="btn ghost sm" data-di="'+ri+'">ข้อมูลเอกสาร</button></div>';
+        }
+      }
       else if(k==='iss'){ chip=x.paid?'<span class="chip ok">จ่ายให้ช่างแล้ว</span>':'<span class="chip">โอนเข้าใบเบิก</span>'; }
       if(k==='rcv'||k==='rcv2'||k==='ret'||(k==='iss' && (x.paid || r[iDoc]==='จ่ายตรง'))){
         var cb='<button class="btn ghost danger sm" data-ce="'+ri+'">ยกเลิกรายการนี้</button>';
@@ -3439,6 +3558,9 @@ function snWatch(id, getSeq){
     }).catch(function(e){ toast(e.message,true); }).then(function(){ busy(btn,false); });
   });
   $('h-list').addEventListener('click', function(e){
+    var di = e.target.closest('button[data-di]');
+    if(di){ var rd=state.histRows[Number(di.dataset.di)]; if(!rd) return;
+      run('getDocInfo',[rd[0]]).then(function(row){ dwForm([row.seq], row); }).catch(function(er){ toast(er.message,true); }); return; }
     var ce = e.target.closest('button[data-ce]'); if(ce){ openCancelEntry(state.histRows[Number(ce.dataset.ce)]); return; }
     var be = e.target.closest('button[data-ed]'); if(be){ openEdit(state.histRows[Number(be.dataset.ed)]); return; }
     var bc = e.target.closest('button[data-cx]'); if(bc){ openCancel(state.histRows[Number(bc.dataset.cx)]); return; }
@@ -3513,7 +3635,7 @@ function snWatch(id, getSeq){
     var pct = s.total ? Math.round(s.done*100/s.total) : 0;
     var h='<div class="dbx">';
     /* --- แถบตัวเลขสำคัญ --- */
-    var todo=0; ['pending','tciLate','tciSoon','recvNotIssued','awaiting','warrSoon','loansOverdue'].forEach(function(k){ if(a[k]) todo+=1; });
+    var todo=0; ['pending','tciLate','tciSoon','recvNotIssued','docWait','awaiting','warrSoon','loansOverdue'].forEach(function(k){ if(a[k]) todo+=1; });
     h+='<div class="dbx-hero"><div class="dbx-heroL">'+dbRing(pct,'#d4b36a',92,s.total?s.done+'/'+s.total:'-', 'TCI รับแล้ว')+'</div>'+
       '<div class="dbx-heroR">'+
       '<div class="dbx-k"><b>'+(a.pending||0)+'</b><span>ใบเบิกค้างรับ</span></div>'+
@@ -3527,6 +3649,7 @@ function snWatch(id, getSeq){
     if(a.tciLate) rows.push(['tci','งาน TCI เกินวันติดตั้งแล้วของยังไม่มา '+a.tciLate+' รายการ','bad']);
     if(a.tciSoon) rows.push(['tci','งาน TCI ใกล้วันติดตั้ง (ภายใน 7 วัน) ของยังไม่มา '+a.tciSoon+' รายการ','warn']);
     if(a.recvNotIssued) rows.push(['iss','รับแล้วรอจ่ายให้ช่าง '+a.recvNotIssued+' ล็อต','']);
+    if(a.docWait) rows.push(['doc','รอเอกสารจาก TAI (ยังไม่มี card ID) '+a.docWait+' รายการ · นานสุด '+a.docWaitDays+' วัน','warn']);
     if(a.awaiting) rows.push(['aw','รับก่อนเบิก รอใบเบิก '+a.awaiting+' รายการ','warn']);
     if(a.warrSoon) rows.push(['warr','LRU ประกันใกล้หมด (ภายใน 60 วัน) '+a.warrSoon,'warn']);
     if(a.loansOverdue) rows.push(['loan','ยืมเกินกำหนดคืน '+a.loansOverdue+' รายการ','bad']);
@@ -3603,6 +3726,7 @@ function snWatch(id, getSeq){
     $('db-bg').classList.remove('on');
     var k=g.dataset.go;
     if(k==='rcv'||k==='iss') show(k);
+    else if(k==='doc'){ $('dw-btn').click(); }
     else if(k==='aw'){ show('stk'); setTimeout(function(){ $('k-aw').click(); }, 150); }
     else if(k==='warr'){ snOpen(''); snSeg('w'); }
     else if(k==='loan'){ show('stk'); }
