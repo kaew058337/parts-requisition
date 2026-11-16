@@ -1281,7 +1281,7 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
 <div class="sheet-bg" id="mr-bg">
   <div class="sheet">
     <div class="hd"><b>รายงานความสิ้นเปลืองพัสดุ</b><button class="x" id="mr-x" aria-label="ปิด">×</button></div>
-    <div class="meta" style="margin:-2px 0 10px">สร้างไฟล์ Excel 4 ชีท (LRU · LRU(TCI) · SP · SP(TCI)) แนวนอน A4 จากรายการ <b>จ่าย</b> ให้ช่างในเดือนที่เลือก (ไม่รวมโอนเข้าใบเบิก/ปรับยอดตรวจนับ และหักที่ส่งคืนเข้าคลังแล้ว)</div>
+    <div class="meta" style="margin:-2px 0 10px">สร้างไฟล์ Excel 4 ชีท (LRU · LRU(TCI) · SP · SP(TCI)) แนวนอน A4 จากพัสดุที่ <b>รับจาก TAI</b> ในเดือนที่เลือก (ไม่รวมโอนเข้าใบเบิกจากคลัง และหักที่ส่งคืนเข้าคลังแล้ว) · พัสดุที่มี S/N แยกบรรทัดละ 1 ตัว</div>
     <div class="kp-nav"><button type="button" id="mr-prev" aria-label="เดือนก่อน">‹</button><b id="mr-mon"></b><button type="button" id="mr-next" aria-label="เดือนถัดไป">›</button></div>
     <div id="mr-sum" class="meta" style="margin:10px 2px"></div>
     <button class="btn" id="mr-go">ดาวน์โหลดไฟล์ Excel</button>
@@ -1967,7 +1967,7 @@ function snWatch(id, getSeq){
     run('getMonthlyReport',[{ym:MR.ym}]).then(function(d){
       MR.data=d; MR.ym=d.ym; $('mr-mon').textContent=kpMonthLabel(d.ym);
       var s=d.sheets, f=function(k){ return k+' '+s[k].length+' แถว'; };
-      $('mr-sum').textContent=d.lines?('พบรายการจ่าย '+d.lines+' รายการ · '+['LRU','LRU(TCI)','SP','SP(TCI)'].map(f).join(' · ')):'เดือนนี้ไม่มีรายการจ่าย';
+      $('mr-sum').textContent=d.lines?('พบรายการรับ '+d.lines+' รายการ · '+['LRU','LRU(TCI)','SP','SP(TCI)'].map(f).join(' · ')):'เดือนนี้ไม่มีรายการรับจาก TAI';
       $('mr-go').disabled=false;
     }).catch(function(e){ $('mr-sum').textContent='โหลดไม่ได้ — '+e.message; });
   }
