@@ -1439,7 +1439,9 @@ function getSystemHealth() {
   const timeLevel = ms < 2000 ? 'ok' : ms < 5000 ? 'warn' : 'bad';
   const rowLevel = ledger < 8000 ? 'ok' : ledger < 20000 ? 'warn' : 'bad';
   const rank = { ok: 0, warn: 1, bad: 2 }, level = rank[timeLevel] >= rank[rowLevel] ? timeLevel : rowLevel;
-  return { asOf: fmtThai_(new Date()), sheets: sheets, ledger: ledger, lots: lots.length, ms: ms, timeLevel: timeLevel, rowLevel: rowLevel, level: level };
+  const seen = {}, dups = [];
+  lots.forEach(l => { if (l.seq) { if (seen[l.seq]) { if (dups.indexOf(l.seq) < 0) dups.push(l.seq); } else seen[l.seq] = 1; } });
+  return { asOf: fmtThai_(new Date()), dupSeq: dups.slice(0, 20), sheets: sheets, ledger: ledger, lots: lots.length, ms: ms, timeLevel: timeLevel, rowLevel: rowLevel, level: level };
 }
 
 /* ---------- ค้นหาพัสดุ (P/N · ชื่อ · S/N) : มีของ / มีในระบบแต่ไม่มีของคงคลัง / ไม่พบ ---------- */
@@ -3278,7 +3280,8 @@ function awaitingDocFrom_(lots, today) {
 }
 function getAwaitingDoc() { return awaitingDocFrom_(computeLots_(), parseDate_(todayStr_())); }
 function getDocInfo(seq) {
-  const l = computeLots_().filter(x => x.seq === Number(seq))[0];
+  const all = computeLots_().filter(x => x.seq === Number(seq));
+  const l = all.filter(x => x.sh === SHEET_RCV && x.src === SRC_REQ && !str_(x.v[RC.CARD]))[0] || all[0];
   if (!l) throw new Error('ไม่พบรายการรับลำดับที่ ' + seq);
   return docRow_(l, parseDate_(todayStr_()));
 }
@@ -3296,11 +3299,16 @@ function saveDocInfo(p) {
     if (hasPrice && !(Number(p.price) >= 0)) throw new Error('ราคาต้องเป็นตัวเลขตั้งแต่ 0 ขึ้นไป');
     if (seqs.length > 1 && (hasPrice || expire || tci)) throw new Error('หลายรายการพร้อมกัน แก้ได้เฉพาะ card ID และ COND (ราคา/หมดอายุ/TCI แก้ทีละรายการ)');
     if (!card && !cond && !hasPrice && !expire && !tci) throw new Error('ยังไม่ได้กรอกข้อมูลอะไร');
-    const R = readRcv_(), rows = seqs.map(s => {
-      const r = R.filter(x => Number(x[RC.SEQ]) === s)[0];
-      if (!r) throw new Error('ไม่พบรายการรับลำดับที่ ' + s + ' (อาจถูกยกเลิกไปแล้ว)');
-      if (r._sh !== SHEET_RCV || (str_(r[RC.SRC]) || SRC_REQ) !== SRC_REQ) throw new Error('ลำดับที่ ' + s + ' ไม่ใช่รายการรับตามใบเบิก');
-      return r;
+    const R = readRcv_(), rows = [];
+    seqs.forEach(s => {
+      // ลำดับรับซ้ำกันได้ในชีทจริง : เลือกแถวที่ยังรอเอกสาร (card ID ว่าง) ก่อน
+      const same = R.filter(x => Number(x[RC.SEQ]) === s && x._sh === SHEET_RCV && (str_(x[RC.SRC]) || SRC_REQ) === SRC_REQ);
+      if (!same.length) {
+        if (R.some(x => Number(x[RC.SEQ]) === s)) throw new Error('ลำดับที่ ' + s + ' ไม่ใช่รายการรับตามใบเบิก');
+        throw new Error('ไม่พบรายการรับลำดับที่ ' + s + ' (อาจถูกยกเลิกไปแล้ว)');
+      }
+      const waiting = same.filter(x => !str_(x[RC.CARD]));
+      (waiting.length ? waiting : same).forEach(x => { if (rows.indexOf(x) < 0) rows.push(x); });
     });
     if (card) {   // ตรวจว่าคอลัมน์ card ID ในชีทอยู่ตำแหน่งที่โปรแกรมเขียนจริง ๆ (กันเขียนผิดคอลัมน์)
       const hs = getSheet_(SHEET_RCV), hc = rcCol_(RC.CARD), hv = str_(hs.getRange(1, hc).getValue());

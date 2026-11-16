@@ -1924,6 +1924,7 @@ function snWatch(id, getSeq){
         '<div class="kp-chip"><b style="color:'+col[d.timeLevel]+'">'+sec+' วิ</b><span>เวลาคำนวณคลัง<br>(ปกติ &lt; 2 วิ)</span></div>'+
         '<div class="kp-chip"><b style="color:'+col[d.rowLevel]+'">'+fmtNum(d.ledger)+'</b><span>แถวสมุดรับ-จ่าย<br>(ปกติ &lt; 8,000)</span></div>'+
         '<div class="kp-chip"><b>'+fmtNum(d.lots)+'</b><span>ล็อตทั้งหมด<br>ที่คำนวณ</span></div></div>'+
+        (d.dupSeq&&d.dupSeq.length?'<div class="kp-note" style="color:#d24545;margin-bottom:10px"><b>พบลำดับรับซ้ำกัน:</b> '+d.dupSeq.join(', ')+' — ในชีท รับ มีหลายแถวใช้ลำดับเดียวกัน ทำให้ยอดจ่าย/คงเหลือของล็อตเหล่านั้นอาจเพี้ยน ควรแก้เลขลำดับให้ไม่ซ้ำ</div>':'')+
         '<div class="kp-h" style="margin-top:6px">จำนวนแถวแยกตามชีท</div><div class="kp-c">'+
         d.sheets.map(function(s){ return '<div class="kp-li" style="display:flex;justify-content:space-between"><span>'+esc(s.name)+'</span><b>'+fmtNum(s.rows)+'</b></div>'; }).join('')+'</div>'+
         '<div class="kp-note">เวลาคำนวณคลังเป็นตัวชี้วัดหลัก เพราะระบบคำนวณคลังใหม่จากสมุดรับ-จ่ายทุกครั้งที่เปิดหน้าจอ ถ้าเกิน 5 วินาทีต่อเนื่อง หรือสมุดเกิน 20,000 แถว ถึงเวลาปรับปรุงหรือย้ายฐานข้อมูล · ตัวเลขนี้วัดจากการเรียกครั้งนี้ อาจผันผวนตามภาระของ Google ณ เวลานั้น ควรลองหลายครั้ง</div>';
