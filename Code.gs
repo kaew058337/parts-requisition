@@ -3302,6 +3302,10 @@ function saveDocInfo(p) {
       if (r._sh !== SHEET_RCV || (str_(r[RC.SRC]) || SRC_REQ) !== SRC_REQ) throw new Error('ลำดับที่ ' + s + ' ไม่ใช่รายการรับตามใบเบิก');
       return r;
     });
+    if (card) {   // ตรวจว่าคอลัมน์ card ID ในชีทอยู่ตำแหน่งที่โปรแกรมเขียนจริง ๆ (กันเขียนผิดคอลัมน์)
+      const hs = getSheet_(SHEET_RCV), hc = rcCol_(RC.CARD), hv = str_(hs.getRange(1, hc).getValue());
+      if (hv !== HEADERS[SHEET_RCV][hc - 1]) throw new Error('ชีท "' + SHEET_RCV + '" คอลัมน์ ' + rcLetter_(RC.CARD) + ' หัวคอลัมน์เป็น "' + hv + '" ไม่ใช่ "' + HEADERS[SHEET_RCV][hc - 1] + '" จึงไม่บันทึกเพื่อป้องกันข้อมูลเพี้ยน');
+    }
     rows.forEach(r => {
       const sh = getSheet_(r._sh);
       if (card) sh.getRange(r._row, rcCol_(RC.CARD)).setNumberFormat('@').setValue(card);
@@ -3309,6 +3313,11 @@ function saveDocInfo(p) {
       if (hasPrice) sh.getRange(r._row, rcCol_(RC.PRICE)).setNumberFormat('#,##0.00').setValue(Number(p.price));
       if (expire) sh.getRange(r._row, rcCol_(RC.EXP)).setNumberFormat('dd/mm/yyyy').setValue(parseDate_(expire));
       if (tci) sh.getRange(r._row, rcCol_(RC.TCI)).setNumberFormat('@').setValue(tci);
+    });
+    SpreadsheetApp.flush();
+    if (card) rows.forEach(r => {   // อ่านกลับมายืนยันว่าบันทึกลงชีทจริง
+      const back = str_(getSheet_(r._sh).getRange(r._row, rcCol_(RC.CARD)).getValue());
+      if (back !== card) throw new Error('บันทึกแล้วแต่อ่านกลับไม่ตรง (แถว ' + r._row + ' ได้ "' + back + '") กรุณาแจ้งผู้ดูแล');
     });
     const what = [card ? (card === CARD_NONE_ ? 'ปิดรายการ (ไม่มีเอกสาร)' : 'card ID ' + card) : '', cond ? 'COND ' + cond : '', hasPrice ? 'ราคา ' + Number(p.price) : '',
       expire ? 'หมดอายุ ' + expire : '', tci ? 'TCI ' + tci : ''].filter(Boolean).join(' | ');
