@@ -178,14 +178,6 @@ function verifyAccess_(req) {
   return { sub: 'key', name: '' };
 }
 
-/** เมนู/รันครั้งเดียว: ตั้งรหัสเข้าใช้งานสำหรับหน้าเว็บภายนอก (แก้ค่าในฟังก์ชันนี้ก่อนรัน หรือตั้งใน Project Settings → Script properties ชื่อ API_KEY) */
-function setApiKey(key) {
-  const k = String(key || '').trim();
-  if (k.length < 6) throw new Error('รหัสต้องยาวอย่างน้อย 6 ตัวอักษร');
-  PropertiesService.getScriptProperties().setProperty('API_KEY', k);
-  return 'ตั้งรหัสแล้ว';
-}
-
 /** เรียกฟังก์ชันของระบบผ่าน HTTP (ใช้เมื่อโฮสต์หน้าเว็บนอก Apps Script) */
 function apiPost_(e) {
   let out;
@@ -1265,7 +1257,6 @@ function submitReceive(p) {
     }
     const remain = reqQty - done - qty; // ยังค้างรับตามใบเบิก
 
-    const rsh = getSheet_(SHEET_RCV);
     const seq = nextRcvSeq_();
     appendRcv_([
       seq, p.docNo, str_(rv[2]), str_(rv[3]), sn, itype, qty, str_(rv[5]),
@@ -1778,7 +1769,6 @@ function kpiCompute_(D, y, m, today) {
       recv: acc, tai: str_(r[17]), po: str_(r[19]), eta: parseThaiShortDate_(r[21]), aog: urgencyDays_(r[9]) === 7
     });
   });
-  const isLate = l => l.done ? l.done > l.due : T > l.due;
   function monthStats(yy, mm) {
     const raised = lines.filter(l => kpiInM_(l.reqDate, yy, mm));
     const dueIn = lines.filter(l => kpiInM_(l.due, yy, mm));
@@ -2034,7 +2024,7 @@ function readKitSpec_() {
 /** เทียบรายการตายตัวกับของที่อยู่ในชุดจริง (ล็อตที่ยังเหลือ) */
 function computeKitStatus_(lots) {
   const spec = readKitSpec_();
-  const have = { 1: {}, 2: {} }, out = { 1: {}, 2: {} }, lastUse = { 1: null, 2: null }, holders = { 1: [], 2: [] };
+  const have = { 1: {}, 2: {} }, lastUse = { 1: null, 2: null }, holders = { 1: [], 2: [] };
   const kitOfSeq = {};
   (lots || computeLots_()).forEach(l => {
     const k = kitOf_(l.v[RC.TAIL]); if (!k) return;
@@ -2125,7 +2115,6 @@ function kitSheetEdited_(e) {
   rc.forEach(r => { bySeq[Number(r[RC.SEQ])] = r; });
   const vals = sh.getRange(r1, 1, r2 - r1 + 1, w).getValues();
   const issRows = readIss_(), loanRows = readLoans_();
-  const setTxt = (s2, row, col, v) => s2.getRange(row, col).setNumberFormat('@').setValue(v);
   const bad = [];
   vals.forEach((v, i) => {
     const seq = Number(v[0]), row = r1 + i;
@@ -2671,7 +2660,6 @@ function serialAlert_(serial, part) {
   });
   if (!hit) return null;
   const docNo = docStr_(hit[IS.DOC]);
-  const q = reqInfoMap_()[docNo + '|' + str_(hit[IS.PART])] || {};
   const lot = findLot_(hit[IS.RSEQ]);
   const recv = lot && lot.recvDate ? lot.recvDate : null;
   if (!recv) return null;
@@ -3113,7 +3101,7 @@ function updateClaim(p) {
 
 /** LRU ที่ยังอยู่ในประกัน และเหลือไม่เกิน N วัน (อยู่ในคลัง หรือติดตั้งอยู่บนเครื่อง) เรียงจากใกล้หมดก่อน */
 function getWarrantyList(days) {
-  const win = Number(days) || WARRANTY_SOON_DAYS, warr = warrantyMap_(), today = parseDate_(todayStr_());
+  const win = Number(days) || WARRANTY_SOON_DAYS, warr = warrantyMap_();
   const info = {};
   readRcv_().forEach(r => {
     const k = snKey_(r[RC.SN]);
@@ -4363,7 +4351,7 @@ function buildLineDigest_(today, urgentOnly) {
   while (!isWorkday_(target, hol)) target = addDays_(target, 1);   // วันทำงานถัดไป (ศุกร์ -> จันทร์)
   const req = getSheet_(SHEET_REQ), rl = req.getLastRow();
   const rows = rl >= 2 ? req.getRange(2, 1, rl - 1, 23).getValues().filter(isValidReqRow_) : [];
-  const got = receivedMap_(), lots = computeLots_();
+  const got = receivedMap_();
   const L = [], more = (n) => n > LINE_MAX_ITEMS_ ? ['…และอีก ' + (n - LINE_MAX_ITEMS_) + ' รายการ (ดูในแอป)'] : [];
   const cut = (arr) => arr.slice(0, LINE_MAX_ITEMS_);
 

@@ -144,7 +144,6 @@
   select{background-image:linear-gradient(45deg,transparent 50%,#7b8ca8 50%),linear-gradient(135deg,#7b8ca8 50%,transparent 50%);background-position:calc(100% - 20px) 52%,calc(100% - 14px) 52%;background-size:6px 6px;background-repeat:no-repeat;padding-right:36px}
   input[type=checkbox]{width:auto}
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .row3{display:grid;grid-template-columns:1.1fr 1fr;gap:12px}
   /* ---- ปุ่ม: Glass Glow ---- */
   .btn{width:100%;position:relative;border:1px solid rgba(169,213,255,.55);border-radius:16px;color:#fff;font:inherit;font-weight:600;padding:14px;font-size:16px;margin-top:16px;cursor:pointer;
     background:linear-gradient(180deg,rgba(76,141,206,.55) 0%,rgba(18,59,101,.96) 55%,rgba(10,35,66,1) 100%);
@@ -1259,7 +1258,7 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
     </div>
     <div class="row2" id="df-r1">
       <div><label>ราคา/หน่วย</label><input id="df-price" type="number" inputmode="decimal" min="0" step="0.01"></div>
-      <div id="df-totw"><label>ราคารวม</label><input id="df-total" readonly></div>
+      <div><label>ราคารวม</label><input id="df-total" readonly></div>
     </div>
     <div class="row2">
       <div><label>COND</label><select id="df-cond"><option value=""></option><option>NE</option><option>NS</option><option>OH</option><option>SV</option><option>RP</option><option>AR</option><option>US</option></select></div>
@@ -1272,7 +1271,7 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
     </div>
     <div id="df-r3"><label>TCI</label><input id="df-tci" autocomplete="off">
     <label>หมายเหตุ</label><input id="df-note" autocomplete="off"></div>
-    <div class="meta" id="df-hint" style="margin:6px 2px 10px">กรอกเฉพาะที่มี ช่องที่เว้นว่างจะไม่ถูกแก้ · ใส่ card ID แล้วรายการจะหายจากหน้ารอเอกสาร</div>
+    <div class="meta" style="margin:6px 2px 10px">กรอกเฉพาะที่มี ช่องที่เว้นว่างจะไม่ถูกแก้ · ใส่ card ID แล้วรายการจะหายจากหน้ารอเอกสาร</div>
     <button class="btn" id="df-save">บันทึก</button>
     <button class="btn ghost" id="df-none" style="margin-top:8px">ไม่มีเอกสาร / ไม่ต้องรอ (ปิดรายการ)</button>
   </div>
@@ -1481,7 +1480,6 @@ function snWatch(id, getSeq){
   var cacheShown = null;
   function lsGet(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } }
   function lsSet(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
-  var lastNetErr='';
   function isNetErr(e){ var m=String((e&&e.message)||e||''); return !navigator.onLine || !m || /network|fetch|connect|timeout|timed out|load failed|failed to|offline|เชื่อมต่อ/i.test(m); }
   function offbarUpdate(){
     var b=document.getElementById('offbar'); if(!b) return;
@@ -1549,7 +1547,7 @@ function snWatch(id, getSeq){
     }).then(function(r){
       if(!r.ok) throw new Error('เซิร์ฟเวอร์ตอบ HTTP '+r.status);
       return r.text().then(function(t){ try{ return JSON.parse(t); }catch(e){ throw new Error('เซิร์ฟเวอร์ตอบผิดรูปแบบ (ไม่ใช่ข้อมูลระบบ) — ตรวจว่า Deploy เวอร์ชันใหม่แล้ว และสิทธิ์เป็น "ทุกคน": '+String(t).replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').slice(0,80)); } });
-    }, function(e){ lastNetErr=(e&&e.name?e.name+': ':'')+((e&&e.message)||''); throw new Error('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบอินเทอร์เน็ต'); })
+    }, function(e){ throw new Error('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบอินเทอร์เน็ต'); })
     .then(function(o){
       if(!o.ok){
         if(o.auth && !window.liff && !retried){
@@ -1981,7 +1979,7 @@ function snWatch(id, getSeq){
   }
   function mrBuild(X,d){
     var wb=new X.Workbook(); wb.creator='ระบบเบิกจ่ายพัสดุ';
-    var FN='TH Sarabun New', th=function(s){ return String(s).replace(/[0-9]/g,function(c){ return '๐๑๒๓๔๕๖๗๘๙'[Number(c)]; }); };
+    var FN='TH Sarabun New';
     var thin={style:'thin'}, bd={top:thin,left:thin,bottom:thin,right:thin};
     var defs=[['LRU','LRU(TAI)',true],['LRU(TCI)','LRU(TAI)(TCI)',true],['SP','SP(TAI)',false],['SP(TCI)','SP(TAI)(TCI)',false]];
     defs.forEach(function(df){
@@ -2254,7 +2252,6 @@ function snWatch(id, getSeq){
   }
 
   /* ---------- เบิก ---------- */
-  var itemSeq = 0;
   var TYPE_OPTS = '<option value="">เลือกประเภทพัสดุ</option><option>LRU</option><option>SP</option><option>LRU(TCI)</option><option>SP(TCI)</option><option>สารเคมี</option>';
   function renumberItems(){
     var its = document.querySelectorAll('#r-items .item'), n = its.length;
@@ -2267,7 +2264,6 @@ function snWatch(id, getSeq){
   }
   function instToggle(d){ var t=/TCI/.test(d.querySelector('.f-type').value); d.querySelector('.f-inst-wrap').style.display=t?'':'none'; if(!t) d.querySelector('.f-inst').value=''; }
   function addItem(){
-    itemSeq++;
     var d = document.createElement('div'); d.className='item';
     d.innerHTML =
       '<div class="no"></div><button class="del" type="button" aria-label="ลบรายการ">×</button>'+
@@ -2604,7 +2600,6 @@ function snWatch(id, getSeq){
     });
     if(!rows.length){ $('c-list').innerHTML=state.rcv.length?emp('search','ไม่พบรายการที่ค้นหา','ลองพิมพ์เลขเบิก, Part number หรือเครื่องให้สั้นลง'):emp('check','ไม่มีใบเบิกรอรับ','ใบเบิกที่ออกแล้วจะมารออยู่ที่นี่จนกว่าจะรับพัสดุครบ'); return; }
     $('c-list').innerHTML = rows.map(function(r){
-      var pct = r.qty? Math.min(100, r.received/r.qty*100):0;
       return '<div class="pcard'+tyCls(r.type)+'" data-i="'+state.rcv.indexOf(r)+'">'+
         '<div class="t"><span class="doc">'+esc(r.docNo)+'</span><span class="chip '+esc(r.urgency)+'">'+esc(urg(r.urgency))+'</span></div>'+
         '<div class="nm">'+esc(r.name)+'</div>'+
@@ -2978,7 +2973,6 @@ function snWatch(id, getSeq){
   function locFill(){
     var dl=$('loc-dl'); if(!dl) return;
     var d=SM.data||LOCC.data, seen={}, empty=[], used=[], extra=[];
-    function lab(s){ return esc(s); }
     if(d) d.groups.forEach(function(g){ g.cells.forEach(function(c){
       if(!c.defined||seen[c.loc]) return; seen[c.loc]=1;
       if(c.items.length) used.push([c.loc,'มีของ '+c.items.length+' รายการ']); else empty.push([c.loc,'ว่าง']);
@@ -3738,7 +3732,6 @@ function snWatch(id, getSeq){
     var pct = s.total ? Math.round(s.done*100/s.total) : 0;
     var h='<div class="dbx">';
     /* --- แถบตัวเลขสำคัญ --- */
-    var todo=0; ['pending','tciLate','tciSoon','recvNotIssued','docWait','awaiting','warrSoon','loansOverdue'].forEach(function(k){ if(a[k]) todo+=1; });
     h+='<div class="dbx-hero"><div class="dbx-heroL">'+dbRing(pct,'#d4b36a',92,s.total?s.done+'/'+s.total:'-', 'TCI รับแล้ว')+'</div>'+
       '<div class="dbx-heroR">'+
       '<div class="dbx-k"><b>'+(a.pending||0)+'</b><span>ใบเบิกค้างรับ</span></div>'+
