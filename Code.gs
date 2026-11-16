@@ -82,6 +82,7 @@ const API_FUNCS_ = {
   moveCell: moveCell,
   getMoveHistory: getMoveHistory,
   getKpi: getKpi,
+  getMonthlyReport: getMonthlyReport,
   getSystemHealth: getSystemHealth,
   cancelEntry: cancelEntry,
   getAwaitingDoc: getAwaitingDoc,
@@ -3336,6 +3337,68 @@ function saveDocInfo(p) {
     log_('เติมข้อมูลเอกสาร TAI', rows.length === 1 ? docStr_(rows[0][RC.DOC]) : '', [rows.length === 1 ? str_(rows[0][RC.PART]) + ' ' + str_(rows[0][RC.NAME]) : rows.length + ' รายการ', what].join(' | '), p.by);
     return { ok: true, count: rows.length };
   });
+}
+
+/* ---------- รายงานความสิ้นเปลืองพัสดุประจำเดือน (LRU / LRU(TCI) / SP / SP(TCI)) ---------- */
+const TAIL_REMARK_ = {
+  '70201': 'บ.ค.๑ ๑/๕๓', '70202': 'บ.ตล.๑๗ ๑/๕๓', '70203': 'บ.ค.๑ ๒/๕๕', '70204': 'บ.ล.๑๗ ๒/๕๕',
+  '70205': 'บ.ล.๑๗ ๓/๖๐', '70206': 'บ.ล.๑๗ ๔/๖๐', '70207': 'บ.ตล.๑๗ ๕/๖๓'
+};
+const MR_MON_ = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+function thDigits_(s) { return String(s).replace(/[0-9]/g, d => '๐๑๒๓๔๕๖๗๘๙'[Number(d)]); }
+function tailRemark_(t) {
+  t = str_(t);
+  if (!t) return '';
+  if (/ALL\s*-?\s*SAAB|ทุกเครื่อง/i.test(t)) return 'ทุกเครื่อง';
+  const m = t.match(/7020[1-7]/);
+  return m ? TAIL_REMARK_[m[0]] : t;
+}
+
+/**
+ * ข้อมูลรายงานความสิ้นเปลืองพัสดุ : p = { ym:'YYYY-MM' }
+ * นับจากรายการ จ่าย ให้ช่างในเดือนนั้น (ไม่รวมโอนเข้าใบเบิก/ปรับยอดตรวจนับ) หักที่ส่งคืนเข้าคลังแล้ว
+ * ราคาจากล็อตที่รับ ; จัดกลุ่ม Part + ราคา + เครื่อง (LRU รวม S/N ในช่องเดียว)
+ */
+function getMonthlyReport(p) {
+  p = p || {};
+  const t = parseDate_(todayStr_());
+  let y = t.getFullYear(), m = t.getMonth();
+  const mm = String(p.ym || '').match(/^(\d{4})-(\d{2})$/);
+  if (mm) { y = Number(mm[1]); m = Number(mm[2]) - 1; }
+  const R = readRcv_(), lotBy = {};
+  R.forEach(r => { lotBy[Number(r[RC.SEQ])] = r; });
+  const back = returnedMap_(R);
+  const groups = { 'LRU': {}, 'LRU(TCI)': {}, 'SP': {}, 'SP(TCI)': {} }, order = { 'LRU': [], 'LRU(TCI)': [], 'SP': [], 'SP(TCI)': [] };
+  const issues = readIss_().filter(r => {
+    const d = r[IS.DATE];
+    if (!(d instanceof Date) || d.getFullYear() !== y || d.getMonth() !== m) return false;
+    const doc = str_(r[IS.DOC]), note = str_(r[IS.NOTE]);
+    return doc !== ADJ_DOC && note.indexOf(XFER_NOTE) !== 0 && note.indexOf(ADJ_DOC) !== 0;
+  }).sort((a, b) => a[IS.DATE] - b[IS.DATE] || Number(a[IS.SEQ]) - Number(b[IS.SEQ]));
+  let lines = 0;
+  issues.forEach(r => {
+    const lot = lotBy[Number(r[IS.RSEQ])];
+    const qty = num_(r[IS.QTY]) - (back[Number(r[IS.SEQ])] || 0);
+    if (qty <= 0) return;
+    let type = lot ? str_(lot[RC.TYPE]) : '';
+    if (type === 'สารเคมี' || !groups[type]) type = (lot && str_(lot[RC.TYPE]) === 'สารเคมี') ? 'SP' : (str_(r[IS.SN]) ? 'LRU' : 'SP');
+    const price = lot && lot[RC.PRICE] !== '' && !isNaN(Number(lot[RC.PRICE])) ? Number(lot[RC.PRICE]) : 0;
+    const tail = tailRemark_(r[IS.TAIL]);
+    const part = str_(r[IS.PART]);
+    const key = part + '|' + price + '|' + tail;
+    let g = groups[type][key];
+    if (!g) { g = groups[type][key] = { part: part, name: str_(r[IS.NAME]), unit: str_(r[IS.UNIT]) || 'EA', price: price, qty: 0, tail: tail, serials: [] }; order[type].push(key); }
+    g.qty += qty;
+    const sn = str_(r[IS.SN]);
+    if (sn && g.serials.indexOf(sn) < 0) g.serials.push(sn);
+    lines++;
+  });
+  const out = {};
+  Object.keys(groups).forEach(ty => {
+    out[ty] = order[ty].map(k => { const g = groups[ty][k]; return { part: g.part, name: g.name, qty: g.qty, unit: g.unit, price: g.price, total: Math.round(g.qty * g.price * 100) / 100, remark: g.tail, serial: g.serials.join(',') }; });
+  });
+  const yy = thDigits_(String((y + 543) % 100).padStart(2, '0'));
+  return { ym: y + '-' + String(m + 1).padStart(2, '0'), monthLabel: MR_MON_[m] + yy, monthLabelNum: MR_MON_[m] + String((y + 543) % 100).padStart(2, '0'), sheets: out, lines: lines };
 }
 
 /* ---------- ยกเลิกรายการ รับ / จ่าย / ส่งคืน ---------- */

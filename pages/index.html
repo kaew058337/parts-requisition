@@ -708,6 +708,7 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
   <button class="dr-it dr-in" id="kp-btn" style="--i:1"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/><path d="M13 8l3-3 3 3"/></svg>Performance &amp; KPI</button>
   <button class="dr-it dr-in" id="hl-btn" style="--i:1"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>สุขภาพระบบ</button>
   <button class="dr-it dr-in" id="dw-btn" style="--i:1"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>รอเอกสาร TAI</button>
+  <button class="dr-it dr-in" id="mr-btn" style="--i:1"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>รายงานสิ้นเปลืองประจำเดือน</button>
   <div class="dr-sec dr-in" style="--i:1">งานพิเศษ</div>
   <button class="dr-it dr-in" id="cnt-btn" style="--i:3"><svg viewBox="0 0 24 24"><path d="M9 11l2 2 4-4"/><rect x="4" y="4" width="16" height="16" rx="3"/></svg>ตรวจนับพัสดุ<span class="ex"><svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8M10 6H5a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1v-5"/></svg></span></button>
   <div class="dr-sec dr-in" style="--i:4">ข้อมูล</div>
@@ -1274,6 +1275,16 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
     <div class="meta" id="df-hint" style="margin:6px 2px 10px">กรอกเฉพาะที่มี ช่องที่เว้นว่างจะไม่ถูกแก้ · ใส่ card ID แล้วรายการจะหายจากหน้ารอเอกสาร</div>
     <button class="btn" id="df-save">บันทึก</button>
     <button class="btn ghost" id="df-none" style="margin-top:8px">ไม่มีเอกสาร / ไม่ต้องรอ (ปิดรายการ)</button>
+  </div>
+</div>
+
+<div class="sheet-bg" id="mr-bg">
+  <div class="sheet">
+    <div class="hd"><b>รายงานความสิ้นเปลืองพัสดุ</b><button class="x" id="mr-x" aria-label="ปิด">×</button></div>
+    <div class="meta" style="margin:-2px 0 10px">สร้างไฟล์ Excel 4 ชีท (LRU · LRU(TCI) · SP · SP(TCI)) แนวนอน A4 จากรายการ <b>จ่าย</b> ให้ช่างในเดือนที่เลือก (ไม่รวมโอนเข้าใบเบิก/ปรับยอดตรวจนับ และหักที่ส่งคืนเข้าคลังแล้ว)</div>
+    <div class="kp-nav"><button type="button" id="mr-prev" aria-label="เดือนก่อน">‹</button><b id="mr-mon"></b><button type="button" id="mr-next" aria-label="เดือนถัดไป">›</button></div>
+    <div id="mr-sum" class="meta" style="margin:10px 2px"></div>
+    <button class="btn" id="mr-go">ดาวน์โหลดไฟล์ Excel</button>
   </div>
 </div>
 
@@ -1947,6 +1958,84 @@ function snWatch(id, getSeq){
   $('hl-btn').addEventListener('click', function(){ $('hl-bg').classList.add('on'); hlLoad(); });
   $('hl-x').addEventListener('click', function(){ $('hl-bg').classList.remove('on'); });
   $('hl-bg').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('on'); });
+  /* ---------- รายงานความสิ้นเปลืองพัสดุประจำเดือน (Excel) ---------- */
+  var MR={ym:'',data:null};
+  function mrNow(){ var t=(state.today||'').slice(0,7); return t||new Date().toISOString().slice(0,7); }
+  function mrShift(ym,d){ var p=ym.split('-'), y=Number(p[0]), m=Number(p[1])-1+d; y+=Math.floor(m/12); m=((m%12)+12)%12; return y+'-'+('0'+(m+1)).slice(-2); }
+  function mrLoad(ym){
+    MR.ym=ym||MR.ym||mrNow(); MR.data=null; $('mr-mon').textContent=kpMonthLabel(MR.ym); $('mr-sum').textContent='กำลังโหลด…'; $('mr-go').disabled=true;
+    run('getMonthlyReport',[{ym:MR.ym}]).then(function(d){
+      MR.data=d; MR.ym=d.ym; $('mr-mon').textContent=kpMonthLabel(d.ym);
+      var s=d.sheets, f=function(k){ return k+' '+s[k].length+' แถว'; };
+      $('mr-sum').textContent=d.lines?('พบรายการจ่าย '+d.lines+' รายการ · '+['LRU','LRU(TCI)','SP','SP(TCI)'].map(f).join(' · ')):'เดือนนี้ไม่มีรายการจ่าย';
+      $('mr-go').disabled=false;
+    }).catch(function(e){ $('mr-sum').textContent='โหลดไม่ได้ — '+e.message; });
+  }
+  function mrLoadLib(){
+    return new Promise(function(res,rej){
+      if(window.ExcelJS) return res(window.ExcelJS);
+      var sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
+      sc.onload=function(){ window.ExcelJS?res(window.ExcelJS):rej(new Error('โหลดตัวสร้าง Excel ไม่สำเร็จ')); }; sc.onerror=function(){ rej(new Error('โหลดตัวสร้าง Excel ไม่ได้ ตรวจสอบอินเทอร์เน็ต')); };
+      document.head.appendChild(sc);
+    });
+  }
+  function mrBuild(X,d){
+    var wb=new X.Workbook(); wb.creator='ระบบเบิกจ่ายพัสดุ';
+    var FN='TH Sarabun New', th=function(s){ return String(s).replace(/[0-9]/g,function(c){ return '๐๑๒๓๔๕๖๗๘๙'[Number(c)]; }); };
+    var thin={style:'thin'}, bd={top:thin,left:thin,bottom:thin,right:thin};
+    var defs=[['LRU','LRU(TAI)',true],['LRU(TCI)','LRU(TAI)(TCI)',true],['SP','SP(TAI)',false],['SP(TCI)','SP(TAI)(TCI)',false]];
+    defs.forEach(function(df){
+      var key=df[0], isL=df[2], rows=d.sheets[key]||[];
+      var ws=wb.addWorksheet(d.monthLabelNum+' '+key,{pageSetup:{paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,horizontalCentered:true,margins:{left:0.4,right:0.4,top:0.5,bottom:0.5,header:0.2,footer:0.2}}});
+      var nc=isL?9:8, widths=[7,24,40,9,10,17,17,19,22];
+      for(var c=1;c<=nc;c++) ws.getColumn(c).width=widths[c-1];
+      var font=function(o){ return Object.assign({name:FN,size:16},o||{}); };
+      ws.mergeCells(1,1,1,nc); ws.getCell(1,1).value='ความสิ้นเปลืองพัสดุ '+df[1]+' ที่ใช้ในการซ่อมอากาศยาน ประจำเดือน '+d.monthLabel;
+      ws.mergeCells(2,1,2,nc); ws.getCell(2,1).value='ฝซอ.ฝูง.๗๐๒ บน.๗';
+      [1,2].forEach(function(r){ var c=ws.getCell(r,1); c.font=font({bold:true}); c.alignment={horizontal:'center',vertical:'middle'}; ws.getRow(r).height=24; });
+      var heads=['ลำดับ','P/N','ชื่อพัสดุ','จำนวน','หน่วยนับ','ราคา/EA (บาท)','ราคารวม (บาท)','หมายเหตุ']; if(isL) heads.push('หมายเหตุ');
+      var hr=ws.getRow(3); heads.forEach(function(t,i){ var c=hr.getCell(i+1); c.value=t; c.font=font({bold:true,color:{argb:(isL&&i===8)?'FFFF0000':'FF000000'}}); c.alignment={horizontal:'center',vertical:'middle',wrapText:true}; c.border=bd; });
+      hr.height=26;
+      var first=4;
+      rows.forEach(function(r,i){
+        var n=first+i, row=ws.getRow(n);
+        var vals=[i+1,r.part,r.name,r.qty,r.unit,r.price,{formula:'D'+n+'*F'+n,result:r.total},r.remark];
+        if(isL) vals.push(r.serial?('S/N '+r.serial):'');
+        vals.forEach(function(v,k){
+          var c=row.getCell(k+1); c.value=v; c.border=bd;
+          c.font=font(k===8?{color:{argb:'FFFF0000'}}:{});
+          c.alignment={horizontal:(k===1||k===2)?'left':'center',vertical:'middle',wrapText:(k===2||k===8)};
+          if(k===5||k===6) c.numFmt='#,##0.00';
+        });
+        row.height=24;
+      });
+      var last=first+rows.length-1, tr=last+1;
+      var lab=ws.getCell(tr,6); lab.value='รวมเงิน (บาท)'; lab.font=font(); lab.alignment={horizontal:'center',vertical:'middle'}; lab.border=bd;
+      var sum=ws.getCell(tr,7); sum.value=rows.length?{formula:'SUM(G'+first+':G'+last+')',result:rows.reduce(function(a,r){ return a+r.total; },0)}:0; sum.numFmt='#,##0.00'; sum.font=font(); sum.alignment={horizontal:'center',vertical:'middle'}; sum.border=bd;
+      ws.getRow(tr).height=24;
+      var f1=tr+2;
+      ws.mergeCells(f1,3,f1,6); ws.mergeCells(f1+1,3,f1+1,6); ws.mergeCells(f1+2,4,f1+2,nc);
+      [[f1,3,'ตรวจสอบแล้วถูกต้อง','right'],[f1+1,3,'ร.อ.','right'],[f1+2,4,'หน.มว.ชปบ.๑ ฝซอ.ฝูง.๗๐๒ บน.๗','left']].forEach(function(a){
+        var c=ws.getCell(a[0],a[1]); c.value=a[2]; c.font=font(); c.alignment={horizontal:a[3],vertical:'middle'}; ws.getRow(a[0]).height=24;
+      });
+      ws.pageSetup.printTitlesRow='1:3';
+      ws.views=[{state:'frozen',ySplit:3}];
+    });
+    return wb;
+  }
+  $('mr-btn').addEventListener('click', function(){ $('mr-bg').classList.add('on'); mrLoad(MR.ym||mrNow()); });
+  $('mr-x').addEventListener('click', function(){ $('mr-bg').classList.remove('on'); });
+  $('mr-bg').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('on'); });
+  $('mr-prev').addEventListener('click', function(){ mrLoad(mrShift(MR.ym,-1)); });
+  $('mr-next').addEventListener('click', function(){ mrLoad(mrShift(MR.ym,1)); });
+  $('mr-go').addEventListener('click', function(){
+    var btn=this, d=MR.data; if(!d) return;
+    busy(btn,true,'กำลังสร้างไฟล์…');
+    mrLoadLib().then(function(X){ return mrBuild(X,d).xlsx.writeBuffer(); }).then(function(buf){
+      exFile(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), 'รายงานความสิ้นเปลืองพัสดุ_'+d.ym+'.xlsx');
+      toast('สร้างไฟล์แล้ว');
+    }).catch(function(e){ toast(e.message||String(e),true); }).then(function(){ busy(btn,false); });
+  });
   /* ---------- Performance & KPI ---------- */
   var KP={ym:'',data:null};
   var TH_MONL=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
