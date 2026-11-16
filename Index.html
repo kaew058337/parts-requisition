@@ -1245,16 +1245,26 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
   <div class="sheet">
     <div class="hd"><b id="df-title">ข้อมูลจากเอกสาร TAI</b><button class="x" id="df-x" aria-label="ปิด">×</button></div>
     <div class="info" id="df-info"></div>
-    <label>card ID</label><input id="df-card" autocapitalize="characters" autocomplete="off">
+    <div class="sec">การรับ</div>
+    <div id="df-r2">
+      <label>วันหมดอายุ</label><input id="df-exp" type="date">
+    </div>
     <div class="row2" id="df-r1">
       <div><label>ราคา/หน่วย</label><input id="df-price" type="number" inputmode="decimal" min="0" step="0.01"></div>
+      <div id="df-totw"><label>ราคารวม</label><input id="df-total" readonly></div>
+    </div>
+    <div class="row2">
       <div><label>COND</label><select id="df-cond"><option value=""></option><option>NE</option><option>NS</option><option>OH</option><option>SV</option><option>RP</option><option>AR</option><option>US</option></select></div>
+      <div id="df-locw"><label>LOCATION</label><input id="df-loc"></div>
     </div>
-    <div class="row2" id="df-r2">
-      <div><label>วันหมดอายุ</label><input id="df-exp" type="date"></div>
-      <div><label>TCI</label><input id="df-tci" autocomplete="off"></div>
+    <div class="sec">เอกสารประกอบ</div>
+    <div class="row2">
+      <div><label>card ID</label><input id="df-card" autocapitalize="characters" autocomplete="off"></div>
+      <div><label>ผู้รับ</label><input id="df-recv" list="rcvlist" autocomplete="off" placeholder="เลือกเจ้าหน้าที่"></div>
     </div>
-    <div class="meta" id="df-hint" style="margin:6px 2px 10px">กรอกเฉพาะที่มี ช่องที่เว้นว่างจะไม่ถูกแก้ · ใส่ card ID แล้วรายการจะหายจาก “รอเอกสาร”</div>
+    <div id="df-r3"><label>TCI</label><input id="df-tci" autocomplete="off">
+    <label>หมายเหตุ</label><input id="df-note" autocomplete="off"></div>
+    <div class="meta" id="df-hint" style="margin:6px 2px 10px">กรอกเฉพาะที่มี ช่องที่เว้นว่างจะไม่ถูกแก้ · ใส่ card ID แล้วรายการจะหายจากหน้ารอเอกสาร</div>
     <button class="btn" id="df-save">บันทึก</button>
     <button class="btn ghost" id="df-none" style="margin-top:8px">ไม่มีเอกสาร / ไม่ต้องรอ (ปิดรายการ)</button>
   </div>
@@ -1862,18 +1872,21 @@ function snWatch(id, getSeq){
     DW.cur = single; DW.formSeqs = seqs;
     $('df-title').textContent = single ? 'ข้อมูลจากเอกสาร TAI · '+single.docNo : 'ใส่ข้อมูลให้ '+seqs.length+' รายการ';
     $('df-info').innerHTML = single ? '<b>'+esc(single.name)+'</b><br><span class="meta">'+esc(single.part)+(single.serial?' · S/N '+esc(single.serial):'')+' · รับ '+fmtNum(single.qty)+' '+esc(single.unit)+'</span>'
-      : '<b>รายการที่เลือก '+seqs.length+' รายการ</b><br><span class="meta">ใส่ card ID / COND เดียวกันให้ทุกรายการ · ราคา วันหมดอายุ และ TCI ให้กรอกทีละรายการ</span>';
+      : '<b>รายการที่เลือก '+seqs.length+' รายการ</b><br><span class="meta">ใส่ card ID / COND / ผู้รับ เดียวกันให้ทุกรายการ · ราคา วันหมดอายุ และ TCI ให้กรอกทีละรายการ</span>';
     $('df-card').value = single ? single.cardId : ''; $('df-cond').value = single ? single.cond : ''; $('df-price').value = single && single.price!=='' ? single.price : '';
     $('df-exp').value = single ? single.expire : ''; $('df-tci').value = single ? single.tci : '';
-    $('df-price').parentNode.style.display = single ? '' : 'none';
-    $('df-r2').style.display = single ? '' : 'none';
-    $('df-r1').style.gridTemplateColumns = single ? '' : '1fr';
+    $('df-loc').value = single ? (single.loc||'') : ''; $('df-recv').value = single ? (single.receiver||'') : ''; $('df-note').value = single ? (single.note||'') : '';
+    dwCalc();
+    ['df-r1','df-r2','df-r3','df-locw'].forEach(function(id){ $(id).style.display = single ? '' : 'none'; });
     $('df-bg').classList.add('on');
   }
+  function dwCalc(){ var c=DW.cur, p=$('df-price').value; $('df-total').value = (c && p!=='') ? fmtNum(c.qty*n(p)) : ''; }
+  $('df-price').addEventListener('input', dwCalc);
   function dwSave(extra){
     if(!state.by){ askBy(function(){ dwSave(extra); }); return; }
     var p={ seqs:DW.formSeqs, cardId:$('df-card').value.trim(), cond:$('df-cond').value, by:state.by };
-    if(DW.cur){ p.price=$('df-price').value; p.expire=$('df-exp').value; p.tci=$('df-tci').value.trim(); }
+    p.receiver=$('df-recv').value.trim();
+    if(DW.cur){ p.price=$('df-price').value; p.expire=$('df-exp').value; p.tci=$('df-tci').value.trim(); p.location=$('df-loc').value.trim(); p.remark=$('df-note').value.trim(); }
     if(extra) p.cardId=extra;
     var btn=$('df-save'); busy(btn,true);
     run('saveDocInfo',[p]).then(function(res){

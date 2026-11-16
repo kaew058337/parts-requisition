@@ -3271,7 +3271,7 @@ function docRow_(l, today) {
     loc: l.loc, cond: l.cond, price: price === '' || price === null || price === undefined || isNaN(Number(price)) ? '' : Number(price),
     cardId: str_(l.v[RC.CARD]), tci: str_(l.v[RC.TCI]), expire: l.expire instanceof Date ? Utilities.formatDate(l.expire, TZ, 'yyyy-MM-dd') : '',
     received: fmtThai_(l.recvDate), days: l.recvDate instanceof Date ? Math.max(0, dayDiff_(l.recvDate, today)) : 0,
-    receiver: str_(l.v[RC.RECV]), inStock: l.remain > 0
+    receiver: str_(l.v[RC.RECV]), note: str_(l.v[RC.NOTE]), inStock: l.remain > 0
   };
 }
 /** รายการรับตามใบเบิก (ชีท รับ) ที่ card ID ยังว่าง = รอเอกสารจ่ายจาก TAI ; เรียงค้างนานสุดก่อน */
@@ -3295,10 +3295,11 @@ function saveDocInfo(p) {
     const seqs = (p.seqs || []).map(Number).filter(Boolean);
     if (!seqs.length) throw new Error('ไม่ได้เลือกรายการ');
     const card = str_(p.cardId), cond = str_(p.cond), expire = str_(p.expire), tci = str_(p.tci);
+    const loc = str_(p.location), recv = str_(p.receiver), note = str_(p.remark);
     const hasPrice = p.price !== undefined && p.price !== null && str_(p.price) !== '';
     if (hasPrice && !(Number(p.price) >= 0)) throw new Error('ราคาต้องเป็นตัวเลขตั้งแต่ 0 ขึ้นไป');
-    if (seqs.length > 1 && (hasPrice || expire || tci)) throw new Error('หลายรายการพร้อมกัน แก้ได้เฉพาะ card ID และ COND (ราคา/หมดอายุ/TCI แก้ทีละรายการ)');
-    if (!card && !cond && !hasPrice && !expire && !tci) throw new Error('ยังไม่ได้กรอกข้อมูลอะไร');
+    if (seqs.length > 1 && (hasPrice || expire || tci || loc || note)) throw new Error('หลายรายการพร้อมกัน แก้ได้เฉพาะ card ID, COND และผู้รับ (อย่างอื่นแก้ทีละรายการ)');
+    if (!card && !cond && !hasPrice && !expire && !tci && !loc && !recv && !note) throw new Error('ยังไม่ได้กรอกข้อมูลอะไร');
     const R = readRcv_(), rows = [];
     seqs.forEach(s => {
       // ลำดับรับซ้ำกันได้ในชีทจริง : เลือกแถวที่ยังรอเอกสาร (card ID ว่าง) ก่อน
@@ -3321,6 +3322,9 @@ function saveDocInfo(p) {
       if (hasPrice) sh.getRange(r._row, rcCol_(RC.PRICE)).setNumberFormat('#,##0.00').setValue(Number(p.price));
       if (expire) sh.getRange(r._row, rcCol_(RC.EXP)).setNumberFormat('dd/mm/yyyy').setValue(parseDate_(expire));
       if (tci) sh.getRange(r._row, rcCol_(RC.TCI)).setNumberFormat('@').setValue(tci);
+      if (loc) sh.getRange(r._row, rcCol_(RC.LOC)).setNumberFormat('@').setValue(loc);
+      if (recv) sh.getRange(r._row, rcCol_(RC.RECV)).setValue(recv);
+      if (note) sh.getRange(r._row, rcCol_(RC.NOTE)).setValue(note);
     });
     SpreadsheetApp.flush();
     if (card) rows.forEach(r => {   // อ่านกลับมายืนยันว่าบันทึกลงชีทจริง
