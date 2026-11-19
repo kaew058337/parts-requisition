@@ -214,7 +214,11 @@ HEADERS[SHEET_MOVE] = ['เวลา', 'ผู้ย้าย', 'ประเภ
 const HDR_STYLE_ = (rg) => rg.setFontWeight('bold').setBackground('#1a56db').setFontColor('#ffffff')
   .setHorizontalAlignment('center').setVerticalAlignment('middle').setWrap(true);
 
+/* จำชีทที่ตรวจโครงสร้างแล้วภายใน 1 การทำงาน (ตัวแปร global เริ่มใหม่ทุกครั้งที่ Apps Script รัน) : ลดการเรียก Spreadsheet service ซ้ำ
+ * ไม่ใช้แคชข้ามคำขอ จึงไม่มีข้อมูลค้าง ; ชีทที่เพิ่งสร้าง/ย้ายโครงสร้างในรอบนี้ก็จำหลังตรวจเสร็จเท่านั้น */
+const SHEET_MEMO_ = {};
 function getSheet_(name) {
+  if (!MIGRATING_ && SHEET_MEMO_[name]) return SHEET_MEMO_[name];
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   if (!MIGRATING_ && (name === SHEET_RCV || name === SHEET_RCV2 || name === SHEET_ISS || name === SHEET_STK || name === SHEET_LOAN)) ensureMigrated_(ss);
   let sh = ss.getSheetByName(name);
@@ -304,6 +308,7 @@ function getSheet_(name) {
     sh.autoResizeColumns(1, h.length);
   }
   ensureTextCols_(sh, name);
+  if (!MIGRATING_) SHEET_MEMO_[name] = sh;
   return sh;
 }
 
