@@ -132,6 +132,7 @@ const API_FUNCS_ = {
   submitCount: submitCount,
   submitIssue: submitIssue,
   submitReceive: submitReceive,
+  submitReceiveBatch: submitReceiveBatch,
   submitRequisition: submitRequisition,
   submitReturn: submitReturn,
   submitReturnToStock: submitReturnToStock,
@@ -1179,8 +1180,10 @@ function appendIss_(vals) {
   return r;
 }
 
-function submitReceive(p) {
-  return withLock_(() => {
+function submitReceive(p) { return withLock_(() => submitReceiveCore_(p)); }
+
+function submitReceiveCore_(p) {
+  {
     const req = getSheet_(SHEET_REQ);
 
     // หาใบเบิกจากเลขเบิก (ตรวจซ้ำว่า เลขเบิก และ part ตรงกัน)
@@ -1280,9 +1283,40 @@ function submitReceive(p) {
     if (p.issueNow) {
       issued = issueCore_({ seq: seq, docNo: p.docNo, tech: p.tech, tail: p.tail, remark: p.issueRemark, payDate: p.payDate || todayStr_(), by: p.by });
     }
-    rebuildStock_();
-    try { if (remain <= 0) sweepTai_(); } catch (e) { /* ข้อมูล TAI ไม่ใช่ส่วนสำคัญ */ }
+    if (!p._batch) {
+      rebuildStock_();
+      try { if (remain <= 0) sweepTai_(); } catch (e) { /* ข้อมูล TAI ไม่ใช่ส่วนสำคัญ */ }
+    }
     return { remain: remain, increasedTo: increasedTo, issued: !!issued, closed: remain <= 0, rcvSeq: seq };
+  }
+}
+
+/**
+ * รับหลายรายการพร้อมกัน (วันที่รับ / card ID / ผู้รับ ใช้ร่วมกัน ; จำนวน ราคา COND แยกรายการ)
+ * p = { items:[{row,docNo,part,qty,price,cond}], receiveDate, cardId, receiver, by }
+ * พัสดุที่มี Serial ใช้ฟังก์ชันนี้ไม่ได้ (ต้องรับทีละตัว) ; รายการที่ผิดพลาดจะไม่กระทบรายการอื่น
+ */
+function submitReceiveBatch(p) {
+  return withLock_(() => {
+    const items = (p.items || []).filter(it => num_(it.qty) > 0);
+    if (!items.length) throw new Error('ยังไม่ได้กรอกจำนวนที่รับ');
+    if (items.length > 60) throw new Error('รับครั้งละไม่เกิน 60 รายการ');
+    const done = [], failed = [];
+    items.forEach(it => {
+      try {
+        const r = submitReceiveCore_({ row: it.row, docNo: str_(it.docNo), part: it.part, qty: it.qty, price: it.price === undefined ? '' : it.price,
+          cond: it.cond, serial: '', cardId: p.cardId, receiver: p.receiver, receiveDate: p.receiveDate, by: p.by, _batch: true });
+        done.push({ docNo: it.docNo, part: it.part, remain: r.remain, closed: r.closed });
+      } catch (e) {
+        failed.push({ docNo: it.docNo, part: it.part, error: String(e && e.message || e) });
+      }
+    });
+    if (done.length) {
+      rebuildStock_();
+      try { if (done.some(d => d.closed)) sweepTai_(); } catch (e) { /* ข้อมูล TAI ไม่ใช่ส่วนสำคัญ */ }
+      log_('รับหลายรายการ', '', done.length + ' รายการ' + (str_(p.cardId) ? ' | card ID ' + str_(p.cardId) : ''), p.by);
+    }
+    return { ok: done.length, failed: failed };
   });
 }
 

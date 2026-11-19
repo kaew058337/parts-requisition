@@ -503,6 +503,11 @@ main .ty-chem{border-left:5px solid var(--ty-chem)}main .ty-kit{border-left:5px 
   .sm-bar .mq{display:inline-flex;align-items:center;gap:8px;margin:8px 0 0;font-size:14px;color:#fff !important;opacity:1 !important}
   .sm-bar .mq input{width:72px;height:34px;border-radius:8px;border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.12);color:#fff;text-align:center;font:600 15px 'Sarabun',sans-serif;padding:0 6px}
   /* ---- รอเอกสาร TAI ---- */
+  .bt-card{border:1px solid var(--line,#e6dfce);border-radius:12px;padding:10px;margin-bottom:8px}
+  .bt-card .row3{display:grid;grid-template-columns:1fr 1.2fr 1fr;gap:8px;margin-top:6px}
+  .bt-card label{font-size:12px;margin:0 0 2px}
+  .bt-off{opacity:.5}
+  .pcard .bt-ck{float:right;margin:2px 0 0 8px;width:20px;height:20px}
   .dw-row{display:flex;gap:10px;align-items:flex-start}
   .dw-row > .dw-ck{padding:4px 2px 0}
   .dw-row > .dw-bd{flex:1;min-width:0;cursor:pointer}
@@ -760,7 +765,9 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
   <!-- ===== รับ ===== -->
   <section class="view" id="v-rcv">
     <input class="search" id="c-search" type="search" placeholder="ค้นหา เลขเบิก / Part / ชื่อ / เครื่อง">
+    <button class="btn ghost" id="bt-mode" type="button" style="margin:0 0 10px">รับหลายรายการพร้อมกัน</button>
     <div id="c-list"><div class="skl" aria-busy="true" aria-label="กำลังโหลด"><div class="skc"><i class="w1"></i><i class="w2"></i><i class="w3"></i><span><b></b><b></b><b></b></span></div><div class="skc"><i class="w1"></i><i class="w2"></i><i class="w3"></i><span><b></b><b></b><b></b></span></div><div class="skc"><i class="w1"></i><i class="w2"></i><i class="w3"></i><span><b></b><b></b><b></b></span></div></div></div>
+    <div class="dw-bar" id="bt-bar"><button class="btn" id="bt-go">รับที่เลือก 0 รายการ</button></div>
   </section>
 
   <!-- ===== จ่าย ===== -->
@@ -1277,6 +1284,19 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
   </div>
 </div>
 
+<div class="sheet-bg" id="bt-bg">
+  <div class="sheet">
+    <div class="hd"><b id="bt-title">รับหลายรายการ</b><button class="x" id="bt-x" aria-label="ปิด">×</button></div>
+    <div class="meta" style="margin:-2px 0 8px">ข้อมูลด้านล่างใช้ร่วมกันทุกรายการ ส่วนจำนวน ราคา และ COND กรอกแยกรายการ (ไม่กรอกราคา/COND ก็ได้ เติมทีหลังในหน้ารอเอกสาร TAI) · พัสดุที่มี Serial ให้รับทีละตัว</div>
+    <label>วันที่รับพัสดุ</label><input id="bt-date" type="date">
+    <div class="row2" style="align-items:start">
+      <div><label>card ID</label><input id="bt-card" autocomplete="off"></div>
+      <div><label>ผู้รับ</label><input id="bt-recv" list="rcvlist" autocomplete="off" placeholder="เลือกเจ้าหน้าที่"></div>
+    </div>
+    <div id="bt-items" style="margin-top:10px"></div>
+    <button class="btn" id="bt-save">บันทึกการรับ</button>
+  </div>
+</div>
 <div class="sheet-bg" id="mr-bg">
   <div class="sheet">
     <div class="hd"><b>รายงานความสิ้นเปลืองพัสดุ</b><button class="x" id="mr-x" aria-label="ปิด">×</button></div>
@@ -2600,8 +2620,9 @@ function snWatch(id, getSeq){
     });
     if(!rows.length){ $('c-list').innerHTML=state.rcv.length?emp('search','ไม่พบรายการที่ค้นหา','ลองพิมพ์เลขเบิก, Part number หรือเครื่องให้สั้นลง'):emp('check','ไม่มีใบเบิกรอรับ','ใบเบิกที่ออกแล้วจะมารออยู่ที่นี่จนกว่าจะรับพัสดุครบ'); return; }
     $('c-list').innerHTML = rows.map(function(r){
-      return '<div class="pcard'+tyCls(r.type)+'" data-i="'+state.rcv.indexOf(r)+'">'+
-        '<div class="t"><span class="doc">'+esc(r.docNo)+'</span><span class="chip '+esc(r.urgency)+'">'+esc(urg(r.urgency))+'</span></div>'+
+      var lru=lruOf(r), off=BT.on&&lru;
+      return '<div class="pcard'+tyCls(r.type)+(off?' bt-off':'')+'" data-i="'+state.rcv.indexOf(r)+'">'+
+        '<div class="t"><span class="doc">'+(BT.on&&!lru?'<input type="checkbox" class="bt-ck" '+(BT.sel[btKey(r)]?'checked ':'')+'tabindex="-1"> ':'')+esc(r.docNo)+'</span><span class="chip '+esc(r.urgency)+'">'+esc(urg(r.urgency))+'</span></div>'+(off?'<div class="meta" style="color:#b45309">พัสดุ LRU รับทีละตัว (แตะเพื่อรับแยก ปิดโหมดเลือกหลายรายการก่อน)</div>':'')+
         '<div class="nm">'+esc(r.name)+'</div>'+
         '<div class="meta">'+esc(r.part)+' · ค้างรับ '+fmtNum(r.remain)+' / '+fmtNum(r.qty)+' '+esc(r.unit)+'</div>'+
         '<div class="meta">เบิก '+esc(r.date)+(r.machine?' · เครื่อง '+esc(r.machine):'')+'</div>'+taiLine(r.tai)+
@@ -2611,7 +2632,54 @@ function snWatch(id, getSeq){
   $('c-search').addEventListener('input', renderRcv);
   $('c-list').addEventListener('click', function(e){
     var c = e.target.closest('.pcard'); if(!c) return;
-    openRcv(state.rcv[Number(c.dataset.i)]);
+    var r = state.rcv[Number(c.dataset.i)];
+    if(BT.on){
+      if(lruOf(r)){ toast('พัสดุ LRU ต้องรับทีละตัว ปิดโหมดเลือกหลายรายการเพื่อรับแยก'); return; }
+      var k=btKey(r); if(BT.sel[k]) delete BT.sel[k]; else BT.sel[k]=1;
+      btBar(); renderRcv(); return;
+    }
+    openRcv(r);
+  });
+
+  /* ---------- รับหลายรายการพร้อมกัน ---------- */
+  var BT={on:false,sel:{}};
+  function btKey(r){ return r.row+'|'+r.docNo+'|'+r.part; }
+  function btCount(){ return Object.keys(BT.sel).length; }
+  function btBar(){ var c=btCount(); $('bt-go').textContent='รับที่เลือก '+c+' รายการ'; $('bt-bar').classList.toggle('on',BT.on&&c>0); }
+  function btMode(on){
+    BT.on=on; BT.sel={}; $('bt-mode').textContent=on?'ยกเลิกการเลือกหลายรายการ':'รับหลายรายการพร้อมกัน'; btBar(); renderRcv();
+  }
+  $('bt-mode').addEventListener('click', function(){ btMode(!BT.on); });
+  $('bt-go').addEventListener('click', function(){
+    var rows=state.rcv.filter(function(r){ return BT.sel[btKey(r)]; });
+    if(!rows.length) return;
+    $('bt-date').value=state.today||''; $('bt-card').value=''; $('bt-recv').value='';
+    $('bt-title').textContent='รับ '+rows.length+' รายการ';
+    $('bt-items').innerHTML=rows.map(function(r,i){
+      return '<div class="bt-card" data-i="'+i+'"><b>'+esc(r.name)+'</b><div class="meta">'+esc(r.docNo)+' · '+esc(r.part)+' · ค้างรับ '+fmtNum(r.remain)+' / '+fmtNum(r.qty)+' '+esc(r.unit)+(r.machine?' · เครื่อง '+esc(r.machine):'')+'</div>'+
+        '<div class="row3"><div><label>จำนวนที่รับ</label><input type="number" inputmode="decimal" min="0" class="bt-q" value="'+r.remain+'"></div>'+
+        '<div><label>ราคา/หน่วย</label><input type="number" inputmode="decimal" min="0" step="0.01" class="bt-p"></div>'+
+        '<div><label>COND</label><select class="bt-c"><option value=""></option><option>NE</option><option>NS</option><option>OH</option><option>SV</option><option>RP</option><option>AR</option><option>US</option></select></div></div></div>';
+    }).join('');
+    BT.rows=rows; $('bt-bg').classList.add('on');
+  });
+  $('bt-x').addEventListener('click', function(){ $('bt-bg').classList.remove('on'); });
+  $('bt-bg').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('on'); });
+  $('bt-save').addEventListener('click', function(){
+    if(!state.by){ askBy(function(){ $('bt-save').click(); }); return; }
+    var btn=this, items=[];
+    Array.prototype.forEach.call($('bt-items').children, function(el,i){
+      var r=BT.rows[i];
+      items.push({ row:r.row, docNo:r.docNo, part:r.part, qty:el.querySelector('.bt-q').value, price:el.querySelector('.bt-p').value, cond:el.querySelector('.bt-c').value });
+    });
+    busy(btn,true);
+    run('submitReceiveBatch',[{ items:items, receiveDate:$('bt-date').value, cardId:$('bt-card').value.trim(), receiver:$('bt-recv').value.trim(), by:state.by }]).then(function(res){
+      $('bt-bg').classList.remove('on');
+      if(res.failed&&res.failed.length){
+        toast('รับแล้ว '+res.ok+' รายการ · ไม่สำเร็จ '+res.failed.length+': '+res.failed.map(function(f){ return f.part+' ('+f.error+')'; }).join(' ; '),true);
+      } else toast('รับแล้ว '+res.ok+' รายการ');
+      btMode(false); loadRcv(); try{ boot(); }catch(e){}
+    }).catch(function(e){ toast(e.message,true); }).then(function(){ busy(btn,false); });
   });
 
   var PF = ['p-sn','p-price','p-total','p-cond','p-exp','p-loc','p-card','p-tci','p-recv','p-remark'];
