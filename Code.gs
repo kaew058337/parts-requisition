@@ -40,11 +40,13 @@ const SERIAL_ALERT_DAYS = 365;
 const TZ = 'Asia/Bangkok';
 function isLRU_(t) { return String(t || '').indexOf('LRU') === 0; }
 
-const ITEM_TYPES = ['LRU', 'SP', 'LRU(TCI)', 'SP(TCI)', 'สารเคมี'];   // สารเคมี: ไม่บังคับ Serial เหมือน SP
+const GRP_CHEM = 'สารเคมี';
+const ITEM_GROUPS = [GRP_CHEM];   // กลุ่มพัสดุ (แยกจาก "ประเภท" ที่ใช้นับยอดรายเดือน) ; ว่าง = ทั่วไป
+const ITEM_TYPES = ['LRU', 'SP', 'LRU(TCI)', 'SP(TCI)', GRP_CHEM];   // "สารเคมี" เป็นประเภทเก่า : ยังรับไว้แต่ระบบแปลงเป็น SP + กลุ่มสารเคมี
 
 const HEADERS = {
   [SHEET_REQ]: ['ลำดับ', 'หมายเลขการเบิก', 'Part number', 'ชื่อ', 'จำนวน', 'หน่วยนับ', 'วันที่เบิก', 'วันที่จ่าย', 'เครื่อง', 'ความเร่งด่วน', 'ข้อขัดข้อง', 'ยศผู้เบิก', 'ชื่อ-สกุลผู้เบิก', 'ตำแหน่งผู้เบิก', 'ประเภทพัสดุ', 'เหตุผลยกเลิก', 'วันที่ติดตั้ง (TCI)', 'สถานะ TAI', 'หมายเหตุ TAI', 'P.O. TAI', 'ผู้จัดหา TAI', 'กำหนดส่ง/วันนำจ่าย TAI', 'ข้อมูล TAI ณ วันที่'],
-  [SHEET_RCV]: ['ลำดับรับ', 'เลขเอกสารการเบิก', 'card ID', 'Part number', 'ชื่อพัสดุ', 'serial number', 'ประเภทพัสดุ', 'จำนวน', 'หน่วยนับ', 'ราคา/หน่วย', 'ราคารวม', 'COND', 'วันที่แจ้ง', 'ความเร่งด่วน', 'วันกำหนดส่งพัสดุ', 'วันที่รับ', 'วันที่เกิน', 'TAIL No.', 'TCI', 'หมดอายุ', 'LOCATION', 'ผู้รับ', 'หมายเหตุ', 'แหล่งที่มา', 'อ้างอิง'],
+  [SHEET_RCV]: ['ลำดับรับ', 'เลขเอกสารการเบิก', 'card ID', 'Part number', 'ชื่อพัสดุ', 'serial number', 'ประเภทพัสดุ', 'จำนวน', 'หน่วยนับ', 'ราคา/หน่วย', 'ราคารวม', 'COND', 'วันที่แจ้ง', 'ความเร่งด่วน', 'วันกำหนดส่งพัสดุ', 'วันที่รับ', 'วันที่เกิน', 'TAIL No.', 'TCI', 'หมดอายุ', 'LOCATION', 'ผู้รับ', 'หมายเหตุ', 'แหล่งที่มา', 'อ้างอิง', 'กลุ่ม'],
   [SHEET_ISS]: ['ลำดับจ่าย', 'วันที่จ่าย', 'เลขเอกสารการเบิก', 'ลำดับรับ (อ้างอิง)', 'Part number', 'ชื่อพัสดุ', 'serial number', 'จำนวน', 'หน่วยนับ', 'TAIL No.', 'จ่ายให้ช่าง', 'หมายเหตุ', 'ผู้บันทึก'],
   [SHEET_CNT]: ['เลขที่ตรวจนับ', 'วันที่ตรวจนับ', 'LOCATION', 'ลำดับรับ', 'Part number', 'ชื่อพัสดุ', 'serial number', 'ประเภทพัสดุ', 'หน่วยนับ', 'ยอดในระบบ', 'นับได้จริง', 'ผลต่าง', 'ผลการปรับ', 'เหตุผล / หมายเหตุ', 'ผู้ตรวจนับ', 'ผู้ตรวจสอบ / กรรมการ', 'เวลาบันทึก'],
   [SHEET_CLAIM]: ['เลขที่เคลม', 'serial number', 'Part number', 'ชื่อพัสดุ', 'ประเภทพัสดุ', 'วันที่ส่งเคลม', 'ที่หนังสือ', 'ผู้รับเคลม/หน่วยงาน', 'สถานะ', 'วันที่ได้รับกลับ', 'serial number ใหม่', 'หมายเหตุ', 'ผู้บันทึก'],
@@ -220,6 +222,11 @@ function getSheet_(name) {
     // ชีทเดิม: ย้ายคอลัมน์ card ID (R) มาไว้ถัดจาก เลขเอกสารการเบิก (C)
     sh.moveColumns(sh.getRange(1, 18, sh.getMaxRows(), 1), 3);
     sh.getRange(1, 3).setNumberFormat('General');
+  }
+  if (sh && (name === SHEET_RCV || name === SHEET_RCV2) && sh.getRange(1, 26).getValue() === '') {
+    // ชีทรับเดิม: เติมคอลัมน์ กลุ่ม ท้ายตาราง
+    if (sh.getMaxColumns() < 26) sh.insertColumnsAfter(sh.getMaxColumns(), 26 - sh.getMaxColumns());
+    HDR_STYLE_(sh.getRange(1, 26).setValue(HEADERS[SHEET_RCV][25]));
   }
   if (sh && name === SHEET_REQ && sh.getRange(1, 16).getValue() === '') {
     // ชีทเบิกเดิม: เติมหัวคอลัมน์ผู้เบิก ประเภทพัสดุ และเหตุผลยกเลิกท้ายตาราง
@@ -971,14 +978,30 @@ function submitRequisitionCore_(p) {
  *  คลังพัสดุ  : คำนวณจากสองชีทข้างบน  คงเหลือ = รับ − จ่าย − ที่ยืมออกและยังไม่คืน (แสดงเฉพาะล็อตที่ยังเหลือ)
  */
 const RC = { SEQ: 0, DOC: 1, PART: 2, NAME: 3, SN: 4, TYPE: 5, QTY: 6, UNIT: 7, PRICE: 8, TOTAL: 9, COND: 10, NOTIFY: 11,
-  URG: 12, DUE: 13, RDATE: 14, OVER: 15, TAIL: 16, CARD: 17, TCI: 18, EXP: 19, LOC: 20, RECV: 21, NOTE: 22, SRC: 23, REF: 24 };
+  URG: 12, DUE: 13, RDATE: 14, OVER: 15, TAIL: 16, CARD: 17, TCI: 18, EXP: 19, LOC: 20, RECV: 21, NOTE: 22, SRC: 23, REF: 24, GRP: 25 };
 const IS = { SEQ: 0, DATE: 1, DOC: 2, RSEQ: 3, PART: 4, NAME: 5, SN: 6, QTY: 7, UNIT: 8, TAIL: 9, TECH: 10, NOTE: 11, BY: 12 };
 /* ชีท รับ: คอลัมน์ card ID อยู่ถัดจาก เลขเอกสารการเบิก (คอลัมน์ C) ; โค้ดภายในยังใช้ลำดับ RC เดิม แล้วแปลงตอนอ่าน/เขียนชีท */
-const RC_PHYS_ = [0, 1, 17, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20, 21, 22, 23, 24];
+const RC_PHYS_ = [0, 1, 17, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20, 21, 22, 23, 24, 25];
 function rcCol_(i) { return RC_PHYS_.indexOf(i) + 1; }                       // ลำดับ RC -> เลขคอลัมน์ในชีท (เริ่ม 1)
 function rcLetter_(i) { return String.fromCharCode(64 + rcCol_(i)); }
-function rcFromSheet_(row) { const o = new Array(RC_PHYS_.length); RC_PHYS_.forEach((li, k) => { o[li] = row[k]; }); return o; }
+function rcFromSheet_(row) {
+  const o = new Array(RC_PHYS_.length); RC_PHYS_.forEach((li, k) => { o[li] = row[k] === undefined ? '' : row[k]; });
+  if (str_(o[RC.TYPE]) === GRP_CHEM) { o[RC.TYPE] = 'SP'; if (!str_(o[RC.GRP])) o[RC.GRP] = GRP_CHEM; }   // ข้อมูลเดิมที่เคยใช้ประเภท "สารเคมี" -> ประเภท SP กลุ่มสารเคมี
+  return o;
+}
 function rcToSheet_(vals) { return RC_PHYS_.map(li => vals[li]); }
+/** กลุ่มของล็อตที่จะบันทึก : ว่าง/ไม่ส่งมา = ใช้กลุ่มเดิมของ Part number นี้ (ล็อตล่าสุด) ; '-' = ทั่วไป ; อื่น ๆ ต้องอยู่ใน ITEM_GROUPS */
+function resolveGrp_(g, part, lots, fallback) {
+  g = str_(g);
+  if (g === '-') return '';
+  if (g) { if (ITEM_GROUPS.indexOf(g) < 0) throw new Error('กลุ่มพัสดุไม่ถูกต้อง'); return g; }
+  if (fallback !== undefined && fallback !== null && str_(fallback)) return str_(fallback);
+  const pt = str_(part);
+  if (!pt) return '';
+  let best = null;
+  (lots || computeLots_()).forEach(l => { if (l.part === pt && (!best || l.seq > best.seq)) best = l; });
+  return best ? best.grp : '';
+}
 const SRC_REQ = 'ใบเบิก';
 const SRC_OPEN = 'ยอดยกมา';
 const SRC_PRE = 'รับก่อนเบิก';       // รับพัสดุเข้าคลังก่อนมีใบเบิก (รอผูกใบเบิก / จ่ายตรง)
@@ -1061,7 +1084,7 @@ function computeLots_() {
       part: str_(r[RC.PART]), name: str_(r[RC.NAME]), serial: str_(r[RC.SN]), type: str_(r[RC.TYPE]), unit: str_(r[RC.UNIT]),
       qty: num_(r[RC.QTY]), issued: issued[seq] || 0, loanOut: loanOut[seq] || 0, loanOpen: loanOpen[seq] || 0,
       remain: remain, cond: str_(r[RC.COND]), loc: str_(r[RC.LOC]), expire: r[RC.EXP] instanceof Date ? r[RC.EXP] : '',
-      recvDate: r[RC.RDATE] instanceof Date ? r[RC.RDATE] : '', note: str_(r[RC.NOTE]), v: r
+      recvDate: r[RC.RDATE] instanceof Date ? r[RC.RDATE] : '', note: str_(r[RC.NOTE]), grp: str_(r[RC.GRP]), v: r
     };
   });
 }
@@ -1156,7 +1179,7 @@ function writeRcvRow_(sh, r, vals) { writeRcvRows_(sh, r, [vals]); return r; }
 function writeRcvRows_(sh, start, rows) {
   const n = rows.length;
   const out = rows.map((v, k) => {
-    v = v.slice(); const r = start + k;
+    v = v.slice(); while (v.length < RC_PHYS_.length) v.push(''); const r = start + k;
     v[RC.TOTAL] = '=IF(AND(ISNUMBER(' + rcLetter_(RC.QTY) + r + '),ISNUMBER(' + rcLetter_(RC.PRICE) + r + ')),' + rcLetter_(RC.QTY) + r + '*' + rcLetter_(RC.PRICE) + r + ',"")';
     v[RC.OVER] = '=IF(AND(ISNUMBER(' + rcLetter_(RC.DUE) + r + '),ISNUMBER(' + rcLetter_(RC.RDATE) + r + ')),' + rcLetter_(RC.RDATE) + r + '-' + rcLetter_(RC.DUE) + r + ',"")';
     return rcToSheet_(v);
@@ -1230,7 +1253,9 @@ function submitReceiveCore_(p) {
       loanLot = lots.filter(l => l.seq === Number(loan[17]))[0] || null;
     }
     const src = lot || loanLot;
-    const itype = str_(rv[14]);
+    let itype = str_(rv[14]), legacyChem = '';
+    if (itype === GRP_CHEM) { itype = 'SP'; legacyChem = GRP_CHEM; }
+    const grp = resolveGrp_(p.group, str_(rv[2]), lots, legacyChem || (src ? src.grp : ''));
     // Serial ไม่บังคับทุกประเภท ; ถ้ามี Serial ต้องรับทีละ 1 ชิ้น
     const sn = str_(p.serial) || (lot ? lot.serial : (loan ? str_(loan[4]) : ''));
     if (sn && qty !== 1) throw new Error('พัสดุที่มี Serial number ต้องรับทีละ 1 ชิ้น (ไม่มี Serial จึงรับหลายชิ้นพร้อมกันได้)');
@@ -1266,7 +1291,7 @@ function submitReceiveCore_(p) {
       seq, p.docNo, str_(rv[2]), str_(rv[3]), sn, itype, qty, str_(rv[5]),
       p.price === '' || p.price === null || p.price === undefined ? '' : num_(p.price), '',
       cond, rv[6], str_(rv[9]), dueDate_(rv[6], rv[9]), recvDate, '',
-      str_(rv[8]), str_(p.cardId), str_(p.tci), expireVal, loc, str_(p.receiver), str_(p.remark), SRC_REQ, lot ? lot.seq : ''
+      str_(rv[8]), str_(p.cardId), str_(p.tci), expireVal, loc, str_(p.receiver), str_(p.remark), SRC_REQ, lot ? lot.seq : '', grp
     ]);
     if (remain <= 0) req.getRange(row, 8).setNumberFormat('dd/mm/yyyy').setValue(recvDate); // รับครบ = วันที่จ่ายในชีทเบิก
     if (lot) { // โอนจากยอดยกมา/ของคืนคลัง เข้าใบเบิกนี้ : บันทึกการออกจากล็อตเดิมในชีท จ่าย
@@ -1306,7 +1331,7 @@ function submitReceiveBatch(p) {
     items.forEach(it => {
       try {
         const r = submitReceiveCore_({ row: it.row, docNo: str_(it.docNo), part: it.part, qty: it.qty, price: it.price === undefined ? '' : it.price,
-          cond: it.cond, serial: '', cardId: p.cardId, receiver: p.receiver, receiveDate: p.receiveDate, by: p.by, _batch: true });
+          cond: it.cond, group: it.group, serial: '', cardId: p.cardId, receiver: p.receiver, receiveDate: p.receiveDate, by: p.by, _batch: true });
         done.push({ docNo: it.docNo, part: it.part, remain: r.remain, closed: r.closed });
       } catch (e) {
         failed.push({ docNo: it.docNo, part: it.part, error: String(e && e.message || e) });
@@ -1470,7 +1495,7 @@ function getStock() {
     const g = groups[key] || (groups[key] = { part: l.part, name: l.name, unit: l.unit, qty: 0, lots: [] });
     g.qty += l.remain;
     g.lots.push({
-      seq: l.seq, free: l.free, serial: l.serial, qty: l.remain, docNo: l.label, type: l.type, cond: l.cond,
+      seq: l.seq, free: l.free, serial: l.serial, qty: l.remain, docNo: l.label, type: l.type, grp: l.grp, cond: l.cond,
       location: l.loc, recv: str_(l.v[RC.RECV]), kit: kitOf_(l.v[RC.TAIL]), expire: fmtThai_(l.expire), received: fmtThai_(l.recvDate), note: l.note,
       issRow: l.free ? 0 : l.seq, issSeq: l.free ? 0 : l.seq, linkNote: '',
       machine: l.free ? '' : ((info[l.doc + '|' + l.part] || {}).machine || ''),
@@ -1637,7 +1662,7 @@ function moveToKit(p) {
     } else {
       // แยกบางส่วน: ลดจำนวนแถวเดิม + เพิ่มแถวใหม่ (ลอกข้อมูลเดิม) รวมจำนวนรับเท่าเดิม
       sh.getRange(lot.row, rcCol_(RC.QTY)).setValue(lot.qty - qty);
-      const nv = lot.v.slice(0, 25);
+      const nv = lot.v.slice(0, RC_PHYS_.length);
       nv[RC.SEQ] = nextRcvSeq_(); nv[RC.QTY] = qty; nv[RC.TAIL] = kit; nv[RC.TOTAL] = ''; nv[RC.OVER] = '';
       appendRcv_(nv);
     }
@@ -1671,6 +1696,16 @@ function editLot(p) {
     const partCh = newPart !== oldPart, nameCh = newName !== oldName;
     if (snCh && newSn && rc.some(x => Number(x[RC.SEQ]) !== seq && snKey_(x[RC.SN]) === snKey_(newSn))) throw new Error('S/N ' + newSn + ' ซ้ำกับรายการอื่น');
     const changes = [];
+    if (str_(p.group) !== '') {
+      const ng = str_(p.group) === '-' ? '' : str_(p.group);
+      if (ng && ITEM_GROUPS.indexOf(ng) < 0) throw new Error('กลุ่มพัสดุไม่ถูกต้อง');
+      const ogp = str_(r[RC.GRP]);
+      if (ng !== ogp || p.groupAll) {
+        let n = 0;
+        rc.forEach(x => { if (Number(x[RC.SEQ]) === seq || (p.groupAll && str_(x[RC.PART]) === oldPart)) { getSheet_(x._sh).getRange(x._row, rcCol_(RC.GRP)).setValue(ng); n++; } });
+        changes.push('กลุ่ม ' + (ogp || 'ทั่วไป') + ' → ' + (ng || 'ทั่วไป') + (p.groupAll ? ' (ทุกล็อตของ P/N นี้ ' + n + ' แถว)' : ''));
+      }
+    }
     if (snCh || partCh) {
       propagatePartSn_(r, str_(r[RC.SEQ]), partCh ? newPart : null, snCh ? newSn : null, readIss_(), readLoans_());
       if (partCh) changes.push('P/N ' + oldPart + ' → ' + newPart);
@@ -1737,7 +1772,7 @@ function moveLocation(p) {
     } else {
       // แยกบางส่วน: ลดจำนวนแถวเดิม (ที่เก็บเดิม) + เพิ่มแถวใหม่ลอกข้อมูลเดิม ที่เก็บใหม่ ; จำนวนรับรวมเท่าเดิม
       sh.getRange(lot.row, rcCol_(RC.QTY)).setValue(lot.qty - qty);
-      const nv = lot.v.slice(0, 25);
+      const nv = lot.v.slice(0, RC_PHYS_.length);
       newSeq = nextRcvSeq_();
       nv[RC.SEQ] = newSeq; nv[RC.QTY] = qty; nv[RC.LOC] = loc; nv[RC.TOTAL] = ''; nv[RC.OVER] = '';
       nv[RC.NOTE] = [str_(lot.note), 'แยกจากลำดับรับ ' + lot.seq].filter(Boolean).join(' | ');
@@ -2286,8 +2321,10 @@ function syncLoc_(e) {
 /* ---------- ตรวจนับพัสดุ (ตามที่จัดเก็บ) + ปรับยอดอย่างมีหลักฐาน ---------- */
 const CNT = { DOC: 0, DATE: 1, LOC: 2, SEQ: 3, PART: 4, NAME: 5, SN: 6, TYPE: 7, UNIT: 8, SYS: 9, CNT: 10, DIFF: 11, RES: 12, NOTE: 13, BY: 14, WIT: 15, AT: 16 };
 const ADJ_DOC = 'ปรับยอดตรวจนับ';
+const USE_DOC = 'ตัดจ่ายตามตรวจนับ';   // สารเคมีที่ช่างหยิบใช้เอง : ยอดที่นับได้น้อยกว่าในระบบ = จ่ายออก (ไม่ใช่การปรับยอด)
 const CNT_OK = 'ตรง';
 const CNT_ADJ = 'ปรับยอดแล้ว';
+const CNT_USE = 'ตัดจ่ายแล้ว';
 const CNT_NOADJ = 'ไม่ปรับยอด';
 const NO_LOC = '(ไม่ระบุที่เก็บ)';
 
@@ -2304,8 +2341,9 @@ function nextCountNo_(sh, date) {
 }
 
 /** รายการ LOCATION ที่มีพัสดุอยู่ พร้อมวันที่ตรวจนับล่าสุด */
-function getCountLocations() {
-  const lots = computeLots_().filter(l => l.remain > 0);
+function getCountLocations(grp) {
+  const gq = str_(grp);
+  const lots = computeLots_().filter(l => l.remain > 0 && (!gq || l.grp === gq));
   const sh = getSheet_(SHEET_CNT), last = sh.getLastRow();
   const lastCnt = {};
   if (last >= 2) sh.getRange(2, 1, last - 1, 3).getValues().forEach(r => {
@@ -2322,18 +2360,18 @@ function getCountLocations() {
 }
 
 /** รายการที่ระบบบอกว่าควรอยู่ใน LOCATION นั้น (ยอดคงเหลือจริงในคลัง ไม่รวมที่ยืมออก) */
-function getCountList(loc) {
-  const k = str_(loc);
-  const items = computeLots_().filter(l => l.remain > 0 && l.loc === k)
+function getCountList(loc, grp) {
+  const k = str_(loc), gq = str_(grp);
+  const items = computeLots_().filter(l => l.remain > 0 && l.loc === k && (!gq || l.grp === gq))
     .sort((a, b) => (a.part < b.part ? -1 : a.part > b.part ? 1 : 0) || (a.serial < b.serial ? -1 : a.serial > b.serial ? 1 : 0) || (a.seq - b.seq))
-    .map(l => ({ seq: l.seq, part: l.part, name: l.name, serial: l.serial, type: l.type, unit: l.unit, qty: l.remain, cond: l.cond, label: l.label }));
-  return { loc: k, label: k || NO_LOC, date: fmtThai_(parseDate_(todayStr_())), items: items };
+    .map(l => ({ seq: l.seq, part: l.part, name: l.name, serial: l.serial, type: l.type, unit: l.unit, qty: l.remain, cond: l.cond, label: l.label, grp: l.grp }));
+  return { loc: k, grp: gq, label: k || NO_LOC, date: fmtThai_(parseDate_(todayStr_())), items: items };
 }
 
 function addFoundRcv_(o, loc, note) {
   return appendRcv_([
     nextRcvSeq_(), '', o.part, o.name, o.serial, o.type, o.qty, o.unit || 'EA', '', '',
-    o.cond, '', '', '', parseDate_(todayStr_()), '', '', '', '', '', loc, '', note, SRC_OPEN, ''
+    o.cond, '', '', '', parseDate_(todayStr_()), '', '', '', '', '', loc, '', note, SRC_OPEN, '', o.grp || ''
   ]);
 }
 
@@ -2351,6 +2389,7 @@ function submitCount(p) {
     if (!items.length && !extras.length) throw new Error('ไม่มีรายการตรวจนับ');
     const adjust = p.adjust === true || p.adjust === 'true';
     const reason = str_(p.reason);
+    const useMode = p.useMode === true || p.useMode === 'true';   // สารเคมีที่นับขาด = ช่างหยิบใช้ -> ตัดจ่าย
     const lotMap = {};
     computeLots_().forEach(l => { lotMap[l.seq] = l; });
 
@@ -2380,7 +2419,8 @@ function submitCount(p) {
       rows.push({ lot: null, seq: '', part: str_(x.part), name: str_(x.name), serial: str_(x.serial), type: type, unit: str_(x.unit) || 'EA', sys: 0, cnt: q, diff: q, note: str_(x.note), cond: str_(x.cond) });
       acts.push({ kind: 'found', qty: q, idx: rows.length - 1 });
     });
-    if (adjust && acts.length && !reason) throw new Error('กรุณาระบุเหตุผลการปรับยอด');
+    const isUse = a => useMode && a.kind === 'out' && a.lot.grp === GRP_CHEM;
+    if (adjust && acts.some(a => !isUse(a)) && !reason) throw new Error('กรุณาระบุเหตุผลการปรับยอด');
 
     const sh = getSheet_(SHEET_CNT);
     const docNo = nextCountNo_(sh, date);
@@ -2389,11 +2429,14 @@ function submitCount(p) {
     if (adjust) {
       acts.forEach(a => {
         const r = rows[a.idx];
-        if (a.kind === 'out') {
+        if (isUse(a)) {
+          appendIss_([nextSeq_(getSheet_(SHEET_ISS)), date, USE_DOC, a.lot.seq, a.lot.part, a.lot.name, a.lot.serial, a.qty, a.lot.unit, '', '', 'ช่างหยิบใช้เอง (ตัดจ่ายตามตรวจนับ ' + docNo + ')', by]);
+          rows[a.idx].used = true;
+        } else if (a.kind === 'out') {
           appendIss_([nextSeq_(getSheet_(SHEET_ISS)), date, ADJ_DOC, a.lot.seq, a.lot.part, a.lot.name, a.lot.serial, a.qty, a.lot.unit, '', '', tag, by]);
         } else if (a.kind === 'in') {
           r.newSeq = nextRcvSeq_();
-          addFoundRcv_({ part: a.lot.part, name: a.lot.name, serial: '', type: a.lot.type, unit: a.lot.unit, qty: a.qty, cond: a.lot.cond }, loc, 'พบเกินจากตรวจนับ ' + docNo + (reason ? ': ' + reason : ''));
+          addFoundRcv_({ part: a.lot.part, name: a.lot.name, serial: '', type: a.lot.type, unit: a.lot.unit, qty: a.qty, cond: a.lot.cond, grp: a.lot.grp }, loc, 'พบเกินจากตรวจนับ ' + docNo + (reason ? ': ' + reason : ''));
         } else {
           r.newSeq = nextRcvSeq_();
           addFoundRcv_({ part: r.part, name: r.name, serial: r.serial, type: r.type, unit: r.unit, qty: a.qty, cond: r.cond }, loc, 'พบเกินจากตรวจนับ ' + docNo + (reason ? ': ' + reason : ''));
@@ -2403,8 +2446,8 @@ function submitCount(p) {
 
     const nowD = new Date(), wit = str_(p.witness);
     const out = rows.map(r => {
-      const res = r.diff === 0 ? CNT_OK : (adjust ? CNT_ADJ : CNT_NOADJ);
-      const note = [r.diff !== 0 && reason ? reason : '', r.note].filter(Boolean).join(' | ');
+      const res = r.diff === 0 ? CNT_OK : (adjust ? (r.used ? CNT_USE : CNT_ADJ) : CNT_NOADJ);
+      const note = [r.used ? 'ช่างหยิบใช้เอง (ตัดจ่าย)' : (r.diff !== 0 && reason ? reason : ''), r.note].filter(Boolean).join(' | ');
       r.res = res; r.fullNote = note;
       return [docNo, date, loc, r.newSeq || r.seq, r.part, r.name, r.serial, r.type, r.unit, r.sys, r.cnt, r.diff, res, note, by, wit, nowD];
     });
@@ -2427,7 +2470,7 @@ function countSession_(rows, docNo) {
   return {
     docNo: docNo, date: fmtThai_(f[CNT.DATE]), loc: str_(f[CNT.LOC]), label: str_(f[CNT.LOC]) || NO_LOC,
     by: str_(f[CNT.BY]), witness: str_(f[CNT.WIT]),
-    adjusted: rows.some(r => str_(r[CNT.RES]) === CNT_ADJ),
+    adjusted: rows.some(r => str_(r[CNT.RES]) === CNT_ADJ || str_(r[CNT.RES]) === CNT_USE),
     diffs: rows.filter(r => num_(r[CNT.DIFF]) !== 0).length,
     reason: (rows.filter(r => num_(r[CNT.DIFF]) !== 0 && str_(r[CNT.NOTE]))[0] || [])[CNT.NOTE] || '',
     rows: rows.map(r => ({ part: str_(r[CNT.PART]), name: str_(r[CNT.NAME]), serial: str_(r[CNT.SN]), type: str_(r[CNT.TYPE]), unit: str_(r[CNT.UNIT]),
@@ -2462,8 +2505,9 @@ function addOpeningStock(p) {
     if (!str_(p.name)) throw new Error('กรุณากรอกชื่อพัสดุ');
     const qty = num_(p.qty);
     if (qty <= 0) throw new Error('จำนวนต้องมากกว่า 0');
-    const type = str_(p.itemType);
+    let type = str_(p.itemType);
     if (type && ITEM_TYPES.indexOf(type) < 0) throw new Error('ประเภทพัสดุไม่ถูกต้อง');
+    if (type === GRP_CHEM) type = 'SP';
     const sn = str_(p.serial);
     if (sn && qty !== 1) throw new Error('พัสดุที่มี Serial number ต้องจำนวน 1 ต่อ 1 Serial');
     const source = str_(p.source) === SRC_PRE ? SRC_PRE : SRC_OPEN;   // รับก่อนเบิก = มีวันที่รับจริง (นับประกันได้) / ยอดยกมา = ของเดิมในคลัง
@@ -2478,7 +2522,7 @@ function addOpeningStock(p) {
     const newSeq = nextRcvSeq_();
     appendRcv_([
       newSeq, '', str_(p.part), str_(p.name), sn, type, qty, str_(p.unit) || 'EA', '', '',
-      str_(p.cond), '', '', '', parseDate_(todayStr_()), '', kit, str_(p.cardId), '', parseDate_(p.expire), str_(p.location), '', str_(p.remark), source, ''
+      str_(p.cond), '', '', '', parseDate_(todayStr_()), '', kit, str_(p.cardId), '', parseDate_(p.expire), str_(p.location), '', str_(p.remark), source, '', resolveGrp_(p.group, p.part, null, str_(p.itemType) === GRP_CHEM ? GRP_CHEM : '')
     ]);
     if (issueNow) issueDirectCore_({ lotSeq: newSeq, qty: qty, tech: p.tech, tail: p.tail, payDate: p.payDate || todayStr_(), remark: p.issueRemark, by: p.by });
     log_(source, '', [str_(p.part), str_(p.name), 'x' + qty, sn ? 'S/N ' + sn : '', str_(p.location), kit].filter(Boolean).join(' | '), p.by);
@@ -2545,7 +2589,7 @@ function linkDirectIssue(p) {
       const seq = nextRcvSeq_();
       appendRcv_([seq, docNo, lot.part, str_(rv[3]) || lot.name, lot.serial, str_(rv[14]) || lot.type, l.take, str_(rv[5]) || lot.unit, '', '',
         lot.cond, rv[6], str_(rv[9]), dueDate_(rv[6], rv[9]), l.date instanceof Date ? l.date : recvDate, '', str_(rv[8]), '', '', lot.expire, lot.loc, '',
-        'ผูกใบเบิกย้อนหลังจากรับก่อนเบิก', SRC_REQ, lot.seq]);
+        'ผูกใบเบิกย้อนหลังจากรับก่อนเบิก', SRC_REQ, lot.seq, lot.grp]);
       appendIss_([nextSeq_(iss), l.date instanceof Date ? l.date : recvDate, docNo, lot.seq, lot.part, lot.name, lot.serial, l.take, lot.unit, '', '',
         XFER_NOTE + ' ' + docNo + ' (ผูกย้อนหลัง)', by]);
       appendIss_([nextSeq_(iss), l.date instanceof Date ? l.date : recvDate, docNo, seq, lot.part, lot.name, lot.serial, l.take, lot.unit, l.tail, l.tech,
@@ -2690,7 +2734,7 @@ function submitReturnToStock(p) {
 
     appendRcv_([
       nextRcvSeq_(), '', str_(rv[IS.PART]), str_(rv[IS.NAME]), sn, type, qty, str_(rv[IS.UNIT]), '', '',
-      cond, '', '', '', parseDate_(todayStr_()), '', '', '', '', lot ? lot.expire : '', loc, '', note, SRC_RET, Number(p.seq)
+      cond, '', '', '', parseDate_(todayStr_()), '', '', '', '', lot ? lot.expire : '', loc, '', note, SRC_RET, Number(p.seq), lot ? lot.grp : ''
     ]);
 
     // บันทึกลงชีท ส่งคืน เพื่อให้ประวัติการส่งคืนอยู่ที่เดียวกัน
@@ -3343,11 +3387,12 @@ function saveDocInfo(p) {
     const seqs = (p.seqs || []).map(Number).filter(Boolean);
     if (!seqs.length) throw new Error('ไม่ได้เลือกรายการ');
     const card = str_(p.cardId), cond = str_(p.cond), expire = str_(p.expire), tci = str_(p.tci);
-    const loc = str_(p.location), recv = str_(p.receiver), note = str_(p.remark);
+    const loc = str_(p.location), recv = str_(p.receiver), note = str_(p.remark), grpIn = str_(p.group);
+    if (grpIn && grpIn !== '-' && ITEM_GROUPS.indexOf(grpIn) < 0) throw new Error('กลุ่มพัสดุไม่ถูกต้อง');
     const hasPrice = p.price !== undefined && p.price !== null && str_(p.price) !== '';
     if (hasPrice && !(Number(p.price) >= 0)) throw new Error('ราคาต้องเป็นตัวเลขตั้งแต่ 0 ขึ้นไป');
-    if (seqs.length > 1 && (hasPrice || expire || tci || loc || note)) throw new Error('หลายรายการพร้อมกัน แก้ได้เฉพาะ card ID, COND และผู้รับ (อย่างอื่นแก้ทีละรายการ)');
-    if (!card && !cond && !hasPrice && !expire && !tci && !loc && !recv && !note) throw new Error('ยังไม่ได้กรอกข้อมูลอะไร');
+    if (seqs.length > 1 && (hasPrice || expire || tci || loc || note)) throw new Error('หลายรายการพร้อมกัน แก้ได้เฉพาะ card ID, COND, ผู้รับ และกลุ่ม (อย่างอื่นแก้ทีละรายการ)');
+    if (!card && !cond && !hasPrice && !expire && !tci && !loc && !recv && !note && !grpIn) throw new Error('ยังไม่ได้กรอกข้อมูลอะไร');
     const R = readRcv_(), rows = [];
     seqs.forEach(s => {
       // ลำดับรับซ้ำกันได้ในชีทจริง : เลือกแถวที่ยังรอเอกสาร (card ID ว่าง) ก่อน
@@ -3373,6 +3418,7 @@ function saveDocInfo(p) {
       if (loc) sh.getRange(r._row, rcCol_(RC.LOC)).setNumberFormat('@').setValue(loc);
       if (recv) sh.getRange(r._row, rcCol_(RC.RECV)).setValue(recv);
       if (note) sh.getRange(r._row, rcCol_(RC.NOTE)).setValue(note);
+      if (grpIn) sh.getRange(r._row, rcCol_(RC.GRP)).setValue(grpIn === '-' ? '' : grpIn);
     });
     SpreadsheetApp.flush();
     if (card) rows.forEach(r => {   // อ่านกลับมายืนยันว่าบันทึกลงชีทจริง
@@ -3488,7 +3534,7 @@ function cancelIssue_(seq, reason, by) {
   if (i < 0) throw new Error('ไม่พบรายการจ่ายลำดับที่ ' + seq + ' (อาจถูกยกเลิกไปแล้ว)');
   const r = vals[i], doc = docStr_(r[IS.DOC]);
   if (!isTechIssue_(r) && doc !== DIRECT) {
-    throw new Error(doc === ADJ_DOC ? 'รายการนี้เกิดจากการปรับยอดตรวจนับ ยกเลิกตรงนี้ไม่ได้ (ให้ตรวจนับใหม่)'
+    throw new Error(doc === ADJ_DOC || doc === USE_DOC ? 'รายการนี้เกิดจากการตรวจนับ ยกเลิกตรงนี้ไม่ได้ (ให้ตรวจนับใหม่)'
       : 'รายการนี้เป็นการโอนเข้าใบเบิก ให้ยกเลิกที่ประวัติ "รับ" ของใบเบิกนั้นแทน');
   }
   const back = returnedMap_()[seq] || 0;
