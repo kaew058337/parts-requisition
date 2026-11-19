@@ -496,11 +496,21 @@ main .ty-chem{border-left:5px solid var(--ty-chem)}main .ty-kit{border-left:5px 
   .sm-bar .mq{display:inline-flex;align-items:center;gap:8px;margin:8px 0 0;font-size:14px;color:#fff !important;opacity:1 !important}
   .sm-bar .mq input{width:72px;height:34px;border-radius:8px;border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.12);color:#fff;text-align:center;font:600 15px 'Sarabun',sans-serif;padding:0 6px}
   /* ---- รอเอกสาร TAI ---- */
+  .mt-row{display:flex;gap:8px;margin:2px 0 12px}
+  .mt-row .btn{margin:0;width:auto;flex:1 1 0;min-width:0;padding:10px 12px;font-size:14px;line-height:1.3;white-space:nowrap;border-radius:14px}
+  .mt-row .btn.mt-cancel{flex:0 0 auto;color:#a3202c}
   .bt-card{border:1px solid var(--line,#e6dfce);border-radius:12px;padding:10px;margin-bottom:8px}
   .bt-card .row3{display:grid;grid-template-columns:1fr 1.2fr 1fr;gap:8px;margin-top:6px}
   .bt-card label{font-size:12px;margin:0 0 2px}
   .bt-off{opacity:.5}
-  .pcard .bt-ck{float:right;margin:2px 0 0 8px;width:20px;height:20px}
+  .bx-card{display:flex;align-items:center;gap:10px}
+  .bx-info{flex:1;min-width:0}
+  .bx-qty{flex:none;width:92px}
+  .bx-qty input{text-align:center}
+  .bt-ck{display:inline-block;position:relative;width:22px;height:22px;box-sizing:border-box;border-radius:50%;border:2px solid #9db3d3;background:#fff;vertical-align:-5px;margin-right:8px;transition:background .15s,border-color .15s}
+  .bt-ck.on{background:var(--navy-royal,#1f4d8f);border-color:var(--navy-royal,#1f4d8f)}
+  .bt-ck.on::after{content:'';position:absolute;left:6px;top:2px;width:5px;height:10px;border:solid #fff;border-width:0 2.5px 2.5px 0;transform:rotate(45deg)}
+  html[data-theme=dark] .bt-ck{background:#18263a;border-color:#4a6890}
   .dw-row{display:flex;gap:10px;align-items:flex-start}
   .dw-row > .dw-ck{padding:4px 2px 0}
   .dw-row > .dw-bd{flex:1;min-width:0;cursor:pointer}
@@ -758,7 +768,7 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
   <!-- ===== รับ ===== -->
   <section class="view" id="v-rcv">
     <input class="search" id="c-search" type="search" placeholder="ค้นหา เลขเบิก / Part / ชื่อ / เครื่อง">
-    <button class="btn ghost" id="bt-mode" type="button" style="margin:0 0 10px">รับหลายรายการพร้อมกัน</button>
+    <div class="mt-row"><button class="btn ghost" id="bt-mode" type="button">รับหลายรายการพร้อมกัน</button></div>
     <div id="c-list"><div class="skl" aria-busy="true" aria-label="กำลังโหลด"><div class="skc"><i class="w1"></i><i class="w2"></i><i class="w3"></i><span><b></b><b></b><b></b></span></div><div class="skc"><i class="w1"></i><i class="w2"></i><i class="w3"></i><span><b></b><b></b><b></b></span></div><div class="skc"><i class="w1"></i><i class="w2"></i><i class="w3"></i><span><b></b><b></b><b></b></span></div></div></div>
     <div class="dw-bar" id="bt-bar"><button class="btn" id="bt-go">รับที่เลือก 0 รายการ</button></div>
   </section>
@@ -766,7 +776,7 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
   <!-- ===== จ่าย ===== -->
   <section class="view" id="v-iss">
     <input class="search" id="i-search" type="search" placeholder="ค้นหา เลขเบิก / Part / Serial / ชื่อ">
-    <div style="display:flex;gap:8px;margin:0 0 10px"><button class="btn ghost" id="bx-mode" type="button" style="margin:0;flex:1">จ่ายหลายรายการพร้อมกัน</button><button class="btn ghost" id="bx-all" type="button" style="margin:0;flex:none;display:none">เลือกทั้งหมดที่แสดง</button></div>
+    <div class="mt-row"><button class="btn ghost" id="bx-mode" type="button">จ่ายหลายรายการพร้อมกัน</button><button class="btn ghost" id="bx-all" type="button" style="display:none">เลือกทั้งหมดที่แสดง</button></div>
     <div id="i-list"><div class="skl" aria-busy="true" aria-label="กำลังโหลด"><div class="skc"><i class="w1"></i><i class="w2"></i><i class="w3"></i><span><b></b><b></b><b></b></span></div><div class="skc"><i class="w1"></i><i class="w2"></i><i class="w3"></i><span><b></b><b></b><b></b></span></div><div class="skc"><i class="w1"></i><i class="w2"></i><i class="w3"></i><span><b></b><b></b><b></b></span></div></div></div>
     <div class="dw-bar" id="bx-bar"><button class="btn" id="bx-go">จ่ายที่เลือก 0 รายการ</button></div>
   </section>
@@ -2632,7 +2642,7 @@ function snWatch(id, getSeq){
     $('c-list').innerHTML = rows.map(function(r){
       var lru=lruOf(r), off=BT.on&&lru;
       return '<div class="pcard'+tyCls(r.type)+(off?' bt-off':'')+'" data-i="'+state.rcv.indexOf(r)+'">'+
-        '<div class="t"><span class="doc">'+(BT.on&&!lru?'<input type="checkbox" class="bt-ck" '+(BT.sel[btKey(r)]?'checked ':'')+'tabindex="-1"> ':'')+esc(r.docNo)+'</span><span class="chip '+esc(r.urgency)+'">'+esc(urg(r.urgency))+'</span></div>'+(off?'<div class="meta" style="color:#b45309">พัสดุ LRU รับทีละตัว (แตะเพื่อรับแยก ปิดโหมดเลือกหลายรายการก่อน)</div>':'')+
+        '<div class="t"><span class="doc">'+(BT.on&&!lru?'<span class="bt-ck'+(BT.sel[btKey(r)]?' on':'')+'"></span>':'')+esc(r.docNo)+'</span><span class="chip '+esc(r.urgency)+'">'+esc(urg(r.urgency))+'</span></div>'+(off?'<div class="meta" style="color:#b45309">พัสดุ LRU รับทีละตัว (แตะเพื่อรับแยก ปิดโหมดเลือกหลายรายการก่อน)</div>':'')+
         '<div class="nm">'+esc(r.name)+'</div>'+
         '<div class="meta">'+esc(r.part)+' · ค้างรับ '+fmtNum(r.remain)+' / '+fmtNum(r.qty)+' '+esc(r.unit)+'</div>'+
         '<div class="meta">เบิก '+esc(r.date)+(r.machine?' · เครื่อง '+esc(r.machine):'')+'</div>'+taiLine(r.tai)+
@@ -2657,7 +2667,7 @@ function snWatch(id, getSeq){
   function btCount(){ return Object.keys(BT.sel).length; }
   function btBar(){ var c=btCount(); $('bt-go').textContent='รับที่เลือก '+c+' รายการ'; $('bt-bar').classList.toggle('on',BT.on&&c>0); }
   function btMode(on){
-    BT.on=on; BT.sel={}; $('bt-mode').textContent=on?'ยกเลิกการเลือกหลายรายการ':'รับหลายรายการพร้อมกัน'; btBar(); renderRcv();
+    BT.on=on; BT.sel={}; $('bt-mode').textContent=on?'ยกเลิกการเลือก':'รับหลายรายการพร้อมกัน'; $('bt-mode').classList.toggle('mt-cancel',on); btBar(); renderRcv();
   }
   $('bt-mode').addEventListener('click', function(){ btMode(!BT.on); });
   $('bt-go').addEventListener('click', function(){
@@ -2841,7 +2851,7 @@ function snWatch(id, getSeq){
     if(!rows.length){ $('i-list').innerHTML=state.iss.length?emp('search','ไม่พบรายการที่ค้นหา','ลองพิมพ์เลขเบิก, Part number, S/N หรือเครื่องให้สั้นลง'):emp('inbox','ไม่มีพัสดุที่รับแล้วรอจ่าย','ต้องรับตามเลขเบิกก่อนจึงจะจ่ายได้'); return; }
     $('i-list').innerHTML = rows.map(function(r){
       return '<div class="pcard'+tyCls(r.type)+'" data-i="'+state.iss.indexOf(r)+'">'+
-        '<div class="t"><span class="doc">'+(BX.on?'<input type="checkbox" class="bt-ck" '+(BX.sel[bxKey(r)]?'checked ':'')+'tabindex="-1"> ':'')+esc(r.docNo)+'</span><span class="chip '+esc(r.urgency)+'">'+esc(urg(r.urgency))+'</span></div>'+
+        '<div class="t"><span class="doc">'+(BX.on?'<span class="bt-ck'+(BX.sel[bxKey(r)]?' on':'')+'"></span>':'')+esc(r.docNo)+'</span><span class="chip '+esc(r.urgency)+'">'+esc(urg(r.urgency))+'</span></div>'+
         '<div class="nm">'+esc(r.name)+'</div>'+
         '<div class="meta">'+esc(r.part)+(r.serial?' · S/N '+esc(r.serial):'')+' · จำนวน '+fmtNum(r.qty)+' '+esc(r.unit)+'</div>'+
         '<div class="meta">'+(r.machine?'เครื่อง '+esc(r.machine):'')+(r.location?' · '+esc(r.location):'')+'</div>'+
@@ -2864,7 +2874,7 @@ function snWatch(id, getSeq){
   }
   function bxBar(){ var c=Object.keys(BX.sel).length; $('bx-go').textContent='จ่ายที่เลือก '+c+' รายการ'; $('bx-bar').classList.toggle('on',BX.on&&c>0); }
   function bxMode(on){
-    BX.on=on; BX.sel={}; $('bx-mode').textContent=on?'ยกเลิกการเลือกหลายรายการ':'จ่ายหลายรายการพร้อมกัน'; $('bx-all').style.display=on?'':'none'; bxBar(); renderIssue();
+    BX.on=on; BX.sel={}; $('bx-mode').textContent=on?'ยกเลิก':'จ่ายหลายรายการพร้อมกัน'; $('bx-mode').classList.toggle('mt-cancel',on); $('bx-all').style.display=on?'':'none'; bxBar(); renderIssue();
   }
   $('bx-mode').addEventListener('click', function(){ bxMode(!BX.on); });
   $('bx-all').addEventListener('click', function(){
@@ -2880,8 +2890,8 @@ function snWatch(id, getSeq){
     $('bx-pay').value=state.today||''; $('bx-tail').value=mk.length===1?mk[0]:''; $('bx-tech').value=''; $('bx-remark').value='';
     $('bx-title').textContent='จ่าย '+rows.length+' รายการ'+(mk.length>1?' · หลายเครื่อง':'');
     $('bx-items').innerHTML=rows.map(function(r){
-      return '<div class="bt-card"><b>'+esc(r.name)+'</b><div class="meta">'+esc(r.docNo)+' · '+esc(r.part)+(r.serial?' · S/N '+esc(r.serial):'')+' · คงเหลือ '+fmtNum(r.qty)+' '+esc(r.unit)+(r.machine?' · เครื่อง '+esc(r.machine):'')+'</div>'+
-        '<div class="row3" style="grid-template-columns:1fr"><div><label>จำนวนที่จ่าย</label><input type="number" inputmode="decimal" min="0" step="any" class="bx-q" value="'+r.qty+'"'+(r.serial?' disabled':'')+'></div></div></div>';
+      return '<div class="bt-card bx-card"><div class="bx-info"><b>'+esc(r.name)+'</b><div class="meta">'+esc(r.docNo)+' · '+esc(r.part)+(r.serial?' · S/N '+esc(r.serial):'')+'<br>คงเหลือ '+fmtNum(r.qty)+' '+esc(r.unit)+(r.machine?' · เครื่อง '+esc(r.machine):'')+'</div></div>'+
+        '<div class="bx-qty"><label>จ่าย</label><input type="number" inputmode="decimal" min="0" step="any" class="bx-q" value="'+r.qty+'"'+(r.serial?' disabled':'')+'></div></div>';
     }).join('');
     BX.rows=rows; $('bx-bg').classList.add('on');
   });
