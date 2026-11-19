@@ -131,6 +131,7 @@ const API_FUNCS_ = {
   submitBorrow: submitBorrow,
   submitCount: submitCount,
   submitIssue: submitIssue,
+  submitIssueBatch: submitIssueBatch,
   submitReceive: submitReceive,
   submitReceiveBatch: submitReceiveBatch,
   submitRequisition: submitRequisition,
@@ -1397,6 +1398,30 @@ function getPendingIssue() {
 
 function submitIssue(p) {
   return withLock_(() => { const res = issueCore_(p); rebuildStock_(); return res; });
+}
+
+/**
+ * จ่ายหลายรายการพร้อมกัน (วันที่จ่าย / TAIL No. / ช่าง / หมายเหตุ ใช้ร่วมกัน ; จำนวนแยกรายการ)
+ * p = { items:[{seq,docNo,qty}], payDate, tail, tech, remark, by } ; รายการที่ผิดพลาดไม่กระทบรายการอื่น
+ */
+function submitIssueBatch(p) {
+  return withLock_(() => {
+    const items = (p.items || []).filter(it => it.qty === undefined || it.qty === '' || num_(it.qty) > 0);
+    if (!items.length) throw new Error('ยังไม่ได้เลือกรายการ');
+    if (items.length > 60) throw new Error('จ่ายครั้งละไม่เกิน 60 รายการ');
+    if (!str_(p.tech)) throw new Error('กรุณากรอกชื่อช่างที่รับพัสดุ');
+    const done = [], failed = [];
+    items.forEach(it => {
+      try {
+        const r = issueCore_({ seq: it.seq, row: it.seq, docNo: str_(it.docNo), qty: it.qty, payDate: p.payDate, tail: p.tail, tech: p.tech, remark: p.remark, by: p.by });
+        done.push({ docNo: it.docNo, seq: it.seq, closed: r.closed, autoReq: !!r.autoReq });
+      } catch (e) {
+        failed.push({ docNo: it.docNo, seq: it.seq, error: String(e && e.message || e) });
+      }
+    });
+    if (done.length) rebuildStock_();
+    return { ok: done.length, failed: failed, autoReq: done.filter(d => d.autoReq).length };
+  });
 }
 
 /** จ่ายล็อตที่รับตามใบเบิก ให้ช่าง (เรียกซ้ำได้ภายใน lock เดียวกัน เช่น รับแล้วจ่ายทันที) */
