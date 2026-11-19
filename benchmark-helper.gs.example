@@ -1,0 +1,12 @@
+/**
+ * Example timing helper. Adapt to the project and avoid logging sensitive data.
+ * Usage: const result = timed_("stockCalculation", () => calculateStock_(testData));
+ */
+function timed_(label, callback) {
+  const started = Date.now();
+  try {
+    return callback();
+  } finally {
+    console.log(`${label}: ${Date.now() - started} ms`);
+  }
+}
