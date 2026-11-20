@@ -499,6 +499,7 @@ main .ty-chem{border-left:5px solid var(--ty-chem)}main .ty-kit{border-left:5px 
   .mt-row{display:flex;gap:8px;margin:2px 0 12px}
   .mt-row .btn{margin:0;width:auto;flex:1 1 0;min-width:0;padding:10px 12px;font-size:14px;line-height:1.3;white-space:nowrap;border-radius:14px}
   .mt-row .btn.mt-cancel{flex:0 0 auto;color:#a3202c}
+  #bt-mode.mt-cancel{flex:1 1 0}
   .bt-card{border:1px solid var(--line,#e6dfce);border-radius:12px;padding:10px;margin-bottom:8px}
   .bt-card .row3{display:grid;grid-template-columns:1fr 1.2fr 1fr;gap:8px;margin-top:6px}
   .bt-card label{font-size:12px;margin:0 0 2px}
@@ -768,9 +769,8 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
   <!-- ===== รับ ===== -->
   <section class="view" id="v-rcv">
     <input class="search" id="c-search" type="search" placeholder="ค้นหา เลขเบิก / Part / ชื่อ / เครื่อง">
-    <div class="mt-row"><button class="btn ghost" id="bt-mode" type="button">รับหลายรายการพร้อมกัน</button></div>
+    <div class="mt-row"><button class="btn ghost" id="bt-mode" type="button">รับหลายรายการพร้อมกัน</button><button class="btn" id="bt-go" type="button" style="display:none">รับที่เลือก 0 รายการ</button></div>
     <div id="c-list"><div class="skl" aria-busy="true" aria-label="กำลังโหลด"><div class="skc"><i class="w1"></i><i class="w2"></i><i class="w3"></i><span><b></b><b></b><b></b></span></div><div class="skc"><i class="w1"></i><i class="w2"></i><i class="w3"></i><span><b></b><b></b><b></b></span></div><div class="skc"><i class="w1"></i><i class="w2"></i><i class="w3"></i><span><b></b><b></b><b></b></span></div></div></div>
-    <div class="dw-bar" id="bt-bar"><button class="btn" id="bt-go">รับที่เลือก 0 รายการ</button></div>
   </section>
 
   <!-- ===== จ่าย ===== -->
@@ -2674,7 +2674,7 @@ function snWatch(id, getSeq){
   var BT={on:false,sel:{}};
   function btKey(r){ return r.row+'|'+r.docNo+'|'+r.part; }
   function btCount(){ return Object.keys(BT.sel).length; }
-  function btBar(){ var c=btCount(); $('bt-go').textContent='รับที่เลือก '+c+' รายการ'; $('bt-bar').classList.toggle('on',BT.on&&c>0); }
+  function btBar(){ var c=btCount(); $('bt-go').textContent='รับที่เลือก '+c+' รายการ'; $('bt-go').style.display=(BT.on&&c>0)?'':'none'; }
   function btMode(on){
     BT.on=on; BT.sel={}; $('bt-mode').textContent=on?'ยกเลิกการเลือก':'รับหลายรายการพร้อมกัน'; $('bt-mode').classList.toggle('mt-cancel',on); btBar(); renderRcv();
   }
