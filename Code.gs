@@ -1332,12 +1332,20 @@ function submitReceiveBatch(p) {
     const items = (p.items || []).filter(it => num_(it.qty) > 0);
     if (!items.length) throw new Error('ยังไม่ได้กรอกจำนวนที่รับ');
     if (items.length > 60) throw new Error('รับครั้งละไม่เกิน 60 รายการ');
-    const done = [], failed = [];
+    const issueNow = p.issueNow === true || p.issueNow === 'true';
+    if (issueNow && !str_(p.tech)) throw new Error('กรุณากรอกชื่อช่างที่รับพัสดุ (จ่ายทันที)');
+    const done = [], failed = [], issueFailed = [];
     items.forEach(it => {
       try {
         const r = submitReceiveCore_({ row: it.row, docNo: str_(it.docNo), part: it.part, qty: it.qty, price: it.price === undefined ? '' : it.price,
           cond: it.cond, group: it.group, serial: '', cardId: p.cardId, receiver: p.receiver, receiveDate: p.receiveDate, by: p.by, _batch: true });
-        done.push({ docNo: it.docNo, part: it.part, remain: r.remain, closed: r.closed });
+        done.push({ docNo: it.docNo, part: it.part, remain: r.remain, closed: r.closed, issued: false });
+        if (issueNow) {   // รับสำเร็จแล้วจึงจ่ายล็อตที่เพิ่งรับ ; จ่ายไม่สำเร็จไม่ทำให้การรับย้อนกลับ
+          try {
+            issueCore_({ seq: r.rcvSeq, docNo: str_(it.docNo), tech: p.tech, tail: p.tail, remark: p.issueRemark, payDate: p.payDate || todayStr_(), by: p.by });
+            done[done.length - 1].issued = true;
+          } catch (e2) { issueFailed.push({ docNo: it.docNo, part: it.part, error: String(e2 && e2.message || e2) }); }
+        }
       } catch (e) {
         failed.push({ docNo: it.docNo, part: it.part, error: String(e && e.message || e) });
       }
@@ -1347,7 +1355,7 @@ function submitReceiveBatch(p) {
       try { if (done.some(d => d.closed)) sweepTai_(); } catch (e) { /* ข้อมูล TAI ไม่ใช่ส่วนสำคัญ */ }
       log_('รับหลายรายการ', '', done.length + ' รายการ' + (str_(p.cardId) ? ' | card ID ' + str_(p.cardId) : ''), p.by);
     }
-    return { ok: done.length, failed: failed };
+    return { ok: done.length, failed: failed, issued: done.filter(d => d.issued).length, issueFailed: issueFailed };
   });
 }
 

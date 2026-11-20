@@ -1328,6 +1328,14 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
       <div><label>card ID</label><input id="bt-card" autocomplete="off"></div>
       <div><label>ผู้รับ</label><input id="bt-recv" list="rcvlist" autocomplete="off" placeholder="เลือกเจ้าหน้าที่"></div>
     </div>
+    <label class="chk" style="display:flex;gap:10px;align-items:center;margin:12px 0 6px;font-weight:700;color:var(--ink)"><input type="checkbox" id="bt-now" style="width:auto;margin:0"> จ่ายให้ช่างทันทีหลังรับ (ทุกรายการ)</label>
+    <div id="bt-now-wrap" style="display:none">
+      <div class="row2">
+        <div><label>วันที่จ่ายให้ช่าง</label><input id="bt-paydate" type="date"></div>
+        <div><label>TAIL No.</label><input id="bt-tail" autocapitalize="characters"></div>
+      </div>
+      <label>จ่ายให้ช่าง</label><input id="bt-tech" list="techlist" autocomplete="off" placeholder="เลือกหรือพิมพ์ ยศ-ชื่อ นามสกุล">
+    </div>
     <div id="bt-items" style="margin-top:10px"></div>
     <button class="btn" id="bt-save">บันทึกการรับ</button>
   </div>
@@ -2697,8 +2705,12 @@ function snWatch(id, getSeq){
         '<div><label>ราคา/หน่วย</label><input type="number" inputmode="decimal" min="0" step="0.01" class="bt-p"></div>'+
         '<div><label>COND</label><select class="bt-c"><option value=""></option><option>NE</option><option>NS</option><option>OH</option><option>SV</option><option>RP</option><option>AR</option><option>US</option></select></div></div></div>';
     }).join('');
+    var ms=rows.map(function(r){ return r.machine||''; }).filter(function(x,i,a){ return x&&a.indexOf(x)===i; });
+    $('bt-now').checked=false; btNow(); $('bt-paydate').value=state.today||''; $('bt-tail').value=ms.length===1?ms[0]:''; $('bt-tech').value='';
     BT.rows=rows; $('bt-bg').classList.add('on');
   });
+  function btNow(){ var on=$('bt-now').checked; $('bt-now-wrap').style.display=on?'block':'none'; $('bt-save').textContent=on?'บันทึกการรับและจ่าย':'บันทึกการรับ'; }
+  $('bt-now').addEventListener('change', btNow);
   $('bt-x').addEventListener('click', function(){ $('bt-bg').classList.remove('on'); });
   $('bt-bg').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('on'); });
   $('bt-save').addEventListener('click', function(){
@@ -2708,12 +2720,15 @@ function snWatch(id, getSeq){
       var r=BT.rows[i];
       items.push({ row:r.row, docNo:r.docNo, part:r.part, qty:el.querySelector('.bt-q').value, price:el.querySelector('.bt-p').value, cond:el.querySelector('.bt-c').value });
     });
+    var now=$('bt-now').checked;
+    if(now&&!$('bt-tech').value.trim()){ toast('กรุณากรอกชื่อช่างที่รับพัสดุ (จ่ายทันที)',true); $('bt-tech').focus(); return; }
     busy(btn,true);
-    run('submitReceiveBatch',[{ items:items, receiveDate:$('bt-date').value, cardId:$('bt-card').value.trim(), receiver:$('bt-recv').value.trim(), by:state.by }]).then(function(res){
+    run('submitReceiveBatch',[{ items:items, issueNow:now, tech:$('bt-tech').value.trim(), tail:$('bt-tail').value.trim(), payDate:$('bt-paydate').value, receiveDate:$('bt-date').value, cardId:$('bt-card').value.trim(), receiver:$('bt-recv').value.trim(), by:state.by }]).then(function(res){
       $('bt-bg').classList.remove('on');
       if(res.failed&&res.failed.length){
         toast('รับแล้ว '+res.ok+' รายการ · ไม่สำเร็จ '+res.failed.length+': '+res.failed.map(function(f){ return f.part+' ('+f.error+')'; }).join(' ; '),true);
-      } else toast('รับแล้ว '+res.ok+' รายการ');
+      } else toast('รับแล้ว '+res.ok+' รายการ'+(now?' · จ่ายแล้ว '+(res.issued||0):''),!!(res.issueFailed&&res.issueFailed.length));
+      if(res.issueFailed&&res.issueFailed.length) toast('รับแล้ว แต่จ่ายไม่สำเร็จ '+res.issueFailed.length+': '+res.issueFailed.map(function(f){ return f.part+' ('+f.error+')'; }).join(' ; '),true);
       btMode(false); loadRcv(); try{ boot(); }catch(e){}
     }).catch(function(e){ toast(e.message,true); }).then(function(){ busy(btn,false); });
   });
