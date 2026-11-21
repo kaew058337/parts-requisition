@@ -290,7 +290,7 @@ begin
                        due_date, received_date, over_days, tail_no, tci, expire_date, location, receiver, note, source, ref_seq)
   values (v_doc, btrim(coalesce(p->>'cardId','')), rq.part_no, rq.name, sn, itype, grp, v_qty, rq.unit, v_price, v_cond, rq.req_date, rq.urgency,
           fn_due(rq.req_date, rq.urgency), rdate, rdate - fn_due(rq.req_date, rq.urgency), rq.machine, btrim(coalesce(p->>'tci','')), v_exp, v_loc,
-          btrim(coalesce(p->>'receiver','')), btrim(coalesce(p->>'remark','')), 'ใบเบิก', case when lot_seq)
+          btrim(coalesce(p->>'receiver','')), btrim(coalesce(p->>'remark','')), 'ใบเบิก', lot_seq)
   returning seq into new_seq;
   if remain <= 0 then update requisitions set pay_date = rdate where seq = rq.seq; end if;
   if lot_seq is not null and lot_seq <> 0 then   -- โอนจากล็อตอิสระเข้าใบเบิก : บันทึกการออกจากล็อตเดิม
