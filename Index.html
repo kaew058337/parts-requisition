@@ -1574,6 +1574,10 @@ function snWatch(id, getSeq){
   function diagnose(){
     var out=['อินเทอร์เน็ตของเครื่อง: '+(navigator.onLine?'ปกติ':'ไม่มีสัญญาณ')];
     if(inGas()){ alert(out.join('\n')+'\nเปิดผ่าน Apps Script โดยตรง'); return; }
+    if(useSupa()){ out.push('ฐานข้อมูล: Supabase');
+      supaTransport('getBootstrap',[]).then(function(){ out.push('✅ เชื่อมต่อได้ปกติ'); cacheShown=null; offbarUpdate(); setTimeout(function(){ boot(); },50); alert(out.join('\n')); },
+        function(e){ out.push('❌ '+e.message); alert(out.join('\n')); });
+      return; }
     out.push('ปลายทาง: '+(API_URL?API_URL.replace(/^(https:\/\/[^/]+\/macros\/s\/).{6}.*(\/[^/]+)$/,'$1…$2'):'(ไม่ได้ตั้งค่า)'));
     var k=''; try{ k=localStorage.getItem('api-key')||''; }catch(e){}
     fetch(API_URL,{method:'POST',redirect:'follow',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn:'getBootstrap',args:[],key:k})})
@@ -1586,7 +1590,40 @@ function snWatch(id, getSeq){
   }
   document.getElementById('offbar').addEventListener('click', function(){ if(cacheShown && navigator.onLine) diagnose(); else flushOutbox(); });
 
+  /* ---------- Supabase (ฐานข้อมูลใหม่): เรียก rpc_* ผ่าน PostgREST ---------- */
+  var CFG = window.APP_CFG || {};
+  function useSupa(){
+    if(!(CFG.SUPA_URL && CFG.SUPA_KEY)) return false;
+    var q = /[?&]backend=(supa|gas)\b/.exec(location.search); if(q) return q[1] === 'supa';   /* ทดสอบ: เติม ?backend=supa ต่อท้ายลิงก์ */
+    return CFG.BACKEND === 'supabase';
+  }
+  /* ชื่อพารามิเตอร์ของฟังก์ชันที่ไม่ได้รับ jsonb ก้อนเดียว (ตามลำดับอาร์กิวเมนต์เดิม) */
+  var SUPA_ARGS = {
+    checkSerial:['sn','except_seq'], checkSerialAlert:['p_serial','p_part'], checkSerialAlerts:['p_serials','p_part'],
+    getCountHistory:['p_limit'], getCountList:['p_loc','p_grp'], getCountLocations:['p_grp'], getDashboard:['p_month'],
+    getDocInfo:['p_seq'], getHistory:['p_kind','p_limit'], getIssuedSerials:['p_part'], getLoansForPart:['p_part','p_name'],
+    getNextReturnNo:['date_iso'], getOpeningLots:['p_part','p_name'], getSerialHistory:['p_serial'], getWarrantyList:['days']
+  };
+  var SUPA_NOARG = { getAwaitingDoc:1, getAwaitingReq:1, getBootstrap:1, getClaims:1, getLoans:1, getPendingIssue:1, getPendingReceive:1,
+    getReconcile:1, getReturnable:1, getShelfMap:1, getStock:1, getSystemHealth:1, scanDuplicateSerials:1 };
+  function supaName(fn){ return 'rpc_' + fn.replace(/[A-Z]/g, function(c){ return '_' + c.toLowerCase(); }); }
+  function supaTransport(fn, args){
+    args = args || [];
+    var body = {};
+    if(SUPA_ARGS[fn]){ SUPA_ARGS[fn].forEach(function(k, i){ if(args[i] !== undefined && args[i] !== null) body[k] = args[i]; }); }
+    else if(!SUPA_NOARG[fn]){ body = { p: (args[0] === undefined || args[0] === null) ? {} : args[0] }; }
+    return fetch(CFG.SUPA_URL + '/rest/v1/rpc/' + supaName(fn), { method:'POST',
+      headers:{ 'Content-Type':'application/json', apikey:CFG.SUPA_KEY, Authorization:'Bearer ' + CFG.SUPA_KEY }, body: JSON.stringify(body) })
+    .then(function(r){ return r.text().then(function(t){ return { ok:r.ok, status:r.status, t:t }; }); },
+          function(){ throw new Error('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบอินเทอร์เน็ต'); })
+    .then(function(o){
+      var j = null; try{ j = o.t ? JSON.parse(o.t) : null; }catch(e){}
+      if(!o.ok) throw new Error((j && j.message) || ('เซิร์ฟเวอร์ตอบ HTTP ' + o.status));
+      return j;
+    });
+  }
   function transport(fn, args, retried){
+    if(useSupa()) return supaTransport(fn, args);
     if(inGas()){
       return new Promise(function(res, rej){
         var r = google.script.run.withSuccessHandler(res).withFailureHandler(function(e){
