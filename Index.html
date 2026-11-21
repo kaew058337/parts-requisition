@@ -4238,8 +4238,11 @@ function snWatch(id, getSeq){
     var from=exIso($('ex-from').value), to=exIso($('ex-to').value);
     if(from && to && from>to) return Promise.reject(new Error('ช่วงวันที่ไม่ถูกต้อง'));
     return run('getHistory',[k,5000]).then(function(d){
-      var di=-1; d.headers.forEach(function(h,i){ if(di<0 && h.indexOf('วันที่')>=0) di=i; });
-      var rows=d.rows.filter(function(r){ if(di<0) return true; var v=exKey(r[di]); if(!v) return true; return (!from||v>=from) && (!to||v<=to); });
+      /* คอลัมน์วันที่ที่ใช้กรอง: ระบุตามประเภทรายงาน (เดิมใช้คอลัมน์แรกที่มีคำว่า "วันที่" ซึ่งใน ประวัติรับพัสดุ คือ "วันที่แจ้ง" ที่มักว่าง ทำให้กรองไม่ได้) */
+      var dcol = { rcv:'วันที่รับ', rcv2:'วันที่รับ', iss:'วันที่จ่าย', req:'วันที่เบิก' }[k] || '';
+      var di = dcol ? d.headers.indexOf(dcol) : -1;
+      if(di<0) d.headers.forEach(function(h,i){ if(di<0 && h.indexOf('วันที่')>=0) di=i; });
+      var rows=d.rows.filter(function(r){ if(di<0) return true; var v=exKey(r[di]); if(!v) return !(from||to) ; return (!from||v>=from) && (!to||v<=to); });
       return { title:title, sub:'ช่วงวันที่ '+exThai($('ex-from').value)+' - '+exThai($('ex-to').value)+' · '+rows.length+' รายการ',
         headers:d.headers, rows:rows, numCols:[] };
     });
