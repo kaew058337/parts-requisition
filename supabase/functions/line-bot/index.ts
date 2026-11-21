@@ -4,7 +4,7 @@
 //  - ?job=test   (x-cron-key): ส่งสรุปเต็มเข้ากลุ่มทันที (ทดสอบ)   ?job=status : ดูสถานะการตั้งค่า
 // Secrets: LINE_CHANNEL_SECRET, LINE_CHANNEL_TOKEN ; รหัสเรียกงานตั้งเวลาอยู่ในตาราง app_settings (cron_key)  (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY มีให้อัตโนมัติ)
 const URL_ = Deno.env.get("SUPABASE_URL")!, KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const SECRET = Deno.env.get("LINE_CHANNEL_SECRET") ?? "", TOKEN = Deno.env.get("LINE_CHANNEL_TOKEN") ?? "";
+const SECRET = (Deno.env.get("LINE_CHANNEL_SECRET") ?? "").trim(), TOKEN = (Deno.env.get("LINE_CHANNEL_TOKEN") ?? "").trim();
 const H = { "Content-Type": "application/json", apikey: KEY, Authorization: "Bearer " + KEY };
 
 async function rpc(fn: string, args: Record<string, unknown> = {}) {
@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
       const CRON = await getSet("cron_key");
       if (!CRON || req.headers.get("x-cron-key") !== CRON) return new Response("forbidden", { status: 403 });
       if (job === "status") {
-        return Response.json({ secret: !!SECRET, token: !!TOKEN, target: !!(await getSet("line_target")), lastGroup: await getSet("line_last_group"),
+        return Response.json({ secret: !!SECRET, secretLen: SECRET.length, token: !!TOKEN, tokenLen: TOKEN.length, target: !!(await getSet("line_target")), lastGroup: await getSet("line_last_group"),
           users: (await getSet("line_search_users")).split(",").filter(Boolean).length });
       }
       const to = await getSet("line_target");
