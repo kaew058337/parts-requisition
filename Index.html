@@ -692,6 +692,50 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
 #offbar.q{background:#e8f1fc;color:#17458f;border-color:#bcd3f2}
 </style>
 <style id="pg">@page{size:A5 landscape;margin:6mm}</style>
+<style id="rail">
+/* ===== แถบเมนูซ้ายแบบ Icon rail ===== */
+:root{--rail:68px;--rail-open:232px}
+body{padding-left:var(--rail)}
+nav{left:0;right:auto;top:0;bottom:0;width:var(--rail);max-width:none;margin:0;z-index:40;display:flex;flex-direction:column;gap:6px;
+  padding:calc(12px + env(safe-area-inset-top)) 8px calc(12px + env(safe-area-inset-bottom));box-sizing:border-box;overflow:hidden;
+  background:linear-gradient(185deg,#071B35 0%,#0A2342 58%,#123B65 130%);border:0;border-right:1px solid rgba(212,179,106,.35);border-radius:0 26px 26px 0;
+  box-shadow:10px 0 34px rgba(0,0,0,.28);transition:width .5s cubic-bezier(.34,1.25,.5,1),box-shadow .4s}
+nav.open{width:var(--rail-open);box-shadow:16px 0 50px rgba(0,0,0,.45)}
+nav .rl-ind{position:absolute;left:8px;right:8px;top:0;height:58px;border-radius:17px;pointer-events:none;opacity:0;
+  background:linear-gradient(90deg,rgba(212,179,106,.26),rgba(212,179,106,.08));box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 8px 22px rgba(0,0,0,.25);
+  transition:transform .55s cubic-bezier(.34,1.35,.5,1),opacity .3s}
+nav .rl-ind::before{content:'';position:absolute;left:-8px;top:15px;bottom:15px;width:4px;border-radius:0 4px 4px 0;background:var(--gold,#A9D5FF);box-shadow:0 0 14px 1px rgba(212,179,106,.8)}
+nav .rl-tg{flex:none;height:46px;margin:0 0 10px;border:0;border-radius:15px;background:rgba(255,255,255,.08);color:#fff;display:flex;flex-direction:row;align-items:center;justify-content:center;gap:12px;padding:0;font:inherit;cursor:pointer;
+  border:1px solid rgba(255,255,255,.16);transition:background .25s}
+nav .rl-tg:hover{background:rgba(255,255,255,.16)}
+nav .rl-tg svg{width:22px;height:22px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:transform .5s cubic-bezier(.34,1.4,.5,1)}
+nav.open .rl-tg svg{transform:rotate(180deg)}
+nav.open .rl-tg{justify-content:flex-start;padding:0 14px}
+nav .rl-tg b{font-size:15px;font-weight:700;white-space:nowrap;display:none;opacity:0;transform:translateX(-8px);transition:opacity .25s,transform .35s}
+nav.open .rl-tg b{display:inline}
+nav.open .rl-tg b{opacity:1;transform:none;transition-delay:.12s}
+nav button:not(.rl-tg){position:relative;z-index:1;flex:none;height:58px;padding:0;box-sizing:border-box;border-radius:17px;color:#d3e4f7;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:10.5px;font-weight:500;white-space:nowrap}
+nav button:not(.rl-tg) svg{width:23px;height:23px;flex:none}
+nav button:not(.rl-tg):hover{color:#fff;background:rgba(255,255,255,.07)}
+nav button.on{color:var(--gold,#A9D5FF);font-weight:700}
+nav button.on::before{display:none}
+nav button.on svg{transform:none;animation:rlPop .55s cubic-bezier(.34,1.6,.5,1)}
+@keyframes rlPop{0%{transform:scale(.7)}100%{transform:scale(1)}}
+nav button .dot{top:7px;left:calc(50% + 7px)}
+nav.open button:not(.rl-tg){flex-direction:row;justify-content:flex-start;gap:16px;padding:0 18px;font-size:16.5px}
+nav.open button:not(.rl-tg) svg{width:24px;height:24px}
+nav.open button:not(.rl-tg){animation:rlIn .4s cubic-bezier(.22,1,.36,1) both;animation-delay:calc(var(--k,0) * 40ms)}
+nav.open button .dot{left:auto;right:16px;top:50%;margin-top:-8px}
+@keyframes rlIn{from{opacity:.2;transform:translateX(-14px)}to{opacity:1;transform:none}}
+.rl-scrim{position:fixed;inset:0;z-index:39;background:rgba(7,27,53,.5);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);opacity:0;visibility:hidden;transition:opacity .35s,visibility .35s}
+.rl-scrim.on{opacity:1;visibility:visible}
+main{padding-bottom:calc(28px + env(safe-area-inset-bottom))}
+.tgbar{left:calc(var(--rail) + 12px);bottom:calc(16px + env(safe-area-inset-bottom))}
+#toast{left:calc(50% + var(--rail) / 2);bottom:calc(28px + env(safe-area-inset-bottom))}
+@media (min-width:900px){:root{--rail:76px}}
+@media (prefers-reduced-motion:reduce){nav,nav .rl-ind,nav button{transition:none!important;animation:none!important}}
+</style>
 </head>
 <body>
 <div id="ptr" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></svg></div>
@@ -4647,5 +4691,32 @@ function snWatch(id, getSeq){
 })();
 </script>
 
+<script>
+/* Icon rail: ตัวชี้เมนูที่เลื่อนได้ + ขยาย/ย่อแถบ */
+(function(){
+  var nav=document.querySelector('nav'); if(!nav) return;
+  var btns=Array.prototype.slice.call(nav.querySelectorAll('button[data-v]'));
+  var ind=document.createElement('span'); ind.className='rl-ind'; ind.setAttribute('aria-hidden','true'); nav.insertBefore(ind,nav.firstChild);
+  var tg=document.createElement('button'); tg.type='button'; tg.className='rl-tg'; tg.setAttribute('aria-label','ขยาย/ย่อเมนู'); tg.setAttribute('aria-expanded','false');
+  tg.innerHTML='<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg><b>เมนู</b>'; nav.insertBefore(tg,btns[0]);
+  var sc=document.createElement('div'); sc.className='rl-scrim'; document.body.appendChild(sc);
+  btns.forEach(function(b,i){ b.style.setProperty('--k',i); });
+  function place(){
+    var on=nav.querySelector('button.on[data-v]'); if(!on){ ind.style.opacity=0; return; }
+    ind.style.opacity=1; ind.style.transform='translateY('+on.offsetTop+'px)';
+  }
+  function setOpen(o){ nav.classList.toggle('open',o); sc.classList.toggle('on',o && window.innerWidth<900); tg.setAttribute('aria-expanded',o?'true':'false'); }
+  tg.addEventListener('click',function(){ setOpen(!nav.classList.contains('open')); });
+  sc.addEventListener('click',function(){ setOpen(false); });
+  btns.forEach(function(b){ b.addEventListener('click',function(){ if(window.innerWidth<900) setOpen(false); }); });
+  var fine=window.matchMedia&&matchMedia('(hover:hover) and (min-width:900px)');
+  nav.addEventListener('mouseenter',function(){ if(fine&&fine.matches) setOpen(true); });
+  nav.addEventListener('mouseleave',function(){ if(fine&&fine.matches) setOpen(false); });
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape') setOpen(false); });
+  new MutationObserver(place).observe(nav,{subtree:true,attributes:true,attributeFilter:['class']});
+  window.addEventListener('resize',place);
+  place(); setTimeout(place,300);
+})();
+</script>
 </body>
 </html>
