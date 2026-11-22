@@ -691,6 +691,20 @@ main .btn.bt-i{border-bottom-color:#dc2626}main .btn.bt-i svg{color:#dc2626}
 main .btn.bt-l{border-bottom-color:#e08a00}main .btn.bt-l svg{color:#e08a00}
 main .btn.bt-e{border-bottom-color:#2f6fb5}main .btn.bt-e svg{color:#2f6fb5}
 html[data-theme=dark] main .btn.bt{background:#14304f;color:#e8f1fb;border-color:rgba(255,255,255,.18)}
+#k-list .lot{position:relative;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .2s}
+#k-list .lot:active{background:rgba(47,111,181,.1)}
+#k-list .lot-sel{position:absolute;right:0;top:6px;margin:0 !important;padding:0 !important;display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer}
+#k-list .lot-ch{position:absolute;right:2px;bottom:9px;width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;opacity:.4}
+#la-bg{z-index:60}
+#la-bg .sheet{padding-bottom:calc(22px + env(safe-area-inset-bottom))}
+#la-bg .la-t{font-weight:700;font-size:17px;color:var(--navy-royal)}
+#la-bg .la-s{font-size:13px;opacity:.75;margin:2px 0 14px;line-height:1.5}
+#la-bg .la-b{display:flex;align-items:center;gap:14px;width:100%;margin:0 0 10px;padding:15px 18px;box-sizing:border-box;font:inherit;font-size:17px;font-weight:700;background:#fff;color:#0b2a55;border:1px solid #d9e1ee;border-bottom-width:5px;border-radius:16px;box-shadow:0 2px 6px rgba(7,27,53,.08);cursor:pointer;text-align:left}
+#la-bg .la-b svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+#la-bg .la-b.i{border-bottom-color:#dc2626}#la-bg .la-b.i svg{color:#dc2626}
+#la-bg .la-b.l{border-bottom-color:#e08a00}#la-bg .la-b.l svg{color:#e08a00}
+#la-bg .la-b.e{border-bottom-color:#2f6fb5}#la-bg .la-b.e svg{color:#2f6fb5}
+html[data-theme=dark] #la-bg .la-b{background:#14304f;color:#e8f1fb;border-color:rgba(255,255,255,.18)}
 .tj-sum{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:4px 0 12px}
 .tj-s{border-radius:14px;padding:10px 6px;text-align:center;color:#fff}
 .tj-s b{display:block;font-size:24px;line-height:1.1}.tj-s span{font-size:12px}
@@ -3249,13 +3263,37 @@ function snWatch(id, getSeq){
         if(l.location) bits.push(esc(l.location));
         if(l.kit) bits.push('<b>'+esc(l.kit)+'</b>');
         if(l.expire) bits.push('หมดอายุ '+esc(l.expire));
-        return '<div class="meta" style="padding:5px 0;border-top:1px solid var(--line)">'+bits.join(' · ')+'<br>'+(l.docNo==='ยอดยกมา'||l.docNo==='คืนเข้าคลัง'||l.docNo==='รับก่อนเบิก'||l.docNo==='ย้ายจากชุด'?esc(l.docNo)+(l.note?' ('+esc(l.note)+')':''):'เลขเบิก '+esc(l.docNo))+' · รับ '+esc(l.received)+'<div style="display:flex;gap:8px;margin-top:6px">'+(l.free?'<button class="btn sm bt bt-i" data-is="'+l.seq+'"><svg viewBox="0 0 24 24"><path d="M12 15V3"/><path d="M7 7l5-5 5 5"/><path d="M4 20h16"/></svg>จ่าย</button>':(l.issRow?'<button class="btn sm bt bt-i" data-ix="'+l.seq+'"><svg viewBox="0 0 24 24"><path d="M12 15V3"/><path d="M7 7l5-5 5 5"/><path d="M4 20h16"/></svg>จ่าย</button>':''))+'<button class="btn sm bt bt-l" data-bl="'+l.seq+'"><svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>ยืม</button><button class="btn sm bt bt-e" data-ed="'+l.seq+'"><svg viewBox="0 0 24 24"><path d="M4 20h4l11-11-4-4L4 16z"/></svg>แก้ไข</button><label style="display:flex;align-items:center;gap:5px;font-size:13px;margin-left:auto"><input type="checkbox" data-tgc="'+l.seq+'"'+(TG.sel[l.seq]?' checked':'')+'>เลือก</label></div>'+(l.linkNote?'<div style="color:var(--bad);margin-top:4px">⚠ '+esc(l.linkNote)+'</div>':'')+'</div>';
+        return '<div class="meta lot" style="padding:7px 64px 7px 0;border-top:1px solid var(--line)">'+bits.join(' · ')+'<br>'+(l.docNo==='ยอดยกมา'||l.docNo==='คืนเข้าคลัง'||l.docNo==='รับก่อนเบิก'||l.docNo==='ย้ายจากชุด'?esc(l.docNo)+(l.note?' ('+esc(l.note)+')':''):'เลขเบิก '+esc(l.docNo))+' · รับ '+esc(l.received)+'<div class="lot-acts" hidden>'+(l.free?'<button class="btn sm bt bt-i" data-is="'+l.seq+'"><svg viewBox="0 0 24 24"><path d="M12 15V3"/><path d="M7 7l5-5 5 5"/><path d="M4 20h16"/></svg>จ่าย</button>':(l.issRow?'<button class="btn sm bt bt-i" data-ix="'+l.seq+'"><svg viewBox="0 0 24 24"><path d="M12 15V3"/><path d="M7 7l5-5 5 5"/><path d="M4 20h16"/></svg>จ่าย</button>':''))+'<button class="btn sm bt bt-l" data-bl="'+l.seq+'"><svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>ยืม</button><button class="btn sm bt bt-e" data-ed="'+l.seq+'"><svg viewBox="0 0 24 24"><path d="M4 20h4l11-11-4-4L4 16z"/></svg>แก้ไข</button></div><label class="lot-sel"><input type="checkbox" data-tgc="'+l.seq+'"'+(TG.sel[l.seq]?' checked':'')+'>เลือก</label><svg class="lot-ch" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>'+(l.linkNote?'<div style="color:var(--bad);margin-top:4px">⚠ '+esc(l.linkNote)+'</div>':'')+'</div>';
       }).join('');
       return '<div class="card lift'+tyCls(g.lots[0]&&g.lots[0].type, g.lots.some(function(l){return l.kit;}))+'" style="padding:14px 16px">'+
         '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><b>'+esc(g.part||'-')+'</b><span class="chip ok">'+fmtNum(g.qty)+' '+esc(g.unit)+'</span></div>'+
         '<div style="margin:4px 0 6px">'+esc(g.name)+'</div>'+lots+'</div>';
     }).join('');
   }
+
+  /* ---------- แตะการ์ดล็อตในคลัง -> เลือก จ่าย / ยืม / แก้ไข ---------- */
+  (function(){
+    var bg=document.createElement('div'); bg.className='sheet-bg'; bg.id='la-bg';
+    bg.innerHTML='<div class="sheet"><div class="hd"><b class="la-t" id="la-t"></b><button class="x" id="la-x" aria-label="ปิด">×</button></div><div class="la-s" id="la-s"></div><div id="la-btns"></div></div>';
+    document.body.appendChild(bg);
+    var IC={i:'<svg viewBox="0 0 24 24"><path d="M12 15V3"/><path d="M7 7l5-5 5 5"/><path d="M4 20h16"/></svg>',l:'<svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>',e:'<svg viewBox="0 0 24 24"><path d="M4 20h4l11-11-4-4L4 16z"/></svg>'};
+    function close(){ bg.classList.remove('on'); }
+    $('la-x').addEventListener('click',close); bg.addEventListener('click',function(e){ if(e.target===bg) close(); });
+    $('k-list').addEventListener('click',function(e){
+      if(e.target.closest('a,button,label,input')) return;
+      var row=e.target.closest('.lot'); if(!row) return;
+      var acts=[['i','จ่าย','button[data-is],button[data-ix]'],['l','ยืม','button[data-bl]'],['e','แก้ไข','button[data-ed]']].filter(function(a){ return row.querySelector(a[2]); });
+      if(!acts.length) return;
+      var card=row.closest('.card'), pb=card&&card.querySelector('b');
+      var c=row.cloneNode(true); Array.prototype.forEach.call(c.querySelectorAll('br'),function(n){ n.replaceWith(' · '); }); Array.prototype.forEach.call(c.querySelectorAll('.lot-acts,.lot-sel,.lot-ch,.pbtn'),function(n){ n.remove(); });
+      $('la-t').textContent=(pb?pb.textContent:'')+(card&&card.children[1]?' · '+card.children[1].textContent:'');
+      $('la-s').textContent=c.textContent.replace(/\s+/g,' ').trim();
+      $('la-btns').innerHTML=acts.map(function(a,n){ return '<button type="button" class="la-b '+a[0]+'" data-n="'+n+'">'+IC[a[0]]+a[1]+'</button>'; }).join('');
+      Array.prototype.forEach.call($('la-btns').querySelectorAll('.la-b'),function(b){ b.addEventListener('click',function(){
+        var t=row.querySelector(acts[Number(b.dataset.n)][2]); close(); setTimeout(function(){ if(t&&document.body.contains(t)) t.click(); },140); }); });
+      bg.classList.add('on');
+    });
+  })();
 
   /* ---------- ป้ายกำกับพัสดุดี (แบบ ทอ.๑๔๑ ก.) 15 x 8.5 ซม. : A4 แนวตั้ง 3 ใบ/แผ่น ---------- */
   function tgDate(){ var d=new Date(); return d.getDate()+' '+TH_MON[d.getMonth()]+' '+(d.getFullYear()+543); }
