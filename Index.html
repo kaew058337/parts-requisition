@@ -742,7 +742,7 @@ nav.open button[data-v]{animation:rlIn .45s cubic-bezier(.22,1,.36,1) both;anima
 @keyframes rlIn{from{opacity:.1;transform:translateX(-16px)}to{opacity:1;transform:none}}
 .rl-scrim{position:fixed;inset:0;z-index:89;background:rgba(7,27,53,.55);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);opacity:0;visibility:hidden;transition:opacity .35s,visibility .35s}
 .rl-scrim.on{opacity:1;visibility:visible}
-header{transition:transform .38s cubic-bezier(.22,1,.36,1)}
+header{transition:transform .6s cubic-bezier(.45,.05,.25,1)}
 header.hd-hide{transform:translate3d(0,-110%,0)}
 @media (prefers-reduced-motion:reduce){header{transition:none}}
 #rl-tab{position:fixed;left:0;top:calc(50% - 38px);z-index:38;width:24px;height:76px;padding:0;border:0;border-radius:0 18px 18px 0;cursor:pointer;
@@ -4780,14 +4780,15 @@ function snWatch(id, getSeq){
 /* หัวหน้าจอ: เลื่อนเนื้อหาขึ้น = ซ่อน, เลื่อนลง = กลับมา */
 (function(){
   var h=document.querySelector('header'); if(!h) return;
-  var last=window.pageYOffset||0, tick=false;
+  var last=window.pageYOffset||0, tick=false, acc=0;
   function upd(){
     tick=false;
-    var y=Math.max(0,window.pageYOffset||0), d=y-last;
-    if(y<70 || document.body.classList.contains('rl-on')) h.classList.remove('hd-hide');
-    else if(d>8) h.classList.add('hd-hide');
-    else if(d<-8) h.classList.remove('hd-hide');
-    if(Math.abs(d)>8 || y<70) last=y;
+    var y=Math.max(0,window.pageYOffset||0), d=y-last; last=y;
+    if(y<70 || document.body.classList.contains('rl-on')){ h.classList.remove('hd-hide'); acc=0; return; }
+    if((d>0)!==(acc>0)) acc=0;          /* เปลี่ยนทิศ = เริ่มนับใหม่ */
+    acc+=d;
+    if(acc>90) h.classList.add('hd-hide');       /* เลื่อนลงต่อเนื่อง ~90px จึงซ่อน */
+    else if(acc<-45) h.classList.remove('hd-hide'); /* เลื่อนกลับ ~45px จึงโผล่ */
   }
   window.addEventListener('scroll',function(){ if(!tick){ tick=true; requestAnimationFrame(upd); } },{passive:true});
   document.addEventListener('click',function(e){ if(e.target.closest&&e.target.closest('nav button[data-v]')){ h.classList.remove('hd-hide'); last=0; } });
