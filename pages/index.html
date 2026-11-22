@@ -685,6 +685,11 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
 #tj-bg .sheet{top:0;height:100%;max-height:none;max-width:none;border-radius:0;border-top:0;box-shadow:none;padding:calc(14px + env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom))}
 #tj-bg .sheet .hd{position:sticky;top:calc(-14px - env(safe-area-inset-top));z-index:2;background:var(--bg);margin:-4px -4px 8px;padding:8px 4px}
 @media(min-width:900px){#tj-bg .sheet{padding-left:max(16px,calc(50% - 560px));padding-right:max(16px,calc(50% - 560px))}}
+main .btn.bt{display:inline-flex;align-items:center;gap:6px;color:#fff;border:1px solid rgba(255,255,255,.6);text-shadow:0 1px 0 rgba(0,0,0,.25);box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 3px 8px rgba(7,27,53,.25)}
+main .btn.bt svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+main .btn.bt-i{background:linear-gradient(180deg,#ef5a5a,#c21f1f)}
+main .btn.bt-l{background:linear-gradient(180deg,#f2c35a,#c98a12)}
+main .btn.bt-e{background:linear-gradient(180deg,#5b9be0,#2a5fa8)}
 .tj-sum{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:4px 0 12px}
 .tj-s{border-radius:14px;padding:10px 6px;text-align:center;color:#fff}
 .tj-s b{display:block;font-size:24px;line-height:1.1}.tj-s span{font-size:12px}
@@ -3243,7 +3248,7 @@ function snWatch(id, getSeq){
         if(l.location) bits.push(esc(l.location));
         if(l.kit) bits.push('<b>'+esc(l.kit)+'</b>');
         if(l.expire) bits.push('หมดอายุ '+esc(l.expire));
-        return '<div class="meta" style="padding:5px 0;border-top:1px solid var(--line)">'+bits.join(' · ')+'<br>'+(l.docNo==='ยอดยกมา'||l.docNo==='คืนเข้าคลัง'||l.docNo==='รับก่อนเบิก'||l.docNo==='ย้ายจากชุด'?esc(l.docNo)+(l.note?' ('+esc(l.note)+')':''):'เลขเบิก '+esc(l.docNo))+' · รับ '+esc(l.received)+'<div style="display:flex;gap:8px;margin-top:6px">'+(l.free?'<button class="btn sm" data-is="'+l.seq+'">จ่าย</button>':(l.issRow?'<button class="btn sm" data-ix="'+l.seq+'">จ่าย</button>':''))+'<button class="btn ghost sm" data-bl="'+l.seq+'">ยืมออก</button><button class="btn ghost sm" data-ed="'+l.seq+'">แก้ไข</button><label style="display:flex;align-items:center;gap:5px;font-size:13px;margin-left:auto"><input type="checkbox" data-tgc="'+l.seq+'"'+(TG.sel[l.seq]?' checked':'')+'>เลือก</label></div>'+(l.linkNote?'<div style="color:var(--bad);margin-top:4px">⚠ '+esc(l.linkNote)+'</div>':'')+'</div>';
+        return '<div class="meta" style="padding:5px 0;border-top:1px solid var(--line)">'+bits.join(' · ')+'<br>'+(l.docNo==='ยอดยกมา'||l.docNo==='คืนเข้าคลัง'||l.docNo==='รับก่อนเบิก'||l.docNo==='ย้ายจากชุด'?esc(l.docNo)+(l.note?' ('+esc(l.note)+')':''):'เลขเบิก '+esc(l.docNo))+' · รับ '+esc(l.received)+'<div style="display:flex;gap:8px;margin-top:6px">'+(l.free?'<button class="btn sm bt bt-i" data-is="'+l.seq+'"><svg viewBox="0 0 24 24"><path d="M12 15V3"/><path d="M7 7l5-5 5 5"/><path d="M4 20h16"/></svg>จ่าย</button>':(l.issRow?'<button class="btn sm bt bt-i" data-ix="'+l.seq+'"><svg viewBox="0 0 24 24"><path d="M12 15V3"/><path d="M7 7l5-5 5 5"/><path d="M4 20h16"/></svg>จ่าย</button>':''))+'<button class="btn sm bt bt-l" data-bl="'+l.seq+'"><svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>ยืม</button><button class="btn sm bt bt-e" data-ed="'+l.seq+'"><svg viewBox="0 0 24 24"><path d="M4 20h4l11-11-4-4L4 16z"/></svg>แก้ไข</button><label style="display:flex;align-items:center;gap:5px;font-size:13px;margin-left:auto"><input type="checkbox" data-tgc="'+l.seq+'"'+(TG.sel[l.seq]?' checked':'')+'>เลือก</label></div>'+(l.linkNote?'<div style="color:var(--bad);margin-top:4px">⚠ '+esc(l.linkNote)+'</div>':'')+'</div>';
       }).join('');
       return '<div class="card lift'+tyCls(g.lots[0]&&g.lots[0].type, g.lots.some(function(l){return l.kit;}))+'" style="padding:14px 16px">'+
         '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><b>'+esc(g.part||'-')+'</b><span class="chip ok">'+fmtNum(g.qty)+' '+esc(g.unit)+'</span></div>'+
