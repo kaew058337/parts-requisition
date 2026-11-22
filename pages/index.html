@@ -695,16 +695,16 @@ html[data-theme=dark] main .btn.bt{background:#14304f;color:#e8f1fb;border-color
 #k-list .lot:active{background:rgba(47,111,181,.1)}
 #k-list .lot-sel{position:absolute;right:0;top:6px;margin:0 !important;padding:0 !important;display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer}
 #k-list .lot-ch{position:absolute;right:2px;bottom:9px;width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;opacity:.4}
-#la-bg{z-index:60}
-#la-bg .sheet{padding-bottom:calc(22px + env(safe-area-inset-bottom))}
-#la-bg .la-t{font-weight:700;font-size:17px;color:var(--navy-royal)}
-#la-bg .la-s{font-size:13px;opacity:.75;margin:2px 0 14px;line-height:1.5}
-#la-bg .la-b{display:flex;align-items:center;gap:14px;width:100%;margin:0 0 10px;padding:15px 18px;box-sizing:border-box;font:inherit;font-size:17px;font-weight:700;background:#fff;color:#0b2a55;border:1px solid #d9e1ee;border-bottom-width:5px;border-radius:16px;box-shadow:0 2px 6px rgba(7,27,53,.08);cursor:pointer;text-align:left}
-#la-bg .la-b svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;flex:none}
-#la-bg .la-b.i{border-bottom-color:#dc2626}#la-bg .la-b.i svg{color:#dc2626}
-#la-bg .la-b.l{border-bottom-color:#e08a00}#la-bg .la-b.l svg{color:#e08a00}
-#la-bg .la-b.e{border-bottom-color:#2f6fb5}#la-bg .la-b.e svg{color:#2f6fb5}
-html[data-theme=dark] #la-bg .la-b{background:#14304f;color:#e8f1fb;border-color:rgba(255,255,255,.18)}
+#lot-bg{z-index:60}
+#lot-bg .sheet{padding-bottom:calc(22px + env(safe-area-inset-bottom))}
+#lot-bg .lot-t{font-weight:700;font-size:17px;color:var(--navy-royal)}
+#lot-bg .lot-s{font-size:13px;opacity:.75;margin:2px 0 14px;line-height:1.5}
+#lot-bg .lot-b{display:flex;align-items:center;gap:14px;width:100%;margin:0 0 10px;padding:15px 18px;box-sizing:border-box;font:inherit;font-size:17px;font-weight:700;background:#fff;color:#0b2a55;border:1px solid #d9e1ee;border-bottom-width:5px;border-radius:16px;box-shadow:0 2px 6px rgba(7,27,53,.08);cursor:pointer;text-align:left}
+#lot-bg .lot-b svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+#lot-bg .lot-b.i{border-bottom-color:#dc2626}#lot-bg .lot-b.i svg{color:#dc2626}
+#lot-bg .lot-b.l{border-bottom-color:#e08a00}#lot-bg .lot-b.l svg{color:#e08a00}
+#lot-bg .lot-b.e{border-bottom-color:#2f6fb5}#lot-bg .lot-b.e svg{color:#2f6fb5}
+html[data-theme=dark] #lot-bg .lot-b{background:#14304f;color:#e8f1fb;border-color:rgba(255,255,255,.18)}
 .tj-sum{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:4px 0 12px}
 .tj-s{border-radius:14px;padding:10px 6px;text-align:center;color:#fff}
 .tj-s b{display:block;font-size:24px;line-height:1.1}.tj-s span{font-size:12px}
@@ -3273,12 +3273,12 @@ function snWatch(id, getSeq){
 
   /* ---------- แตะการ์ดล็อตในคลัง -> เลือก จ่าย / ยืม / แก้ไข ---------- */
   (function(){
-    var bg=document.createElement('div'); bg.className='sheet-bg'; bg.id='la-bg';
-    bg.innerHTML='<div class="sheet"><div class="hd"><b class="la-t" id="la-t"></b><button class="x" id="la-x" aria-label="ปิด">×</button></div><div class="la-s" id="la-s"></div><div id="la-btns"></div></div>';
+    var bg=document.createElement('div'); bg.className='sheet-bg'; bg.id='lot-bg';
+    bg.innerHTML='<div class="sheet"><div class="hd"><b class="lot-t" id="lot-t"></b><button class="x" id="lot-x" aria-label="ปิด">×</button></div><div class="lot-s" id="lot-s"></div><div id="lot-btns"></div></div>';
     document.body.appendChild(bg);
     var IC={i:'<svg viewBox="0 0 24 24"><path d="M12 15V3"/><path d="M7 7l5-5 5 5"/><path d="M4 20h16"/></svg>',l:'<svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>',e:'<svg viewBox="0 0 24 24"><path d="M4 20h4l11-11-4-4L4 16z"/></svg>'};
     function close(){ bg.classList.remove('on'); }
-    $('la-x').addEventListener('click',close); bg.addEventListener('click',function(e){ if(e.target===bg) close(); });
+    $('lot-x').addEventListener('click',close); bg.addEventListener('click',function(e){ if(e.target===bg) close(); });
     $('k-list').addEventListener('click',function(e){
       if(e.target.closest('a,button,label,input')) return;
       var row=e.target.closest('.lot'); if(!row) return;
@@ -3286,10 +3286,10 @@ function snWatch(id, getSeq){
       if(!acts.length) return;
       var card=row.closest('.card'), pb=card&&card.querySelector('b');
       var c=row.cloneNode(true); Array.prototype.forEach.call(c.querySelectorAll('br'),function(n){ n.replaceWith(' · '); }); Array.prototype.forEach.call(c.querySelectorAll('.lot-acts,.lot-sel,.lot-ch,.pbtn'),function(n){ n.remove(); });
-      $('la-t').textContent=(pb?pb.textContent:'')+(card&&card.children[1]?' · '+card.children[1].textContent:'');
-      $('la-s').textContent=c.textContent.replace(/\s+/g,' ').trim();
-      $('la-btns').innerHTML=acts.map(function(a,n){ return '<button type="button" class="la-b '+a[0]+'" data-n="'+n+'">'+IC[a[0]]+a[1]+'</button>'; }).join('');
-      Array.prototype.forEach.call($('la-btns').querySelectorAll('.la-b'),function(b){ b.addEventListener('click',function(){
+      $('lot-t').textContent=(pb?pb.textContent:'')+(card&&card.children[1]?' · '+card.children[1].textContent:'');
+      $('lot-s').textContent=c.textContent.replace(/\s+/g,' ').trim();
+      $('lot-btns').innerHTML=acts.map(function(a,n){ return '<button type="button" class="lot-b '+a[0]+'" data-n="'+n+'">'+IC[a[0]]+a[1]+'</button>'; }).join('');
+      Array.prototype.forEach.call($('lot-btns').querySelectorAll('.lot-b'),function(b){ b.addEventListener('click',function(){
         var t=row.querySelector(acts[Number(b.dataset.n)][2]); close(); setTimeout(function(){ if(t&&document.body.contains(t)) t.click(); },140); }); });
       bg.classList.add('on');
     });
