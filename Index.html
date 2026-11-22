@@ -674,6 +674,10 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
 .dbx-todo:first-child{border-top:0}.dbx-todo .dot{width:10px;height:10px;border-radius:50%;background:#7aa2d6;flex:none}.dbx-todo .dot.bad{background:#dc2626}.dbx-todo .dot.warn{background:#e0a020}
 .dbx-todo .tx{flex:1;font-size:14px}.dbx-todo .chev{color:#9aa8bf;font-size:20px}
 .dbx-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+#tj-bg{background:var(--bg);-webkit-backdrop-filter:none;backdrop-filter:none}
+#tj-bg .sheet{top:0;height:100%;max-height:none;max-width:none;border-radius:0;border-top:0;box-shadow:none;padding:calc(14px + env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom))}
+#tj-bg .sheet .hd{position:sticky;top:calc(-14px - env(safe-area-inset-top));z-index:2;background:var(--bg);margin:-4px -4px 8px;padding:8px 4px}
+@media(min-width:900px){#tj-bg .sheet{padding-left:max(16px,calc(50% - 560px));padding-right:max(16px,calc(50% - 560px))}}
 .tj-sum{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:4px 0 12px}
 .tj-s{border-radius:14px;padding:10px 6px;text-align:center;color:#fff}
 .tj-s b{display:block;font-size:24px;line-height:1.1}.tj-s span{font-size:12px}
