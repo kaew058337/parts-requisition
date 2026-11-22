@@ -734,6 +734,15 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
 <main>
   <!-- ===== เบิก ===== -->
   <section class="view" id="v-req">
+    <div class="card" id="tci-card" style="display:none">
+      <h2>รายการ TCI รอเบิก <small id="tci-cnt" style="font-weight:400"></small></h2>
+      <div class="meta" style="margin:0 0 8px">มาจากไฟล์ตาราง TCI ที่ส่งในกลุ่มไลน์ — เลือกผู้เบิกด้านล่าง แล้วกดออกใบเบิก (1 รายการ = 1 ใบ)</div>
+      <div id="tci-list"></div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn" id="tci-issue" type="button" style="flex:1">ออกใบเบิกที่เลือก</button>
+        <button class="btn ghost" id="tci-drop" type="button">ลบที่เลือก</button>
+      </div>
+    </div>
     <div class="card">
       <h2>ข้อมูลใบเบิก</h2>
       <div class="row2">
@@ -1595,7 +1604,7 @@ function snWatch(id, getSeq){
     getNextReturnNo:['date_iso'], getOpeningLots:['p_part','p_name'], getSerialHistory:['p_serial'], getWarrantyList:['days']
   };
   var SUPA_NOARG = { getAwaitingDoc:1, getAwaitingReq:1, getBootstrap:1, getClaims:1, getLoans:1, getPendingIssue:1, getPendingReceive:1,
-    getReconcile:1, getReturnable:1, getShelfMap:1, getStock:1, getSystemHealth:1, scanDuplicateSerials:1 };
+    getReconcile:1, getTciInbox:1, getReturnable:1, getShelfMap:1, getStock:1, getSystemHealth:1, scanDuplicateSerials:1 };
   function supaName(fn){ return 'rpc_' + fn.replace(/[A-Z]/g, function(c){ return '_' + c.toLowerCase(); }); }
   function supaTransport(fn, args){
     args = args || [];
@@ -1719,6 +1728,7 @@ function snWatch(id, getSeq){
     document.querySelectorAll('nav button').forEach(function(b){ b.classList.toggle('on', b.dataset.v===v); });
     $('title').textContent = titles[v];
     window.scrollTo(0, scrollMem[v]||0);
+    if(v==='req') loadTciInbox();
     if(v==='rcv') loadRcv();
     if(v==='iss') loadIssue();
     if(v==='stk'){ if(state.stkMode==='loan') loadLoans(); else loadStock(); }
@@ -2471,6 +2481,55 @@ function snWatch(id, getSeq){
       $('r-items').innerHTML=''; addItem(); draftClear();
       boot();
     }).catch(function(e){ state.reqConfirmDup=false; if(isNetErr(e)){ queueIt(); return; } toast(e.message,true); }).then(function(){ busy(btn,false); });
+  });
+
+
+  /* ---------- รายการ TCI รอเบิก (จากไฟล์ตาราง TCI ในไลน์) ---------- */
+  function tciSel(){ return Array.prototype.map.call(document.querySelectorAll('#tci-list input[type=checkbox]:checked'), function(c){ return Number(c.value); }); }
+  function loadTciInbox(){
+    if(!useSupa()) return;
+    run('getTciInbox', []).then(function(list){
+      list = list || [];
+      $('tci-card').style.display = list.length ? 'block' : 'none';
+      $('tci-cnt').textContent = list.length ? '('+list.length+' รายการ)' : '';
+      $('tci-list').innerHTML = list.map(function(x){
+        return '<label style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px solid #e5e7eb"><input type="checkbox" checked value="'+x.id+'" style="margin-top:4px">'+
+          '<span><b>'+esc(x.part)+'</b> '+esc(x.name)+' × '+esc(String(x.qty))+'<div class="meta" style="margin:0">เครื่อง '+esc(x.machine)+' · ติดตั้ง '+esc(x.installTh)+' · '+esc(x.itemType)+(x.issue?' · '+esc(x.issue):'')+'</div></span></label>';
+      }).join('');
+    }).catch(function(){});
+  }
+  $('tci-issue').addEventListener('click', function(){
+    if(!state.by){ askBy(function(){ $('tci-issue').click(); }); return; }
+    var ids = tciSel();
+    if(!ids.length){ toast('เลือกรายการก่อน', true); return; }
+    if(!$('r-fullname').value){ toast('กรุณาเลือกผู้เบิกก่อน (ช่อง ผู้เบิก ด้านล่าง)', true); return; }
+    if(!confirm('ออกใบเบิก '+ids.length+' ใบ ในชื่อ '+$('r-fullname').value+' ?')) return;
+    var payload = { ids:ids, date:$('r-date').value, urgency:$('r-urg').value, rank:$('r-rank').value, fullName:$('r-fullname').value, position:$('r-position').value, by:state.by,
+      token:'tci'+Date.now().toString(36)+Math.random().toString(36).slice(2,8) };
+    var btn=$('tci-issue'); busy(btn,true);
+    run('tciInboxIssue', [payload]).then(function(r){
+      remember();
+      var docs = r.docs || [];
+      state.lastReqs = docs.map(function(x){ return { docNo:x.docNo, machine:x.machine, part:x.part, name:x.name, qty:x.qty, unit:x.unit,
+        issue:x.issue, rank:payload.rank, fullName:payload.fullName, urgency:payload.urgency, itemType:x.itemType, position:payload.position }; });
+      state.lastReq = state.lastReqs[0];
+      var many = docs.length>1;
+      $('d-no').textContent = many ? docs.length+' ใบ' : docs[0].docNo;
+      $('d-cnt').textContent = '';
+      $('d-list').innerHTML = many ? state.lastReqs.map(function(x,i){
+        return '<div class="dl-row"><div><b>'+esc(x.docNo)+'</b><div class="meta" style="margin:0">'+esc(x.part||'')+' '+esc(x.name)+' × '+esc(String(x.qty))+'</div></div><button class="btn ghost sm" data-pr="'+i+'">พิมพ์</button></div>';
+      }).join('') : '';
+      $('d-print').style.display = many ? 'none' : '';
+      $('d-printall').style.display = many ? '' : 'none';
+      $('d-printall').textContent = 'พิมพ์ทั้งหมด '+docs.length+' ใบ (A5)';
+      $('d-bg').classList.add('on');
+      loadTciInbox(); boot();
+    }).catch(function(e){ toast(e.message,true); }).then(function(){ busy(btn,false); });
+  });
+  $('tci-drop').addEventListener('click', function(){
+    var ids = tciSel(); if(!ids.length){ toast('เลือกรายการก่อน', true); return; }
+    if(!confirm('ลบ '+ids.length+' รายการออกจากรายการรอเบิก? (ไม่ออกใบเบิก)')) return;
+    run('tciInboxDrop', [{ ids:ids, by:state.by||'' }]).then(function(){ toast('ลบแล้ว'); loadTciInbox(); }).catch(function(e){ toast(e.message,true); });
   });
 
 

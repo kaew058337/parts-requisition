@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>รายงานสรุปประจำสัปดาห์</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{--navy:#0b2a55;--light:#eaf1fb;--bd:#9fb3d1}
+  *{box-sizing:border-box}
+  body{margin:0;background:#e5e7eb;font-family:'Sarabun',system-ui,sans-serif;color:#111;font-size:11px}
+  .bar{position:sticky;top:0;z-index:5;background:#0b2a55;color:#fff;padding:8px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .bar button,.bar input{font:inherit;padding:6px 10px;border-radius:6px;border:0}
+  .bar button{background:#fff;color:#0b2a55;font-weight:700;cursor:pointer}
+  .page{background:#fff;width:210mm;max-width:100%;margin:10px auto;padding:12mm 10mm}
+  h1{font-size:22px;color:var(--navy);margin:0 0 2px}
+  h2{font-size:14px;color:var(--navy);margin:16px 0 3px}
+  .sub{color:#444;font-size:11px;margin-bottom:4px}
+  .sum{font-size:11px;margin:0 0 5px}
+  table{border-collapse:collapse;width:100%;margin-bottom:6px;table-layout:auto}
+  th,td{border:.5px solid var(--bd);padding:2px 4px;text-align:left;vertical-align:top;word-break:break-word}
+  th{background:var(--navy);color:#fff}
+  tr:nth-child(even) td{background:var(--light)}
+  tr{break-inside:avoid;page-break-inside:avoid}
+  .bad{color:#b91c1c;font-weight:700}.warn{color:#b45309;font-weight:700}
+  .none{color:#666;margin:0 0 8px}
+  .wrap{overflow-x:auto}
+  @page{size:A4;margin:10mm}
+  @media print{body{background:#fff}.bar{display:none}.page{margin:0;padding:0;width:auto}}
+</style>
+</head>
+<body>
+<div class="bar"><b>รายงานสรุปประจำสัปดาห์</b>
+  <input type="date" id="d"><button id="go">ดู</button><button id="pr">พิมพ์ / บันทึกเป็น PDF</button></div>
+<div class="page" id="pg">กำลังโหลด…</div>
+<script src="config.js"></script>
+<script>
+(function(){
+  var C=window.APP_CFG||{};
+  function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]});}
+  function tbl(head,rows,empty){
+    if(!rows.length) return '<p class="none">'+(empty||'— ไม่มีรายการ —')+'</p>';
+    return '<div class="wrap"><table><thead><tr>'+head.map(function(h){return '<th>'+h+'</th>';}).join('')+'</tr></thead><tbody>'+
+      rows.map(function(r){return '<tr>'+r.map(function(c){return '<td>'+c+'</td>';}).join('')+'</tr>';}).join('')+'</tbody></table></div>';
+  }
+  function render(w){
+    var s=w.tciSum||{}, tb=w.tai.filter(function(x){return x.level==='bad';}).length, tw=w.tai.filter(function(x){return x.level==='warn';}).length;
+    var miss=w.next.filter(function(x){return x.remain>0;}).length;
+    var h='<h1>รายงานสรุปประจำสัปดาห์</h1><div class="sub">ประจำวันที่ '+esc(w.w1)+' – '+esc(w.w2)+' · จัดทำ '+esc(w.today)+'</div>';
+    h+='<h2>1. สถานะพัสดุค้างจ่าย (ข้อมูลจาก TAI) '+w.tai.length+' รายการ</h2><p class="sum">ต้องติดตาม '+tb+' · เฝ้าระวัง '+tw+' · ปกติ '+(w.tai.length-tb-tw)+'</p>';
+    h+=tbl(['ที่','ใบเบิก','Part number','ชื่อพัสดุ','เครื่อง','ค้าง','สถานะ TAI','ผู้จำหน่าย / PO'],w.tai.map(function(x,i){
+      return [i+1,esc(x.doc),esc(x.part),esc(x.name),esc(x.machine),x.remain,'<span class="'+esc(x.level)+'">'+(x.urg==='AOG'?'AOG · ':'')+esc(x.label)+'</span>'+(x.asof?' <small>[ข้อมูล ณ '+esc(x.asof)+(x.stale?' · เก่า':'')+']</small>':''),
+        esc([x.supplier,x.po].filter(Boolean).join(' / ')||'-')];}),'— ไม่มีพัสดุค้างจ่ายจาก TAI —');
+    h+='<h2>2. สถานะงาน TCI เดือนนี้</h2><p class="sum">รับแล้ว '+(s.done||0)+' / '+(s.total||0)+' · ค้างรับ '+(s.pending||0)+' · รับบางส่วน '+(s.partial||0)+' · เกินวันติดตั้ง '+(s.overdue||0)+'</p>';
+    h+=tbl(['ที่','Part number','ชื่อพัสดุ','เครื่อง','ติดตั้ง','จำนวน','สถานะ','ความคืบหน้า TAI'],(w.tci||[]).map(function(x,i){
+      return [i+1,esc(x.part),esc(x.name),esc(x.machine),esc(x.install),x.qty,esc(x.status||'')+(x.remain>0?' (ค้าง '+x.remain+')':'')+(x.instLate?' <span class="bad">เกินวันติดตั้ง</span>':''),esc(x.tai?x.tai.label:'-')];}),'— ไม่มีงาน TCI ในเดือนนี้ —');
+    h+='<h2>3. งาน TCI ที่จะติดตั้งสัปดาห์หน้า ('+esc(w.n1)+' – '+esc(w.n2)+')</h2><p class="sum">ของมาแล้ว '+(w.next.length-miss)+' · ของยังไม่มา '+miss+'</p>';
+    h+=tbl(['วันติดตั้ง','Part number','ชื่อพัสดุ','เครื่อง','จำนวน','ใบเบิก','สถานะของ','ความคืบหน้า TAI'],w.next.map(function(x){
+      return [esc(x.install),esc(x.part),esc(x.name),esc(x.machine),x.qty,esc(x.doc),x.remain>0?'<span class="bad">ยังไม่มา (ค้าง '+x.remain+')</span>':'ของมาแล้ว',esc(x.tai||'-')];}),'— ไม่มีงานติดตั้งสัปดาห์หน้า —');
+    h+='<h2>4. พัสดุที่รับสัปดาห์นี้ (มีใบเบิก) '+w.recv.length+' รายการ</h2>';
+    h+=tbl(['วันที่รับ','Part number','ชื่อพัสดุ','เครื่อง','จำนวน','ใบเบิก'],w.recv.map(function(x){return [esc(x.date),esc(x.part),esc(x.name),esc(x.machine),x.qty,esc(x.doc)];}));
+    h+='<h2>5. รายการเบิกสัปดาห์นี้ '+w.reqs.length+' รายการ</h2>';
+    h+=tbl(['วันที่เบิก','ใบเบิก','Part number','ชื่อพัสดุ','จำนวน','เครื่อง','ประเภท'],w.reqs.map(function(x){return [esc(x.date),esc(x.doc),esc(x.part),esc(x.name),x.qty,esc(x.machine),(x.urg==='AOG'?'AOG · ':'')+esc(x.type)];}));
+    h+='<h2>6. การจ่ายพัสดุสัปดาห์นี้ '+w.iss.length+' รายการ</h2>';
+    h+=tbl(['วันที่จ่าย','ใบเบิก','Part number','ชื่อพัสดุ','S/N','จำนวน','เครื่อง','ช่าง'],w.iss.map(function(x){return [esc(x.date),esc(x.doc),esc(x.part),esc(x.name),esc(x.sn),x.qty,esc(x.tail),esc(x.tech)];}));
+    document.getElementById('pg').innerHTML=h;
+    document.title='รายงานสรุปประจำสัปดาห์ '+w.w1+' - '+w.w2;
+  }
+  function load(){
+    var d=document.getElementById('d').value, body=d?{p:{date:d}}:{p:{}};
+    document.getElementById('pg').textContent='กำลังโหลด…';
+    fetch(C.SUPA_URL+'/rest/v1/rpc/rpc_get_weekly',{method:'POST',headers:{'Content-Type':'application/json',apikey:C.SUPA_KEY,Authorization:'Bearer '+C.SUPA_KEY},body:JSON.stringify(body)})
+      .then(function(r){return r.json();}).then(function(w){ if(w&&w.message) throw new Error(w.message); render(w); })
+      .catch(function(e){document.getElementById('pg').textContent='โหลดไม่สำเร็จ: '+e.message;});
+  }
+  document.getElementById('go').onclick=load;
+  document.getElementById('pr').onclick=function(){window.print();};
+  load();
+})();
+</script>
+</body>
+</html>
