@@ -721,6 +721,22 @@ nav button.on svg{transform:none;animation:rlPop .55s cubic-bezier(.34,1.6,.5,1)
 nav button[data-v=his]{margin-top:16px}
 nav button[data-v=his]::after{content:'';position:absolute;left:14px;right:14px;top:-9px;height:1px;background:linear-gradient(90deg,transparent,rgba(212,179,106,.55),transparent)}
 @keyframes rlPop{0%{transform:scale(.7)}100%{transform:scale(1)}}
+nav button.rl-act{position:relative;z-index:1;flex:none;height:52px;padding:0 18px;box-sizing:border-box;border-radius:15px;border:0;background:transparent;color:#d3e4f7;
+  display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:16px;font:inherit;font-size:16px;font-weight:500;white-space:nowrap;cursor:pointer;text-align:left}
+nav .rl-act svg{width:22px;height:22px;flex:none;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+nav .rl-act:hover{color:#fff;background:rgba(255,255,255,.07)}
+nav .rl-act em{font-style:normal;color:var(--gold,#A9D5FF);font-weight:700;margin-left:-8px}
+nav .rl-sep{flex:none;height:1px;margin:8px 14px 4px;background:linear-gradient(90deg,transparent,rgba(212,179,106,.55),transparent)}
+nav .rl-ft{flex:none;margin-top:auto;padding-top:12px;border-top:1px solid rgba(255,255,255,.14);display:flex;align-items:center;gap:10px}
+nav button.rl-who{flex:1;min-width:0;display:flex;flex-direction:row;justify-content:flex-start;align-items:center;gap:10px;width:auto;height:52px;padding:0 8px;border:0;border-radius:15px;background:transparent;color:#fff;font:inherit;cursor:pointer;text-align:left}
+nav button.rl-who:hover{background:rgba(255,255,255,.07)}
+nav .rl-av{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-weight:700;background:var(--gold,#A9D5FF);color:#0A2342}
+nav .rl-who b{text-align:left;display:block;font-size:15px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+nav .rl-who small{display:block;font-size:11px;color:var(--ice,#A9D5FF);font-weight:400}
+nav .rl-rf{flex:none;width:44px;height:44px;border-radius:13px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1);color:#fff;display:grid;place-items:center;padding:0;cursor:pointer}
+nav .rl-rf svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+nav .rl-rf.spin svg{animation:rlSp .7s linear}
+@keyframes rlSp{to{transform:rotate(360deg)}}
 nav button .dot{top:50%;left:auto;right:16px;margin-top:-8px}
 nav.open button[data-v]{animation:rlIn .45s cubic-bezier(.22,1,.36,1) both;animation-delay:calc(var(--k,0) * 45ms + 80ms)}
 @keyframes rlIn{from{opacity:.1;transform:translateX(-16px)}to{opacity:1;transform:none}}
@@ -1786,7 +1802,7 @@ function snWatch(id, getSeq){
     if(v==='ret' && state.retMode==='stock') loadReturnable();
     if(v==='his') loadHistory();
   }
-  document.querySelectorAll('nav button').forEach(function(b){ b.addEventListener('click', function(){ show(b.dataset.v); }); });
+  document.querySelectorAll('nav button[data-v]').forEach(function(b){ b.addEventListener('click', function(){ show(b.dataset.v); }); });
   $('his-btn').addEventListener('click', function(){ show('his'); });
   $('back-btn').addEventListener('click', function(){ show(state.lastMain || 'stk'); });
   $('refresh').addEventListener('click', function(){
@@ -2004,9 +2020,12 @@ function snWatch(id, getSeq){
 
   /* ---------- รอเอกสาร TAI (เติม ราคา / COND / card ID ภายหลัง) ---------- */
   var DW={rows:[],sel:{},shown:[],cur:null};
+  function rlDw(n){ window.__dwN=n; var e=document.getElementById('rl-dw-n'); if(e) e.textContent=n?'('+n+')':''; }
+  function dwCount(){ run('getAwaitingDoc',[]).then(function(r){ rlDw((r||[]).length); }).catch(function(){}); }
+  window.__dwCount=dwCount;
   function dwLoad(){
     $('dw-list').innerHTML=skel(); DW.sel={}; dwBar();
-    run('getAwaitingDoc',[]).then(function(rows){ DW.rows=rows; dwRender(); })
+    run('getAwaitingDoc',[]).then(function(rows){ DW.rows=rows; rlDw(rows.length); dwRender(); })
       .catch(function(e){ $('dw-list').innerHTML='<div class="empty">'+esc(e.message)+'</div>'; });
   }
   function dwRender(){
@@ -2378,7 +2397,7 @@ function snWatch(id, getSeq){
       });
       buildUsers(d.users||[]);
       if(!state.draftDone){ state.draftDone=true; draftRestore(); }
-      flushOutbox();
+      flushOutbox(); dwCount();
       state.recon = d.recon||0;
       setOverdue(d.loansOverdue||0);
       if(d.synced) state.syncNotes=d.changes;
@@ -4711,11 +4730,34 @@ function snWatch(id, getSeq){
   var op=document.createElement('button'); op.type='button'; op.id='rl-tab'; op.setAttribute('aria-label','เปิดเมนูหลัก'); op.setAttribute('aria-controls','mainnav'); op.setAttribute('aria-expanded','false');
   op.innerHTML='<svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>'; document.body.appendChild(op);
   btns.forEach(function(b,i){ b.style.setProperty('--k',i); });
+  /* ทางลัดต่อท้ายเมนู + ท้ายแถบ: ชื่อผู้ใช้ / รีเฟรช */
+  var SV={db:'<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>',
+    dw:'<svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>',
+    rf:'<svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 10-2.3 5.7"/><path d="M20 4v7h-7"/></svg>'};
+  var sep=document.createElement('div'); sep.className='rl-sep'; nav.appendChild(sep);
+  function act(id,target,svg,label,extra){
+    var b=document.createElement('button'); b.type='button'; b.className='rl-act'; b.id=id;
+    b.innerHTML=svg+'<span>'+label+'</span>'+(extra||''); b.style.setProperty('--k',btns.length+(id==='rl-db'?1:2));
+    b.addEventListener('click',function(){ setOpen(false); setTimeout(function(){ var t=document.getElementById(target); if(t) t.click(); },160); });
+    nav.appendChild(b); return b;
+  }
+  act('rl-db','db-btn',SV.db,'แดชบอร์ด');
+  act('rl-dw','dw-btn',SV.dw,'รอเอกสาร TAI','<em id="rl-dw-n"></em>');
+  var ft=document.createElement('div'); ft.className='rl-ft';
+  ft.innerHTML='<button type="button" class="rl-who" id="rl-who"><span class="rl-av" id="rl-av">?</span><span style="min-width:0"><b id="rl-name">ยังไม่ได้ตั้งชื่อ</b><small>แตะเพื่อเปลี่ยนชื่อ</small></span></button><button type="button" class="rl-rf" id="rl-rf" aria-label="รีเฟรช">'+SV.rf+'</button>';
+  nav.appendChild(ft);
+  function sync(){
+    var n=document.getElementById('dr-name'), a=document.getElementById('dr-av');
+    if(n) document.getElementById('rl-name').textContent=n.textContent; if(a) document.getElementById('rl-av').textContent=a.textContent;
+    var c=document.getElementById('rl-dw-n'); if(c&&window.__dwN!=null) c.textContent=window.__dwN?'('+window.__dwN+')':'';
+  }
+  document.getElementById('rl-who').addEventListener('click',function(){ setOpen(false); setTimeout(function(){ var t=document.getElementById('who-btn'); if(t) t.click(); },160); });
+  document.getElementById('rl-rf').addEventListener('click',function(){ var r=document.getElementById('refresh'); if(r) r.click(); if(window.__dwCount) window.__dwCount(); var s=this; s.classList.remove('spin'); void s.offsetWidth; s.classList.add('spin'); });
   function place(){
     var on=nav.querySelector('button.on[data-v]'); if(!on){ ind.style.opacity=0; return; }
     ind.style.opacity=1; ind.style.transform='translateY('+on.offsetTop+'px)';
   }
-  function setOpen(o){ nav.classList.toggle('open',o); sc.classList.toggle('on',o); document.body.classList.toggle('rl-on',o); if(op) op.setAttribute('aria-expanded',o?'true':'false'); if(o) place(); }
+  function setOpen(o){ nav.classList.toggle('open',o); sc.classList.toggle('on',o); document.body.classList.toggle('rl-on',o); if(op) op.setAttribute('aria-expanded',o?'true':'false'); if(o){ place(); sync(); if(window.__dwCount) window.__dwCount(); } }
   if(op) op.addEventListener('click',function(){ setOpen(!nav.classList.contains('open')); });
   hd.querySelector('.rl-x').addEventListener('click',function(){ setOpen(false); });
   sc.addEventListener('click',function(){ setOpen(false); });
