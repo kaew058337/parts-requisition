@@ -1,0 +1,2 @@
+-- 012: ส่งออกข้อมูลให้ Apps Script (สำเนาลงชีททุกคืน) ต้องใส่รหัส cron_key ; คืน {cols, rows}
+-- (ฟังก์ชันจริงที่ใช้งานอยู่ ดูใน migration 012b_backup_export_cols บน Supabase)
