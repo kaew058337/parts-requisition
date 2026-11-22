@@ -24,9 +24,12 @@
   tr{break-inside:avoid;page-break-inside:avoid}
   .bad{color:#b91c1c;font-weight:700}.warn{color:#b45309;font-weight:700}
   .none{color:#666;margin:0 0 8px}
-  .wrap{overflow-x:auto}
+  .wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{min-width:760px}
+  .nw{white-space:nowrap;word-break:normal}
+  @media (max-width:700px){.page{padding:10px 8px;margin:0}body{font-size:12px}h1{font-size:19px}}
   @page{size:A4;margin:10mm}
-  @media print{body{background:#fff}.bar{display:none}.page{margin:0;padding:0;width:auto}}
+  @media print{table{min-width:0}body{background:#fff}.bar{display:none}.page{margin:0;padding:0;width:auto}}
 </style>
 </head>
 <body>
@@ -40,8 +43,10 @@
   function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]});}
   function tbl(head,rows,empty){
     if(!rows.length) return '<p class="none">'+(empty||'— ไม่มีรายการ —')+'</p>';
-    return '<div class="wrap"><table><thead><tr>'+head.map(function(h){return '<th>'+h+'</th>';}).join('')+'</tr></thead><tbody>'+
-      rows.map(function(r){return '<tr>'+r.map(function(c){return '<td>'+c+'</td>';}).join('')+'</tr>';}).join('')+'</tbody></table></div>';
+    var NW={'ที่':1,'ใบเบิก':1,'Part number':1,'เครื่อง':1,'ค้าง':1,'จำนวน':1,'วันติดตั้ง':1,'วันที่รับ':1,'วันที่เบิก':1,'วันที่จ่าย':1,'ติดตั้ง':1};
+    var cls=head.map(function(h){return NW[h]?' class="nw"':'';});
+    return '<div class="wrap"><table><thead><tr>'+head.map(function(h,i){return '<th'+cls[i]+'>'+h+'</th>';}).join('')+'</tr></thead><tbody>'+
+      rows.map(function(r){return '<tr>'+r.map(function(c,i){return '<td'+cls[i]+'>'+c+'</td>';}).join('')+'</tr>';}).join('')+'</tbody></table></div>';
   }
   function render(w){
     var s=w.tciSum||{}, tb=w.tai.filter(function(x){return x.level==='bad';}).length, tw=w.tai.filter(function(x){return x.level==='warn';}).length;
