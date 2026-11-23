@@ -705,6 +705,14 @@ html[data-theme=dark] main .btn.bt{background:#14304f;color:#e8f1fb;border-color
 #lot-bg .lot-b.l{border-bottom-color:#e08a00}#lot-bg .lot-b.l svg{color:#e08a00}
 #lot-bg .lot-b.e{border-bottom-color:#2f6fb5}#lot-bg .lot-b.e svg{color:#2f6fb5}
 html[data-theme=dark] #lot-bg .lot-b{background:#14304f;color:#e8f1fb;border-color:rgba(255,255,255,.18)}
+#x-bg{z-index:70}
+.tj-lot{cursor:pointer;-webkit-tap-highlight-color:transparent}
+.tj-lot .dbx-tci{margin-bottom:0}
+.tj-loc{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:2px 0 10px;padding:9px 12px;border-radius:12px;background:rgba(255,255,255,.7);border:1px solid rgba(234,179,8,.55);font-size:14px}
+.tj-loc i{font-style:normal;font-weight:700;color:#a16207;white-space:nowrap}
+.tj-loc.none{opacity:.7;font-size:13px}
+.tj-lot:active .tj-loc{background:rgba(234,179,8,.3)}
+html[data-theme=dark] .tj-loc{background:rgba(255,255,255,.08)}
 .tj-sum{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:4px 0 12px}
 .tj-s{border-radius:14px;padding:10px 6px;text-align:center;color:#fff}
 .tj-s b{display:block;font-size:24px;line-height:1.1}.tj-s span{font-size:12px}
@@ -4246,7 +4254,20 @@ function snWatch(id, getSeq){
   var TJ={month:'',data:null};
   function tjOpen(){ $('tj-bg').classList.add('on'); $('tj-bg').firstElementChild.scrollTop=0; $('tj-body').innerHTML='<div class="empty"><span class="spin"></span></div>'; tjLoad(TJ.month); }
   window.__tjOpen=tjOpen;
-  function tjLoad(m){ run('getDashboard',[m||'']).then(function(d){ TJ.data=d; TJ.month=d.month; tjRender(); }).catch(function(e){ $('tj-body').innerHTML='<div class="empty">'+esc(e.message)+'</div>'; }); }
+  function tjLoad(m){
+    Promise.all([run('getDashboard',[m||'']), run('getStock',[]).catch(function(){ return null; })]).then(function(rs){
+      var d=rs[0]; TJ.data=d; TJ.month=d.month; TJ.lots={};
+      (rs[1]||[]).forEach(function(g){ g.lots.forEach(function(l){
+        if(l.free || !(l.qty>0)) return; var k=l.docNo+'|'+g.part;
+        (TJ.lots[k]=TJ.lots[k]||[]).push({ seq:l.seq, part:g.part, name:g.name, unit:g.unit, serial:l.serial, qty:l.qty, type:l.type, location:l.location, source:l.docNo, issRow:l.issRow, issSeq:l.issSeq, machine:l.machine });
+      }); });
+      tjRender(); }).catch(function(e){ $('tj-body').innerHTML='<div class="empty">'+esc(e.message)+'</div>'; }); }
+  function tjYelHtml(x){
+    var ls=(TJ.lots&&TJ.lots[x.docNo+'|'+x.part])||[];
+    var loc=ls.length ? ls.map(function(l,i){ return '<div class="tj-loc" data-i="'+i+'"><span>📍 <b>'+esc(l.location||'ไม่ระบุที่เก็บ')+'</b>'+(l.serial?' · S/N '+esc(l.serial):'')+' · '+fmtNum(l.qty)+' '+esc(l.unit||'')+'</span><i>จ่าย ›</i></div>'; }).join('')
+      : '<div class="tj-loc none"><span>ไม่พบล็อตในคลัง (อาจจ่ายไปแล้วหรือยังโหลดไม่เสร็จ)</span></div>';
+    return '<div class="tj-lot" data-k="'+esc(x.docNo+'|'+x.part)+'">'+tciRowHtml(x)+loc+'</div>';
+  }
   function tjRender(){
     var d=TJ.data, list=d.tci||[], s=d.tciSum||{};
     var G=[
@@ -4258,11 +4279,20 @@ function snWatch(id, getSeq){
     h+='<div class="tj-sum">'+G.map(function(g){ return '<div class="tj-s '+g.k+'"><b>'+g.rows.length+'</b><span>'+g.t.split(' · ')[0]+'</span></div>'; }).join('')+'</div>';
     G.forEach(function(g){
       if(!g.rows.length) return;
-      h+='<div class="tj-g '+g.k+'"><div class="tj-h"><span>'+g.ic+' '+g.t+'</span><i>'+g.rows.length+'</i></div>'+g.rows.map(tciRowHtml).join('')+'</div>';
+      h+='<div class="tj-g '+g.k+'"><div class="tj-h"><span>'+g.ic+' '+g.t+'</span><i>'+g.rows.length+'</i></div>'+g.rows.map(function(x){ return g.k==='yel' ? tjYelHtml(x) : tciRowHtml(x); }).join('')+'</div>';
     });
     $('tj-body').innerHTML=h+'</div>';
   }
   $('tj-body').addEventListener('change', function(e){ if(e.target.id==='tj-month' && e.target.value){ $('tj-body').innerHTML='<div class="empty"><span class="spin"></span></div>'; tjLoad(e.target.value); } });
+  $('tj-body').addEventListener('click', function(e){
+    var w=e.target.closest('.tj-lot'); if(!w) return;
+    var ls=(TJ.lots&&TJ.lots[w.dataset.k])||[], ln=e.target.closest('.tj-loc'), l=ls.length===1 ? ls[0] : (ln&&ln.dataset.i!=null ? ls[Number(ln.dataset.i)] : null);
+    if(!l){ if(ls.length>1) toast('มีหลายล็อต แตะที่ล็อตที่ต้องการจ่าย'); return; }
+    if(!l.issRow){ toast('ล็อตนี้จ่ายจากหน้าคลัง',true); return; }
+    state.fromStock=true;
+    openIssue({ row:l.issRow, seq:l.issSeq, docNo:l.source, part:l.part, name:l.name, serial:l.serial, type:l.type, qty:l.qty, unit:l.unit, machine:l.machine, issue:'' });
+  });
+  new MutationObserver(function(){ if(!$('x-bg').classList.contains('on') && $('tj-bg').classList.contains('on')) setTimeout(function(){ if($('tj-bg').classList.contains('on')) tjLoad(TJ.month); },700); }).observe($('x-bg'),{attributes:true,attributeFilter:['class']});
   $('tj-x').addEventListener('click', function(){ $('tj-bg').classList.remove('on'); });
   $('db-btn').addEventListener('click', dbOpen);
   $('db-x').addEventListener('click', function(){ $('db-bg').classList.remove('on'); });
