@@ -1035,7 +1035,7 @@ main{padding-bottom:calc(28px + env(safe-area-inset-bottom))}
     </div>
     <div class="row2">
       <div><label>COND</label>
-        <select id="p-cond"><option value=""></option><option>NE</option><option>NS</option><option>OH</option><option>SV</option><option>RP</option><option>AR</option><option>US</option></select></div>
+        <select id="p-cond"><option value=""></option><option>NE</option><option>NS</option><option>OH</option><option>SV</option><option>RP</option><option>AR</option><option>US</option><option>FN</option></select></div>
       <div><label>LOCATION</label><input id="p-loc"></div>
     </div>
     <label>กลุ่มพัสดุ</label><select id="p-grp"><option value="">ตามเดิมของ P/N นี้ (ครั้งแรก = ทั่วไป)</option><option value="สารเคมี">สารเคมี</option><option value="-">ทั่วไป</option></select>
@@ -1247,7 +1247,7 @@ main{padding-bottom:calc(28px + env(safe-area-inset-bottom))}
     <div class="row2">
       <div><label>จำนวนที่คืน</label><input id="rs-qty" type="number" inputmode="decimal" min="0"></div>
       <div><label>COND</label>
-        <select id="rs-cond"><option value=""></option><option>NE</option><option>NS</option><option>OH</option><option>SV</option><option>RP</option><option>AR</option><option>US</option></select></div>
+        <select id="rs-cond"><option value=""></option><option>NE</option><option>NS</option><option>OH</option><option>SV</option><option>RP</option><option>AR</option><option>US</option><option>FN</option></select></div>
     </div>
     <label>LOCATION ที่เก็บ</label><input id="rs-loc">
     <label>เหตุผลที่คืน</label>
@@ -1287,7 +1287,7 @@ main{padding-bottom:calc(28px + env(safe-area-inset-bottom))}
       <div><label>ประเภทพัสดุ</label>
         <select id="o-type"><option value=""></option><option>LRU</option><option>SP</option><option>LRU(TCI)</option><option>SP(TCI)</option></select></div>
       <div><label>COND</label>
-        <select id="o-cond"><option value=""></option><option>NE</option><option>NS</option><option>OH</option><option>SV</option><option>RP</option><option>AR</option><option>US</option></select></div>
+        <select id="o-cond"><option value=""></option><option>NE</option><option>NS</option><option>OH</option><option>SV</option><option>RP</option><option>AR</option><option>US</option><option>FN</option></select></div>
     </div>
     <div id="o-sn-wrap"><label id="o-sn-lb">Serial number</label><input id="o-sn"></div>
     <div class="row2">
@@ -1410,7 +1410,7 @@ main{padding-bottom:calc(28px + env(safe-area-inset-bottom))}
       <div><label>ราคารวม</label><input id="df-total" readonly></div>
     </div>
     <div class="row2">
-      <div><label>COND</label><select id="df-cond"><option value=""></option><option>NE</option><option>NS</option><option>OH</option><option>SV</option><option>RP</option><option>AR</option><option>US</option></select></div>
+      <div><label>COND</label><select id="df-cond"><option value=""></option><option>NE</option><option>NS</option><option>OH</option><option>SV</option><option>RP</option><option>AR</option><option>US</option><option>FN</option></select></div>
       <div id="df-locw"><label>LOCATION</label><input id="df-loc"></div>
       <div><label>กลุ่มพัสดุ</label><select id="df-grp"><option value="">ไม่เปลี่ยน</option><option value="สารเคมี">สารเคมี</option><option value="-">ทั่วไป</option></select></div>
     </div>
@@ -2912,7 +2912,7 @@ function snWatch(id, getSeq){
       return '<div class="bt-card" data-i="'+i+'"><b>'+esc(r.name)+'</b><div class="meta">'+esc(r.docNo)+' · '+esc(r.part)+' · ค้างรับ '+fmtNum(r.remain)+' / '+fmtNum(r.qty)+' '+esc(r.unit)+(r.machine?' · เครื่อง '+esc(r.machine):'')+'</div>'+
         '<div class="row3"><div><label>จำนวนที่รับ</label><input type="number" inputmode="decimal" min="0" class="bt-q" value="'+r.remain+'"></div>'+
         '<div><label>ราคา/หน่วย</label><input type="number" inputmode="decimal" min="0" step="0.01" class="bt-p"></div>'+
-        '<div><label>COND</label><select class="bt-c"><option value=""></option><option>NE</option><option>NS</option><option>OH</option><option>SV</option><option>RP</option><option>AR</option><option>US</option></select></div></div></div>';
+        '<div><label>COND</label><select class="bt-c"><option value=""></option><option>NE</option><option>NS</option><option>OH</option><option>SV</option><option>RP</option><option>AR</option><option>US</option><option>FN</option></select></div></div></div>';
     }).join('');
     var ms=rows.map(function(r){ return r.machine||''; }).filter(function(x,i,a){ return x&&a.indexOf(x)===i; });
     $('bt-now').checked=false; btNow(); $('bt-paydate').value=state.today||''; $('bt-tail').value=ms.length===1?ms[0]:''; $('bt-tech').value='';
