@@ -708,11 +708,11 @@ html[data-theme=dark] #lot-bg .lot-b{background:#14304f;color:#e8f1fb;border-col
 #x-bg{z-index:70}
 .tj-lot{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .tj-lot .dbx-tci{margin-bottom:0}
-.tj-loc{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:2px 0 10px;padding:9px 12px;border-radius:12px;background:rgba(255,255,255,.7);border:1px solid rgba(234,179,8,.55);font-size:14px}
-.tj-loc i{font-style:normal;font-weight:700;color:#a16207;white-space:nowrap}
-.tj-loc.none{opacity:.7;font-size:13px}
-.tj-lot:active .tj-loc{background:rgba(234,179,8,.3)}
-html[data-theme=dark] .tj-loc{background:rgba(255,255,255,.08)}
+.tj-loc{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:-4px 0 10px;padding:0 0 0 62px;font-size:13px;color:var(--muted,#5b6b82)}
+.tj-loc b{font-weight:600;color:inherit}
+.tj-loc i{font-style:normal;font-weight:600;opacity:.65;white-space:nowrap}
+.tj-loc.none{opacity:.7}
+.tj-lot:active .tj-loc{opacity:.6}
 .tj-sum{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:4px 0 12px}
 .tj-s{border-radius:14px;padding:10px 6px;text-align:center;color:#fff}
 .tj-s b{display:block;font-size:24px;line-height:1.1}.tj-s span{font-size:12px}
@@ -4264,7 +4264,7 @@ function snWatch(id, getSeq){
       tjRender(); }).catch(function(e){ $('tj-body').innerHTML='<div class="empty">'+esc(e.message)+'</div>'; }); }
   function tjYelHtml(x){
     var ls=(TJ.lots&&TJ.lots[x.docNo+'|'+x.part])||[];
-    var loc=ls.length ? ls.map(function(l,i){ return '<div class="tj-loc" data-i="'+i+'"><span>📍 <b>'+esc(l.location||'ไม่ระบุที่เก็บ')+'</b>'+(l.serial?' · S/N '+esc(l.serial):'')+' · '+fmtNum(l.qty)+' '+esc(l.unit||'')+'</span><i>จ่าย ›</i></div>'; }).join('')
+    var loc=ls.length ? ls.map(function(l,i){ return '<div class="tj-loc" data-i="'+i+'"><span>ที่เก็บ <b>'+esc(l.location||'ไม่ระบุที่เก็บ')+'</b>'+(l.serial?' · S/N '+esc(l.serial):'')+' · '+fmtNum(l.qty)+' '+esc(l.unit||'')+'</span><i>จ่าย ›</i></div>'; }).join('')
       : '<div class="tj-loc none"><span>ไม่พบล็อตในคลัง (อาจจ่ายไปแล้วหรือยังโหลดไม่เสร็จ)</span></div>';
     return '<div class="tj-lot" data-k="'+esc(x.docNo+'|'+x.part)+'">'+tciRowHtml(x)+loc+'</div>';
   }
