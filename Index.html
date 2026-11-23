@@ -3965,15 +3965,15 @@ function snWatch(id, getSeq){
             (st==='open' ? '<button class="btn ghost sm" data-ed="'+ri+'">แก้ไข</button><button class="btn ghost danger sm" data-cx="'+ri+'">ยกเลิก</button>' : '')+'</div>';
         }
       }
-      else if(k==='ret'){ btns='<div style="display:flex;gap:8px;margin-top:10px"><button class="btn ghost sm" data-pr="'+ri+'">พิมพ์ใบส่งคืน</button></div>'; chip = r[12] ? '<span class="chip ok">'+esc(r[12])+'</span>' : ''; }
+      else if(k==='ret'){ btns = (r[10]||'').indexOf('[นำเข้าจากไฟล์เดิม]')===0 ? '' : '<div style="display:flex;gap:8px;margin-top:10px"><button class="btn ghost sm" data-pr="'+ri+'">พิมพ์ใบส่งคืน</button></div>'; chip = r[12] ? '<span class="chip ok">'+esc(r[12])+'</span>' : ''; }
       else if(k==='rcv'||k==='rcv2'){ var srcv=r[d.headers.indexOf('แหล่งที่มา')]; chip='<span class="chip '+(x.paid?'ok':'')+'">'+(x.paid?'จ่ายให้ช่างแล้ว':(srcv&&srcv!=='ใบเบิก'?esc(srcv):'รับแล้ว รอจ่ายให้ช่าง'))+'</span>';
         if(k==='rcv' && (!srcv||srcv==='ใบเบิก')){
           if(!r[d.headers.indexOf('card ID')]) chip+=' <span class="chip warn">รอเอกสาร TAI</span>';
           btns='<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="btn ghost sm" data-di="'+ri+'">ข้อมูลเอกสาร</button></div>';
         }
       }
-      else if(k==='iss'){ chip=x.paid?'<span class="chip ok">จ่ายให้ช่างแล้ว</span>':'<span class="chip">โอนเข้าใบเบิก</span>'; }
-      if(k==='rcv'||k==='rcv2'||k==='ret'||(k==='iss' && (x.paid || r[iDoc]==='จ่ายตรง'))){
+      else if(k==='iss'){ chip=r[iDoc]==='ประวัติเดิม'?'<span class="chip">ประวัติเดิม</span>':x.paid?'<span class="chip ok">จ่ายให้ช่างแล้ว</span>':'<span class="chip">โอนเข้าใบเบิก</span>'; }
+      if((k==='rcv'||k==='rcv2'||k==='ret'||(k==='iss' && (x.paid || r[iDoc]==='จ่ายตรง'))) && r[iDoc]!=='ประวัติเดิม' && !(k==='ret' && (r[10]||'').indexOf('[นำเข้าจากไฟล์เดิม]')===0)){
         var cb='<button class="btn ghost danger sm" data-ce="'+ri+'">ยกเลิกรายการนี้</button>';
         btns = btns ? btns.replace(/<\/div>$/, cb+'</div>') : '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">'+cb+'</div>';
       }
