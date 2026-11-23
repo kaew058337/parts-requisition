@@ -674,10 +674,10 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
 .dbx-todo:first-child{border-top:0}.dbx-todo .dot{width:10px;height:10px;border-radius:50%;background:#7aa2d6;flex:none}.dbx-todo .dot.bad{background:#dc2626}.dbx-todo .dot.warn{background:#e0a020}
 .dbx-todo .tx{flex:1;font-size:14px}.dbx-todo .chev{color:#9aa8bf;font-size:20px}
 .dbx-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
-#tj-bg{background:var(--bg);-webkit-backdrop-filter:none;backdrop-filter:none}
-#tj-bg .sheet{top:0;height:100%;max-height:none;max-width:none;border-radius:0;border-top:0;box-shadow:none;padding:calc(14px + env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom))}
-#tj-bg .sheet .hd{position:sticky;top:calc(-14px - env(safe-area-inset-top));z-index:2;background:var(--bg);margin:-4px -4px 8px;padding:8px 4px}
-@media(min-width:900px){#tj-bg .sheet{padding-left:max(16px,calc(50% - 560px));padding-right:max(16px,calc(50% - 560px))}}
+#tj-bg,#dq-bg{background:var(--bg);-webkit-backdrop-filter:none;backdrop-filter:none}
+#tj-bg .sheet,#dq-bg .sheet{top:0;height:100%;max-height:none;max-width:none;border-radius:0;border-top:0;box-shadow:none;padding:calc(14px + env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom))}
+#tj-bg .sheet .hd,#dq-bg .sheet .hd{position:sticky;top:calc(-14px - env(safe-area-inset-top));z-index:2;background:var(--bg);margin:-4px -4px 8px;padding:8px 4px}
+@media(min-width:900px){#tj-bg .sheet,#dq-bg .sheet{padding-left:max(16px,calc(50% - 560px));padding-right:max(16px,calc(50% - 560px))}}
 main .btn.bt{display:inline-flex;align-items:center;gap:6px;background:#fff;color:#0b2a55;border:1px solid #d9e1ee;border-bottom-width:4px;text-shadow:none;box-shadow:0 2px 6px rgba(7,27,53,.08)}
 main .btn.bt svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;flex:none}
 main .btn.bt-i{border-bottom-color:#dc2626}main .btn.bt-i svg{color:#dc2626}
@@ -699,6 +699,7 @@ html[data-theme=dark] main .btn.bt{background:#14304f;color:#e8f1fb;border-color
 #lot-bg .lot-b.e{border-bottom-color:#2f6fb5}#lot-bg .lot-b.e svg{color:#2f6fb5}
 html[data-theme=dark] #lot-bg .lot-b{background:#14304f;color:#e8f1fb;border-color:rgba(255,255,255,.18)}
 #x-bg{z-index:70}
+#dqx-bg{z-index:80}
 .tj-lot{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .tj-lot .dbx-tci{margin-bottom:0}
 .tj-loc{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:-4px 0 10px;padding:0 0 0 62px;font-size:13px;color:var(--muted,#5b6b82)}
@@ -1490,6 +1491,23 @@ main{padding-bottom:calc(28px + env(safe-area-inset-bottom))}
   </div>
 </div>
 
+<div class="sheet-bg" id="dq-bg">
+  <div class="sheet">
+    <div class="hd"><b>ตรวจข้อมูล</b><button class="x" id="dq-x" aria-label="ปิด">×</button></div>
+    <div id="dq-seg" style="display:flex;gap:6px;margin:0 0 10px"></div>
+    <div id="dq-body"><div class="empty"><span class="spin"></span></div></div>
+  </div>
+</div>
+<div class="sheet-bg" id="dqx-bg">
+  <div class="sheet">
+    <div class="hd"><b id="dqx-t">แก้ข้อมูล</b><button class="x" id="dqx-x" aria-label="ปิด">×</button></div>
+    <div class="meta" id="dqx-s" style="margin-bottom:10px"></div>
+    <div><label>S/N</label><input id="dqx-sn" autocomplete="off"></div>
+    <div><label id="dqx-ml">เครื่อง</label><input id="dqx-mc" autocomplete="off" placeholder="เช่น 70204"></div>
+    <div id="dqx-tw"><label>ช่างผู้รับ</label><input id="dqx-tc" autocomplete="off"></div>
+    <button class="btn" id="dqx-ok" style="margin-top:14px;width:100%">บันทึก</button>
+  </div>
+</div>
 <div class="sheet-bg" id="tj-bg">
   <div class="sheet">
     <div class="hd"><b>งาน TCI</b><button class="x" id="tj-x" aria-label="ปิด">×</button></div>
@@ -1730,7 +1748,7 @@ function snWatch(id, getSeq){
     getDocInfo:['p_seq'], getHistory:['p_kind','p_limit'], getIssuedSerials:['p_part'], getLoansForPart:['p_part','p_name'],
     getNextReturnNo:['date_iso'], getOpeningLots:['p_part','p_name'], getSerialHistory:['p_serial'], getWarrantyList:['days']
   };
-  var SUPA_NOARG = { getAwaitingDoc:1, getAwaitingReq:1, getBootstrap:1, getClaims:1, getLoans:1, getPendingIssue:1, getPendingReceive:1,
+  var SUPA_NOARG = { getDq:1, getAwaitingDoc:1, getAwaitingReq:1, getBootstrap:1, getClaims:1, getLoans:1, getPendingIssue:1, getPendingReceive:1,
     getReconcile:1, getTciInbox:1, getReturnable:1, getShelfMap:1, getStock:1, getSystemHealth:1, scanDuplicateSerials:1 };
   function supaName(fn){ return 'rpc_' + fn.replace(/[A-Z]/g, function(c){ return '_' + c.toLowerCase(); }); }
   function supaTransport(fn, args){
@@ -1931,6 +1949,9 @@ function snWatch(id, getSeq){
       if(sg!==SM.sig){ SM.sig=sg; SM.data=d; smRender(); if(SM.cell) smCell(); }
     }).catch(function(e){ $('sm-ts').textContent='⚠ อัปเดตไม่ได้ — '+e.message; });
   }
+  /* ค้นหาแบบไม่สนขีด/ช่องว่าง/ตัวพิมพ์ เช่น 895-06050 เจอ 89506050 */
+  function nk(t){ return String(t==null?'':t).toLowerCase().replace(/[^a-z0-9ก-๙]/g,''); }
+  function qm(hay,q){ hay=String(hay).toLowerCase(); if(hay.indexOf(q)>=0) return true; var a=nk(q); return a.length>=3 && nk(hay).indexOf(a)>=0; }
   function smItemText(i){ return (i.part+' '+i.name+' '+i.serial+' '+i.doc).toLowerCase(); }
   function smHit(c,q){ return !!q && (String(c.loc).toLowerCase().indexOf(q)>=0 || c.items.some(function(i){ return smItemText(i).indexOf(q)>=0; })); }
   function smRender(){
@@ -2090,7 +2111,7 @@ function snWatch(id, getSeq){
   }
   function dwRender(){
     var q=$('dw-q').value.trim().toLowerCase();
-    DW.shown=DW.rows.filter(function(r){ return !q || (r.docNo+' '+r.part+' '+r.name+' '+r.serial).toLowerCase().indexOf(q)>=0; });
+    DW.shown=DW.rows.filter(function(r){ return !q || qm(r.docNo+' '+r.part+' '+r.name+' '+r.serial,q); });
     if(!DW.shown.length){ $('dw-list').innerHTML=DW.rows.length?emp('search','ไม่พบรายการที่ค้นหา'):emp('doc','ไม่มีรายการที่รอเอกสาร','พัสดุที่รับตามใบเบิกมี card ID ครบแล้ว'); dwBar(); return; }
     $('dw-list').innerHTML=DW.shown.map(function(r){
       return '<div class="pcard'+tyCls(r.type)+'"><div class="dw-row"><label class="dw-ck"><input type="checkbox" data-dwc="'+r.seq+'"'+(DW.sel[r.seq]?' checked':'')+'></label>'+
@@ -2354,7 +2375,7 @@ function snWatch(id, getSeq){
   var MH={rows:[],filter:null};
   function mhRender(){
     var q=$('mh-q').value.trim().toLowerCase(), rows=MH.rows.filter(function(r){
-      return !q || (r.part+' '+r.name+' '+r.serial+' '+r.from+' '+r.to+' '+r.by+' '+r.kind+' '+r.doc).toLowerCase().indexOf(q)>=0; });
+      return !q || qm(r.part+' '+r.name+' '+r.serial+' '+r.from+' '+r.to+' '+r.by+' '+r.kind+' '+r.doc,q); });
     $('mh-list').innerHTML=rows.length?rows.map(function(r){
       return '<div class="mh-it"><div class="mh-top"><span class="mh-k">'+esc(r.kind)+'</span><span>'+esc(r.t)+' · '+esc(r.by)+'</span></div>'+
         '<div class="mh-n">'+esc(r.name||r.part)+'</div>'+
@@ -2869,7 +2890,7 @@ function snWatch(id, getSeq){
   function renderRcv(){
     var q = $('c-search').value.trim().toLowerCase();
     var rows = state.rcv.filter(function(r){
-      return !q || (r.docNo+' '+r.part+' '+r.name+' '+r.machine).toLowerCase().indexOf(q)>=0;
+      return !q || qm(r.docNo+' '+r.part+' '+r.name+' '+r.machine,q);
     });
     if(!rows.length){ $('c-list').innerHTML=state.rcv.length?emp('search','ไม่พบรายการที่ค้นหา','ลองพิมพ์เลขเบิก, Part number หรือเครื่องให้สั้นลง'):emp('check','ไม่มีใบเบิกรอรับ','ใบเบิกที่ออกแล้วจะมารออยู่ที่นี่จนกว่าจะรับพัสดุครบ'); return; }
     $('c-list').innerHTML = rows.map(function(r){
@@ -3086,7 +3107,7 @@ function snWatch(id, getSeq){
   function renderIssue(){
     var q = $('i-search').value.trim().toLowerCase();
     var rows = state.iss.filter(function(r){
-      return !q || (r.docNo+' '+r.part+' '+r.name+' '+r.serial+' '+r.machine).toLowerCase().indexOf(q)>=0;
+      return !q || qm(r.docNo+' '+r.part+' '+r.name+' '+r.serial+' '+r.machine,q);
     });
     if(!rows.length){ $('i-list').innerHTML=state.iss.length?emp('search','ไม่พบรายการที่ค้นหา','ลองพิมพ์เลขเบิก, Part number, S/N หรือเครื่องให้สั้นลง'):emp('inbox','ไม่มีพัสดุที่รับแล้วรอจ่าย','ต้องรับตามเลขเบิกก่อนจึงจะจ่ายได้'); return; }
     $('i-list').innerHTML = rows.map(function(r){
@@ -3110,7 +3131,7 @@ function snWatch(id, getSeq){
   function bxKey(r){ return String(r.seq); }
   function bxShown(){
     var q=$('i-search').value.trim().toLowerCase();
-    return state.iss.filter(function(r){ return !q || (r.docNo+' '+r.part+' '+r.name+' '+r.serial+' '+r.machine).toLowerCase().indexOf(q)>=0; });
+    return state.iss.filter(function(r){ return !q || qm(r.docNo+' '+r.part+' '+r.name+' '+r.serial+' '+r.machine,q); });
   }
   function bxBar(){ var c=Object.keys(BX.sel).length; $('bx-go').textContent='จ่ายที่เลือก '+c+' รายการ'; $('bx-bar').classList.toggle('on',BX.on&&c>0); }
   function bxMode(on){
@@ -3242,8 +3263,7 @@ function snWatch(id, getSeq){
     }).filter(function(g){
       if(!g.lots.length) return false;
       if(!q) return true;
-      var s=(g.part+' '+g.name+' '+g.lots.map(function(l){return l.serial+' '+l.location+' '+l.docNo;}).join(' ')).toLowerCase();
-      return s.indexOf(q)>=0;
+      return qm(g.part+' '+g.name+' '+g.lots.map(function(l){return l.serial+' '+l.location+' '+l.docNo;}).join(' '),q);
     });
     state.lotMap = {};
     (state.stk||[]).forEach(function(g){ g.lots.forEach(function(l){
@@ -3560,7 +3580,7 @@ function snWatch(id, getSeq){
   function renderLoans(){
     var q=$('kl-search').value.trim().toLowerCase();
     var all=state.loans2||[];
-    var rows=all.filter(function(x){ return !q || (x.borrower+' '+x.part+' '+x.name+' '+x.serial+' '+x.purpose).toLowerCase().indexOf(q)>=0; });
+    var rows=all.filter(function(x){ return !q || qm(x.borrower+' '+x.part+' '+x.name+' '+x.serial+' '+x.purpose,q); });
     var od = all.filter(function(x){ return x.open && x.late>0; });
     $('k-banner').innerHTML = od.length ? '<div class="warnbox"><b>เกินกำหนดคืน '+od.length+' รายการ</b><br>'+od.slice(0,5).map(function(x){ return esc(x.borrower)+' · '+esc(x.name)+(x.serial?' S/N '+esc(x.serial):'')+' · เกิน '+x.late+' วัน'; }).join('<br>')+'</div>' : '';
     if(!rows.length){ $('kl-list').innerHTML=all.length?emp('search','ไม่พบรายการที่ค้นหา'):emp('swap','ยังไม่มีรายการยืม','กด “ยืมออก” ที่การ์ดพัสดุในหน้าคลังเพื่อบันทึกการยืม'); return; }
@@ -3610,7 +3630,7 @@ function snWatch(id, getSeq){
   function renderPicker(){
     var q=$('bp-search').value.trim().toLowerCase();
     var list=[]; Object.keys(state.lotMap||{}).forEach(function(k){ list.push(state.lotMap[k]); });
-    list = list.filter(function(l){ return !q || (l.part+' '+l.name+' '+l.serial+' '+l.location).toLowerCase().indexOf(q)>=0; });
+    list = list.filter(function(l){ return !q || qm(l.part+' '+l.name+' '+l.serial+' '+l.location,q); });
     if(!list.length){ $('bp-list').innerHTML=Object.keys(state.lotMap||{}).length?emp('search','ไม่พบรายการที่ค้นหา'):emp('box','ไม่มีพัสดุในคลังให้ยืม','พัสดุต้องอยู่ในคลังก่อนจึงยืมออกได้'); return; }
     $('bp-list').innerHTML = list.map(function(l){
       return '<div class="pcard'+tyCls(l.type,l.kit)+'" data-bp="'+l.seq+'"><div class="t"><span class="doc">'+esc(l.part||'-')+'</span><span class="chip ok">'+fmtNum(l.qty)+' '+esc(l.unit)+'</span></div>'+
@@ -3896,7 +3916,7 @@ function snWatch(id, getSeq){
   }
   function renderReturnable(){
     var q=$('rt-search').value.trim().toLowerCase();
-    var rows=(state.rt||[]).filter(function(r){ return !q || (r.docNo+' '+r.part+' '+r.name+' '+r.serial+' '+r.machine).toLowerCase().indexOf(q)>=0; });
+    var rows=(state.rt||[]).filter(function(r){ return !q || qm(r.docNo+' '+r.part+' '+r.name+' '+r.serial+' '+r.machine,q); });
     if(!rows.length){ $('rt-list').innerHTML=(state.rt||[]).length?emp('search','ไม่พบรายการที่ค้นหา'):emp('swap','ไม่มีรายการที่ส่งคืนได้','พัสดุที่จ่ายแล้วจะมาอยู่ที่นี่เมื่อต้องส่งคืนของเก่า'); return; }
     $('rt-list').innerHTML = rows.map(function(r){
       return '<div class="pcard'+tyCls(r.type)+'" data-i="'+state.rt.indexOf(r)+'">'+
@@ -3946,7 +3966,7 @@ function snWatch(id, getSeq){
     var q=$('h-search').value.trim().toLowerCase();
     var list=[];
     d.rows.forEach(function(r,i){
-      if(!q || r.join(' ').toLowerCase().indexOf(q)>=0) list.push({ r:r, paid:d.paid ? d.paid[i] : false });
+      if(!q || qm(r.join(' '),q)) list.push({ r:r, paid:d.paid ? d.paid[i] : false });
     });
     state.histRows = list.map(function(x){ return x.r; });
     var skipNote = (d.skipped>0) ? '<div class="info" style="margin:0 0 10px">ข้าม '+d.skipped+' แถวในชีท เบิก ที่ข้อมูลไม่ครบ (ไม่มีหมายเลขการเบิก) · ตรวจที่เมนูในชีท: ระบบเบิก-จ่าย → ตรวจแถวใบเบิกที่ข้อมูลไม่ครบ</div>' : '';
@@ -4243,6 +4263,53 @@ function snWatch(id, getSeq){
     else if(k==='loan'){ show('stk'); }
   });
 
+  /* ---------- ตรวจข้อมูล: เติมแถวนำเข้าที่ไม่มีเครื่อง/S/N + ดู Part ที่เขียนต่างกัน ---------- */
+  var DQ={d:null,tab:'ret',cur:null};
+  function dqNeed(){ return DQ.d ? DQ.d.ret.length+DQ.d.leg.length : null; }
+  function dqBadge(){ var n=dqNeed(), e=document.getElementById('rl-dq-n'); if(e) e.textContent=n?'('+n+')':''; window.__dqN=n; }
+  function dqCount(){ run('getDq',[]).then(function(d){ DQ.d=d; dqBadge(); }).catch(function(){}); }
+  window.__dqCount=dqCount;
+  function dqOpen(){ $('dq-bg').classList.add('on'); $('dq-bg').firstElementChild.scrollTop=0; $('dq-body').innerHTML='<div class="empty"><span class="spin"></span></div>';
+    run('getDq',[]).then(function(d){ DQ.d=d; dqBadge(); dqRender(); }).catch(function(e){ $('dq-body').innerHTML='<div class="empty">'+esc(e.message)+'</div>'; }); }
+  window.__dqOpen=dqOpen;
+  function dqRender(){
+    var d=DQ.d; if(!d) return;
+    $('dq-seg').innerHTML=[['ret','ส่งคืน',d.ret.length],['leg','จ่ายเดิม',d.leg.length],['var','Part ซ้ำ',d.variants.length]].map(function(t){
+      return '<button type="button" class="btn sm '+(DQ.tab===t[0]?'':'ghost')+'" data-t="'+t[0]+'">'+t[1]+' ('+t[2]+')</button>'; }).join('');
+    var h='';
+    if(DQ.tab==='var'){
+      h+='<div class="info" style="margin:0 0 10px">Part number เดียวกันที่เขียนต่างกัน ค้นหาในแอปจะเจอรวมกันอยู่แล้ว (ไม่สนขีด/ช่องว่าง) รายการนี้ไว้ตรวจเท่านั้น</div>';
+      h+=d.variants.length ? d.variants.map(function(v){ return '<div class="card" style="padding:12px 14px">'+v.forms.map(function(f){ return '<div style="display:flex;justify-content:space-between"><b>'+esc(f.p)+'</b><span class="meta">'+f.n+' รายการ</span></div>'; }).join('')+'</div>'; }).join('') : '<div class="empty">ไม่มี Part number ที่เขียนต่างกัน</div>';
+    } else {
+      var rows=DQ.tab==='ret'?d.ret:d.leg;
+      if(!rows.length) h='<div class="empty">เรียบร้อย ไม่มีแถวที่ข้อมูลไม่ครบ</div>';
+      else h='<div class="meta" style="margin:0 0 8px">แตะแถวเพื่อเติมข้อมูล · '+(DQ.tab==='ret'?'ประวัติส่งคืนที่นำเข้า':'ประวัติจ่ายที่นำเข้า')+' · ช่องสีแดงคือที่ยังขาด</div>'+rows.map(function(r,i){
+        var mc=DQ.tab==='ret'?r.machine:r.tail;
+        return '<div class="card dq-row" data-i="'+i+'" style="padding:12px 14px;cursor:pointer"><div style="display:flex;justify-content:space-between;gap:8px"><b>'+esc(r.part)+'</b><span class="meta">'+esc(r.date)+'</span></div><div>'+esc(r.name)+'</div>'+
+          '<div class="meta" style="margin-top:4px">S/N: '+(r.sn?esc(r.sn):'<span style="color:#dc2626;font-weight:700">ไม่มี</span>')+' · เครื่อง: '+(mc?esc(mc):'<span style="color:#dc2626;font-weight:700">ไม่มี</span>')+(DQ.tab==='leg'&&r.orig?' · ต้นฉบับ: '+esc(r.orig):'')+(DQ.tab==='ret'&&r.issue?' · '+esc(r.issue):'')+'</div></div>'; }).join('');
+    }
+    $('dq-body').innerHTML=h;
+  }
+  $('dq-seg').addEventListener('click',function(e){ var b=e.target.closest('button[data-t]'); if(!b) return; DQ.tab=b.dataset.t; dqRender(); });
+  $('dq-body').addEventListener('click',function(e){
+    var c=e.target.closest('.dq-row'); if(!c) return;
+    var rows=DQ.tab==='ret'?DQ.d.ret:DQ.d.leg, r=rows[Number(c.dataset.i)]; DQ.cur={src:DQ.tab,r:r};
+    $('dqx-t').textContent=r.part; $('dqx-s').textContent=r.name+' · '+r.date+(DQ.tab==='leg'&&r.orig?' · ต้นฉบับ: '+r.orig:'');
+    $('dqx-sn').value=r.sn||''; $('dqx-mc').value=(DQ.tab==='ret'?r.machine:r.tail)||''; $('dqx-tc').value=r.tech||'';
+    $('dqx-tw').style.display=DQ.tab==='leg'?'':'none';
+    $('dqx-bg').classList.add('on'); setTimeout(function(){ $('dqx-sn').focus(); },250);
+  });
+  $('dqx-x').addEventListener('click',function(){ $('dqx-bg').classList.remove('on'); });
+  $('dqx-ok').addEventListener('click',function(){
+    var c=DQ.cur; if(!c) return; var b=$('dqx-ok'); b.disabled=true;
+    var v={src:c.src,id:c.r.id,serial:$('dqx-sn').value,machine:$('dqx-mc').value,tech:$('dqx-tc').value};
+    run('dqFix',[v]).then(function(){
+      var sn=v.serial.trim(), mc=v.machine.trim(), list=c.src==='ret'?DQ.d.ret:DQ.d.leg, i=list.indexOf(c.r);
+      if(sn && mc){ if(i>=0) list.splice(i,1); } else { c.r.sn=sn; if(c.src==='ret') c.r.machine=mc; else { c.r.tail=mc; c.r.tech=v.tech.trim(); } }
+      dqBadge(); dqRender(); $('dqx-bg').classList.remove('on'); toast('บันทึกแล้ว');
+    }).catch(function(e){ toast(e.message||'บันทึกไม่สำเร็จ',true); }).then(function(){ b.disabled=false; });
+  });
+  $('dq-x').addEventListener('click',function(){ $('dq-bg').classList.remove('on'); });
   /* ---------- หน้า งาน TCI (จัดกลุ่มตามสถานะของ) ---------- */
   var TJ={month:'',data:null};
   function tjOpen(){ $('tj-bg').classList.add('on'); $('tj-bg').firstElementChild.scrollTop=0; $('tj-body').innerHTML='<div class="empty"><span class="spin"></span></div>'; tjLoad(TJ.month); }
@@ -4867,20 +4934,21 @@ function snWatch(id, getSeq){
   var sep=document.createElement('div'); sep.className='rl-sep'; nav.appendChild(sep);
   function act(id,target,svg,label,extra){
     var b=document.createElement('button'); b.type='button'; b.className='rl-act'; b.id=id;
-    b.innerHTML=svg+'<span>'+label+'</span>'+(extra||''); b.style.setProperty('--k',btns.length+(id==='rl-tj'?1:id==='rl-db'?2:3));
+    b.innerHTML=svg+'<span>'+label+'</span>'+(extra||''); b.style.setProperty('--k',btns.length+(id==='rl-tj'?1:id==='rl-db'?2:id==='rl-dw'?3:4));
     b.addEventListener('click',function(){ setOpen(false); setTimeout(function(){ if(typeof target==='function') return target(); var t=document.getElementById(target); if(t) t.click(); },160); });
     nav.appendChild(b); return b;
   }
   act('rl-tj',function(){ if(window.__tjOpen) window.__tjOpen(); },'<svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/><circle cx="19" cy="17" r="1.6"/></svg>','งาน TCI');
   act('rl-db','db-btn',SV.db,'แดชบอร์ด');
   act('rl-dw','dw-btn',SV.dw,'รอเอกสาร TAI','<em id="rl-dw-n"></em>');
+  act('rl-dq',function(){ if(window.__dqOpen) window.__dqOpen(); },'<svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2h9"/></svg>','ตรวจข้อมูล','<em id="rl-dq-n"></em>');
   var ft=document.createElement('div'); ft.className='rl-ft';
   ft.innerHTML='<button type="button" class="rl-who" id="rl-who"><span class="rl-av" id="rl-av">?</span><span style="min-width:0"><b id="rl-name">ยังไม่ได้ตั้งชื่อ</b><small>แตะเพื่อเปลี่ยนชื่อ</small></span></button><button type="button" class="rl-rf" id="rl-rf" aria-label="รีเฟรช">'+SV.rf+'</button>';
   nav.appendChild(ft);
   function sync(){
     var n=document.getElementById('dr-name'), a=document.getElementById('dr-av');
     if(n) document.getElementById('rl-name').textContent=n.textContent; if(a) document.getElementById('rl-av').textContent=a.textContent;
-    var c=document.getElementById('rl-dw-n'); if(c&&window.__dwN!=null) c.textContent=window.__dwN?'('+window.__dwN+')':'';
+    var c=document.getElementById('rl-dw-n'); if(c&&window.__dwN!=null) c.textContent=window.__dwN?'('+window.__dwN+')':''; var q=document.getElementById('rl-dq-n'); if(q&&window.__dqN!=null) q.textContent=window.__dqN?'('+window.__dqN+')':''; if(window.__dqCount) window.__dqCount();
   }
   document.getElementById('rl-who').addEventListener('click',function(){ setOpen(false); setTimeout(function(){ var t=document.getElementById('who-btn'); if(t) t.click(); },160); });
   document.getElementById('rl-rf').addEventListener('click',function(){ var r=document.getElementById('refresh'); if(r) r.click(); if(window.__dwCount) window.__dwCount(); var s=this; s.classList.remove('spin'); void s.offsetWidth; s.classList.add('spin'); });
