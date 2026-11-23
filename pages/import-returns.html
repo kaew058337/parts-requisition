@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>นำเข้าประวัติส่งคืนเก่า</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#eef2f8;font-family:'Sarabun',system-ui,sans-serif;color:#0b2a55;font-size:15px}
+  .w{max-width:760px;margin:0 auto;padding:18px 16px 60px}
+  h1{font-size:21px;margin:6px 0 4px}
+  .card{background:#fff;border-radius:16px;padding:16px;margin:14px 0;box-shadow:0 2px 10px rgba(7,27,53,.08)}
+  .m{color:#556;font-size:13.5px;line-height:1.6}
+  input[type=file]{width:100%;padding:12px;border:2px dashed #9fb3d1;border-radius:12px;background:#f7faff;font:inherit}
+  button{font:inherit;font-weight:700;border:0;border-radius:14px;padding:13px 18px;cursor:pointer;color:#fff;background:linear-gradient(180deg,#1f4d8f,#0b2a55);width:100%;margin-top:10px}
+  button:disabled{opacity:.45;cursor:default}
+  button.go{background:linear-gradient(180deg,#34c075,#128a4a)}
+  table{border-collapse:collapse;width:100%;font-size:12.5px;margin-top:8px}
+  th,td{border-bottom:1px solid #dde5f2;padding:5px 6px;text-align:left;vertical-align:top}
+  th{background:#0b2a55;color:#fff}
+  .wrap{overflow-x:auto}
+  .k{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+  .k div{background:#eaf1fb;border-radius:12px;padding:10px;text-align:center}.k b{display:block;font-size:22px}
+  .ok{color:#0f7a3a;font-weight:700}.bad{color:#b91c1c;font-weight:700}
+</style>
+</head>
+<body>
+<div class="w">
+  <h1>นำเข้าประวัติส่งคืนเก่า</h1>
+  <div class="m">เลือกไฟล์ Excel “รายการส่งพัสดุคืน TAI” ระบบจะอ่านและทำความสะอาดข้อมูลในเครื่องนี้ ให้ตรวจตัวอย่างก่อน แล้วจึงกดนำเข้า ข้อมูลที่นำเข้าจะขึ้นในประวัติส่งคืน และในการค้นหา S/N</div>
+  <div class="card">
+    <input type="file" id="f" accept=".xlsx,.xls">
+    <div id="st" class="m" style="margin-top:8px"></div>
+  </div>
+  <div id="pv"></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="legacy_returns_parse.js"></script>
+<script src="config.js"></script>
+<script>
+(function(){
+  var C=window.APP_CFG||{}, DATA=null;
+  function $(i){return document.getElementById(i);}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]});}
+  function rpc(name,body){
+    return fetch(C.SUPA_URL+'/rest/v1/rpc/'+name,{method:'POST',headers:{'Content-Type':'application/json',apikey:C.SUPA_KEY,Authorization:'Bearer '+C.SUPA_KEY},body:JSON.stringify({p:body})})
+      .then(function(r){return r.json().then(function(j){ if(!r.ok||(j&&j.message)) throw new Error((j&&j.message)||('HTTP '+r.status)); return j; });});
+  }
+  $('f').addEventListener('change',function(){
+    var f=this.files[0]; if(!f) return; $('st').textContent='กำลังอ่านไฟล์…'; $('pv').innerHTML='';
+    var rd=new FileReader();
+    rd.onload=function(){
+      try{
+        var wb=XLSX.read(new Uint8Array(rd.result),{type:'array',cellDates:true}), ws=wb.Sheets[wb.SheetNames[0]];
+        var rg=XLSX.utils.decode_range(ws['!ref']); rg.s.c=0; rg.e.c=Math.min(rg.e.c,18); ws['!ref']=XLSX.utils.encode_range(rg);
+        var aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+        DATA=LegacyReturns.parse(aoa); show();
+      }catch(e){ $('st').innerHTML='<span class="bad">อ่านไฟล์ไม่สำเร็จ: '+esc(e.message)+'</span>'; }
+    };
+    rd.readAsArrayBuffer(f);
+  });
+  function show(){
+    var R=DATA.rows, S=DATA.skipped; if(!R.length){ $('st').innerHTML='<span class="bad">ไม่พบข้อมูลในไฟล์</span>'; return; }
+    var ds=R.map(function(x){return x.date;}).sort(), withSn=R.filter(function(x){return x.sn;}).length;
+    $('st').innerHTML='อ่านไฟล์สำเร็จ';
+    var h='<div class="card"><b>สรุปที่จะนำเข้า</b><div class="k"><div><b>'+R.length+'</b>แถว</div><div><b>'+withSn+'</b>มี S/N</div><div><b>'+S.length+'</b>ข้าม</div></div>'+
+      '<div class="m" style="margin-top:8px">ช่วงวันที่ส่งคืน '+esc(ds[0])+' ถึง '+esc(ds[ds.length-1])+' · ช่อง S/N ที่มีหลายค่า (คั่นด้วย ,) ถูกแยกเป็นหลายแถว</div>';
+    if(S.length) h+='<div class="m" style="margin-top:8px"><b>แถวที่ข้าม (แก้ในไฟล์แล้วเพิ่มเองภายหลังได้)</b><br>'+S.map(function(x){return 'แถวที่ '+x.row+' · '+esc(x.why)+(x.part?' · '+esc(x.part):'')+(x.sn?' · S/N '+esc(x.sn):'');}).join('<br>')+'</div>';
+    h+='<div class="wrap"><table><thead><tr><th>วันที่</th><th>P/N</th><th>ชื่อ</th><th>S/N ออก</th><th>S/N เข้า</th><th>เครื่อง</th></tr></thead><tbody>'+
+      R.slice(0,6).concat(R.slice(-3)).map(function(x){return '<tr><td>'+esc(x.date)+'</td><td>'+esc(x.part)+'</td><td>'+esc(x.name)+'</td><td>'+esc(x.sn)+'</td><td>'+esc(x.sin)+'</td><td>'+esc(x.machine)+'</td></tr>';}).join('')+
+      '</tbody></table></div><div class="m">แสดง 6 แถวแรกและ 3 แถวสุดท้าย</div>'+
+      '<button id="chk">ตรวจซ้ำกับข้อมูลในระบบ</button><div id="dr" class="m" style="margin-top:8px"></div><button id="go" class="go" disabled>นำเข้าประวัติ</button><div id="rs" class="m" style="margin-top:8px"></div></div>';
+    $('pv').innerHTML=h;
+    $('chk').onclick=function(){
+      $('dr').textContent='กำลังตรวจ…';
+      rpc('rpc_import_legacy_returns',{rows:R,dryRun:true}).then(function(j){
+        $('dr').innerHTML='ซ้ำกับรายการที่บันทึกในระบบอยู่แล้ว (จะข้าม) <b>'+j.dupExisting+'</b> แถว · เคยนำเข้ามาก่อนหน้า <b>'+j.previouslyImported+'</b> แถว'+(j.previouslyImported>0?' (ถ้านำเข้าอีกครั้ง ระบบจะแทนที่ชุดเดิมให้ ไม่ซ้ำซ้อน)':'');
+        $('go').disabled=false;
+      }).catch(function(e){ $('dr').innerHTML='<span class="bad">ตรวจไม่สำเร็จ: '+esc(e.message)+'</span>'; });
+    };
+    $('go').onclick=function(){
+      if(!confirm('นำเข้า '+R.length+' แถวเข้าประวัติส่งคืน?')) return;
+      this.disabled=true; $('rs').textContent='กำลังนำเข้า…';
+      rpc('rpc_import_legacy_returns',{rows:R,by:'นำเข้าไฟล์เก่า'}).then(function(j){
+        $('rs').innerHTML='<span class="ok">นำเข้าสำเร็จ '+j.inserted+' แถว</span> · ข้ามซ้ำ '+j.skippedDuplicates+' · แทนที่ชุดเดิม '+j.replaced;
+      }).catch(function(e){ $('rs').innerHTML='<span class="bad">นำเข้าไม่สำเร็จ: '+esc(e.message)+'</span>'; $('go').disabled=false; });
+    };
+  }
+})();
+</script>
+</body>
+</html>
