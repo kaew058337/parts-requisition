@@ -780,6 +780,16 @@ nav.open button[data-v]{animation:rlIn .45s cubic-bezier(.22,1,.36,1) both;anima
 .rl-scrim.on{opacity:1;visibility:visible}
 header{transition:transform .6s cubic-bezier(.45,.05,.25,1)}
 header.hd-hide{transform:translate3d(0,-110%,0)}
+
+/* ===== คอมพิวเตอร์ (จอกว้าง): ตรึงแถบเมนูซ้ายไว้ตลอด ===== */
+@media (min-width:1024px){
+  body{padding-left:268px}
+  nav{transform:none !important;visibility:visible !important;transition:none;z-index:30;border-radius:0;box-shadow:4px 0 24px rgba(7,27,53,.18);width:268px}
+  nav .rl-x,#rl-tab,.rl-scrim{display:none !important}
+  nav.open button[data-v]{animation:none}
+  .tgbar{left:calc(268px + 12px)}
+  header.hd-hide{transform:none}
+}
 @media (prefers-reduced-motion:reduce){header{transition:none}}
 #rl-tab{position:fixed;left:0;top:calc(50% - 38px);z-index:38;width:24px;height:76px;padding:0;border:0;border-radius:0 18px 18px 0;cursor:pointer;
   background:linear-gradient(180deg,#123B65,#0A2342);box-shadow:4px 0 16px rgba(7,27,53,.35),inset -1px 0 0 rgba(212,179,106,.65);display:grid;place-items:center;
@@ -4865,6 +4875,12 @@ function snWatch(id, getSeq){
   },{passive:true});
   new MutationObserver(place).observe(nav,{subtree:true,attributes:true,attributeFilter:['class']});
   place();
+  /* จอกว้าง: แถบตรึงอยู่แล้ว ต้องจัดตำแหน่งตัวชี้/ชื่อ/ตัวเลขเอง */
+  var DK=window.matchMedia('(min-width:1024px)');
+  function dk(){ if(DK.matches){ place(); sync(); } }
+  if(DK.addEventListener) DK.addEventListener('change',dk); window.addEventListener('resize',dk);
+  setInterval(function(){ if(DK.matches) sync(); },4000);
+  setTimeout(dk,300); setTimeout(dk,1500);
 })();
 </script>
 <script>
