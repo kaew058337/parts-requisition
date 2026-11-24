@@ -1619,7 +1619,6 @@ main{padding-bottom:calc(28px + env(safe-area-inset-bottom))}
     <div id="ct-b" style="display:none">
       <div class="ct-bar">
         <button class="btn ghost sm" id="ct-back">← เลือก LOCATION</button>
-        <button class="btn ghost sm" id="ct-prsheet">พิมพ์ใบนับ</button>
       </div>
       <div class="info" id="ct-info"></div>
       <div class="ct-bar"><button class="btn ghost sm" id="ct-allok">ตรงระบบทุกรายการที่ยังไม่กรอก</button></div>
@@ -4920,7 +4919,6 @@ function snWatch(id, getSeq){
     }).catch(function(err){ toast(err.message,true); }).then(function(){ busy(b,false); });
   });
   $('ct-prrep').addEventListener('click', function(){ if(ct.last) printCountReport(ct.last); });
-  $('ct-prsheet').addEventListener('click', function(){ if(ct.items.length) printCountSheet(); else toast('ไม่มีรายการให้พิมพ์',true); });
 
   /* ---------- พิมพ์ใบตรวจนับ / รายงานผล (A4 แนวตั้ง) ---------- */
   function doPrintHtml(html, size, margin){
@@ -4945,20 +4943,6 @@ function snWatch(id, getSeq){
     return '<div class="sig">'+list.map(function(x){
       return '<div><div>ลงชื่อ ......................................</div><div style="margin-top:1mm">( '+(x[1]?esc(x[1]):'......................................')+' )</div><div>'+esc(x[0])+'</div></div>';
     }).join('')+'</div>';
-  }
-  function printCountSheet(){
-    var psk=pfDetect(), base=psk?16:12.5, mn=base*0.6, H=8.5;
-    var cols=[9,34,52,30,15,24,30];
-    var rows=ct.items.map(function(it,i){
-      return '<tr style="height:'+H+'mm"><td class="c">'+(i+1)+'</td><td>'+cell(it.part,cols[1],H,base,mn)+'</td><td>'+cell(it.name,cols[2],H,base,mn)+'</td>'+
-        '<td>'+cell(it.serial,cols[3],H,base,mn)+'</td><td class="c">'+fmtNum(it.qty)+'</td><td></td><td></td></tr>';
-    }).join('');
-    for(var k=0;k<3;k++) rows+='<tr style="height:'+H+'mm"><td class="c"></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
-    var html='<div class="pr ct'+(psk?'':' fb')+'">'+
-      ctHead('ใบตรวจนับพัสดุ','LOCATION : <b>'+esc(ct.label)+'</b>','วันที่ '+esc(ct.date))+
-      ctTable(cols,['ที่','Part number','ชื่อพัสดุ','Serial number','ระบบ','นับได้จริง','หมายเหตุ'],rows)+
-      ctSig([['ผู้ตรวจนับ',''],['ผู้ตรวจสอบ / กรรมการ','']])+'</div>';
-    doPrintHtml(html,'A4 portrait','8mm');
   }
   function printCountReport(d){
     var psk=pfDetect(), base=psk?16:12.5, mn=base*0.6, H=8.5;
