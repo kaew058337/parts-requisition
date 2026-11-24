@@ -316,3 +316,27 @@ $$;
 revoke all on function fn_close_loan_qty(bigint,numeric,text,text,text), fn_loan_out(bigint,numeric), fn_count_overdue_loans(), fn_next_count_no(date), fn_count_session(text) from public, anon;
 grant execute on function rpc_submit_borrow(jsonb), rpc_return_loan(jsonb), rpc_close_loan_replaced(jsonb), rpc_get_loans(), rpc_get_loans_for_part(text,text),
   rpc_get_count_locations(text), rpc_get_count_list(text,text), rpc_submit_count(jsonb), rpc_get_count_history(int) to anon;
+
+-- ---------- ใช้งานจริง : จ่ายพัสดุที่ยืมให้ช่าง (ปิดยืม + ตัดจ่ายพร้อมกัน) ----------
+create or replace function rpc_issue_loan(p jsonb) returns jsonb language plpgsql security definer set search_path = public as $$
+declare l loans; q numeric := coalesce(fn_num(p->>'qty'),0); lot record; pay date; tail text; left_ numeric; kit text; auto jsonb := null; tech text := btrim(coalesce(p->>'tech',''));
+begin
+  perform fn_lock();
+  l := fn_loan_out(nullif(p->>'seq','')::bigint, q);
+  if tech = '' then raise exception 'กรุณากรอกชื่อช่างที่รับพัสดุ'; end if;
+  select * into lot from v_lots where seq = l.lot_seq;
+  if not found then raise exception 'ไม่พบล็อตเดิมในคลัง จึงจ่ายไม่ได้'; end if;
+  pay := coalesce(fn_date(p->>'payDate'), fn_today());
+  tail := coalesce(nullif(btrim(coalesce(p->>'tail','')),''), lot.tail_no);
+  insert into issues(issue_date, doc_no, receipt_seq, part_no, name, serial_no, qty, unit, tail_no, technician, note, created_by)
+  values (pay, lot.doc_no, lot.seq, lot.part_no, lot.name, lot.serial_no, q, lot.unit, tail, tech,
+          concat_ws(' | ', nullif(lot.note,''), 'ใช้งานจริงจากรายการยืม #' || l.seq || ' (ผู้ยืม ' || l.borrower || ')', nullif(btrim(coalesce(p->>'remark','')),'')), btrim(coalesce(p->>'by','')));
+  update loans set qty_returned_to_stock = qty_returned_to_stock + q where seq = l.seq;  -- ตัดยอดยืมออก เพราะตัดจ่ายแทน
+  left_ := fn_close_loan_qty(l.seq, q, 'ใช้งานจริง (จ่ายให้ช่าง)', '', 'ใช้งานจริง x' || fn_qtytxt(q) || ' (จ่ายให้ ' || tech || ')');
+  perform fn_log(p->>'by', 'จ่าย (จากรายการยืม)', lot.doc_no, concat_ws(' | ', lot.part_no, lot.name, 'x' || fn_qtytxt(q), case when lot.serial_no <> '' then 'S/N ' || lot.serial_no end,
+    'ช่าง ' || tech, case when tail <> '' then 'TAIL ' || tail end, 'ยืม #' || l.seq, case when left_ > 0 then 'ค้างยืมอีก ' || fn_qtytxt(left_) else '(ปิดรายการยืม)' end));
+  kit := fn_kit_of(lot.tail_no);
+  if kit <> '' then auto := fn_auto_kit_req(lot.part_no, lot.name, lot.unit, lot.item_type, lot.serial_no, kit, q, p); end if;
+  return jsonb_build_object('ok', true, 'left', left_, 'autoReq', auto);
+end $$;
+grant execute on function rpc_issue_loan(jsonb) to anon;

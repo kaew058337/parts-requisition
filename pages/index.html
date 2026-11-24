@@ -3219,10 +3219,13 @@ function snWatch(id, getSeq){
     var qv=Number($('x-qty').value);
     if(!(qv>0) || qv>r.qty){ toast('จำนวนที่จ่ายต้องมากกว่า 0 และไม่เกิน '+fmtNum(r.qty),true); return; }
     var btn=$('x-submit'); busy(btn,true);
-    run('submitIssue', [{ row:r.row, seq:r.seq, docNo:r.docNo, qty:qv, payDate:$('x-pay').value, tail:$('x-tail').value,
-      tech:$('x-tech').value, remark:$('x-remark').value, by:state.by }])
-    .then(function(res){
+    var call = r.loanSeq
+      ? run('issueLoan', [{ seq:r.loanSeq, qty:qv, payDate:$('x-pay').value, tail:$('x-tail').value, tech:$('x-tech').value, remark:$('x-remark').value, by:state.by }])
+      : run('submitIssue', [{ row:r.row, seq:r.seq, docNo:r.docNo, qty:qv, payDate:$('x-pay').value, tail:$('x-tail').value,
+      tech:$('x-tech').value, remark:$('x-remark').value, by:state.by }]);
+    call.then(function(res){
       $('x-bg').classList.remove('on');
+      if(r.loanSeq){ toast(res.left>0 ? 'จ่ายแล้ว · ค้างยืมอีก '+fmtNum(res.left) : 'จ่ายให้ช่างแล้ว ปิดรายการยืมแล้ว'); loadLoans(); boot(); return; }
       toast((res.closed ? 'จ่ายครบ ปิดใบเบิกแล้ว' : (qv<r.qty ? 'บันทึกการจ่าย '+fmtNum(qv)+' แล้ว เหลือในคลัง '+fmtNum(r.qty-qv) : 'บันทึกการจ่ายแล้ว'))+kitReqNote(res), !!(res.autoReq&&res.autoReq.error));
       loadIssue(); if(state.fromStock){ state.fromStock=false; loadStock(); }
     }).catch(function(e){ toast(e.message,true); }).then(function(){ busy(btn,false); });
@@ -3721,18 +3724,11 @@ function snWatch(id, getSeq){
     }).catch(function(e){ toast(e.message,true); }).then(function(){ busy(btn,false); });
   });
 
-  // ใช้งานจริง: เปิดหน้าเบิกพร้อมข้อมูลพัสดุ แล้วไปรับโดยเลือก "ของที่ยืมไปใช้"
+  // ใช้งานจริง: เปิดหน้าจ่ายให้ช่าง (ปิดรายการยืมและตัดจ่ายพร้อมกัน)
   function startReqFromLoan(x){
     if(!x) return;
-    show('req');
-    var it=document.querySelector('#r-items .item');
-    if(it){
-      it.querySelector('.f-part').value=x.part; it.querySelector('.f-name').value=x.name;
-      it.querySelector('.f-qty').value=x.out; it.querySelector('.f-unit').value=x.unit||'EA';
-    }
-    if(x.type && it) it.querySelector('.f-type').value=x.type; instToggle(it);
-    $('r-issue').value='เบิกตามพัสดุที่ยืมไปใช้ (ยืมเลขที่ '+x.seq+' · '+x.borrower+')';
-    toast('เลือกเครื่องและผู้เบิก แล้วบันทึกใบเบิก จากนั้นไปหน้า รับ เลือก "ของที่ยืมไปใช้"');
+    state.fromStock=false;
+    openIssue({ loanSeq:x.seq, docNo:'ยืม #'+x.seq, part:x.part, name:x.name, serial:x.serial, type:x.type, qty:x.out, unit:x.unit, machine:'', issue:'ผู้ยืม '+x.borrower });
   }
 
   /* ---------- แจ้งเตือน Serial (ส่งคืนซ้ำภายใน 365 วัน) ---------- */
