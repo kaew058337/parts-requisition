@@ -1610,11 +1610,34 @@ main{padding-bottom:calc(28px + env(safe-area-inset-bottom))}
       <div id="ct-fl" class="seg" style="display:none;grid-template-columns:repeat(4,1fr);margin:10px 0">
         <button data-f="todo" class="on">ยังไม่นับ</button><button data-f="diff">มีผลต่าง</button><button data-f="done">นับแล้ว</button><button data-f="all">ทั้งหมด</button>
       </div>
+      <div style="display:flex;gap:8px;align-items:center;margin:0 0 8px"><button class="btn ghost sm" id="ct-selmode" style="margin:0;width:auto">เลือกหลายที่เก็บ (ใบนับรวม)</button></div>
+      <div id="ct-selbar" style="display:none;position:sticky;top:0;z-index:5;background:var(--card,#fff);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:0 0 10px">
+        <div id="ct-selinfo" style="margin-bottom:8px"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn ghost sm" id="ct-selall" style="margin:0;width:auto">เลือกทั้งหมดที่แสดง</button>
+          <button class="btn ghost sm" id="ct-selclr" style="margin:0;width:auto">ล้าง</button>
+          <button class="btn sm" id="ct-selpr" style="margin:0;width:auto">พิมพ์ใบนับรวม</button>
+          <button class="btn sm" id="ct-selent" style="margin:0;width:auto">ลงผลนับรวม</button>
+        </div>
+      </div>
       <input class="search" id="ct-search" type="search" placeholder="ค้นหา LOCATION">
       <div id="ct-locs"><div class="empty"><span class="spin"></span></div></div>
       <div class="sec">ใบตรวจนับล่าสุด</div>
       <div id="ct-hist"></div>
       <div id="ct-past"></div>
+    </div>
+
+    <div id="ct-e" style="display:none">
+      <div class="ct-bar"><button class="btn ghost sm" id="ct-e-back">← กลับ</button><button class="btn ghost sm" id="ct-e-allok">ตรงระบบทุกรายการที่ยังไม่กรอก</button></div>
+      <div class="info" id="ct-e-info"></div>
+      <div id="ct-e-list"></div>
+      <div id="ct-e-foot" style="margin-top:12px">
+        <div id="ct-e-sum" style="margin-bottom:8px"></div>
+        <label style="display:flex;gap:10px;align-items:center;margin:6px 0;color:var(--ink)"><input type="checkbox" id="ct-e-adjust" style="width:auto;margin:0"> ปรับยอดในระบบตามที่นับได้</label>
+        <div id="ct-e-rw" style="display:none"><label>เหตุผล (ใช้กับของที่นับเกิน)</label><input id="ct-e-reason"></div>
+        <label>ชื่อพยาน / กรรมการ (ถ้ามี)</label><input id="ct-e-wit">
+        <button class="btn" id="ct-e-save" style="margin-top:12px">บันทึกผลตรวจนับทั้งหมด</button>
+      </div>
     </div>
 
     <div id="ct-d" style="display:none">
@@ -4648,8 +4671,8 @@ function snWatch(id, getSeq){
   /* ---------- ตรวจนับพัสดุ ---------- */
   var ct = { chem:false, loc:'', label:'', date:'', items:[], extras:[], locs:[], hist:[], last:null };
   function ctShow(v){
-    ['a','b','c','d'].forEach(function(k){ $('ct-'+k).style.display = (k===v?'block':'none'); });
-    $('ct-title').textContent = v==='a' ? 'ตรวจนับพัสดุ' : (v==='b' ? 'ตรวจนับ · '+ct.label : (v==='d' ? 'สรุปรอบนับ' : 'ผลการตรวจนับ'));
+    ['a','b','c','d','e'].forEach(function(k){ $('ct-'+k).style.display = (k===v?'block':'none'); });
+    $('ct-title').textContent = v==='a' ? 'ตรวจนับพัสดุ' : (v==='b' ? 'ตรวจนับ · '+ct.label : (v==='d' ? 'สรุปรอบนับ' : (v==='e' ? 'ลงผลนับรวม' : 'ผลการตรวจนับ')));
     $('ct-bg').firstElementChild.scrollTop = 0;
   }
   function ctOpen(){ $('ct-bg').classList.add('on'); ctShow('a'); ctLoadLocs(); }
@@ -4675,7 +4698,7 @@ function snWatch(id, getSeq){
     }).then(function(){
       return run('getCountHistory',[8]).catch(function(){ return []; });
     }).then(function(h){
-      ct.hist=h||[]; ct.limit=60; ctRenderRound(); ctRenderLocs(); ctRenderHist(); ctRenderPast();
+      ct.hist=h||[]; ct.limit=60; if(typeof ctSelBar==='function') ctSelBar(); ctRenderRound(); ctRenderLocs(); ctRenderHist(); ctRenderPast();
     }).catch(function(e){ $('ct-locs').innerHTML='<div class="empty">'+esc(e.message)+'</div>'; });
   }
   function ctMonthName(){ var m=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม']; var d=new Date(); return 'ตรวจนับประจำเดือน'+m[d.getMonth()]+' '+(d.getFullYear()+543); }
@@ -4712,7 +4735,8 @@ function snWatch(id, getSeq){
       if(r){ chip = !l.done ? '<span class="chip">ยังไม่นับ</span>' : (l.diffs>0 ? '<span class="chip" style="background:#fde7e5;color:var(--bad)">ผลต่าง '+l.diffs+'</span>' : '<span class="chip ok">นับแล้ว ✓</span>'); }
       else chip='<span class="chip">'+l.lots+' รายการ</span>';
       var sub = r ? (l.lots+' ล็อต · รวม '+fmtNum(l.qty)+' หน่วย'+(l.done?' · นับโดย '+esc(l.by)+' '+esc(l.date):'')) : ('รวม '+fmtNum(l.qty)+' หน่วย · '+(l.last?'นับล่าสุด '+esc(l.last):'ยังไม่เคยนับ'));
-      return '<div class="pcard lift" role="button" tabindex="0" data-k="'+o.k+'"><div class="t"><span class="doc">'+esc(l.label)+'</span>'+chip+'</div>'+
+      var sel = ct.selMode ? '<input type="checkbox" '+(ct.sel[l.loc]?'checked ':'')+'style="width:22px;height:22px;margin:0 10px 0 0;flex:none;pointer-events:none"> ' : '';
+      return '<div class="pcard lift'+(ct.selMode&&ct.sel[l.loc]?' sel':'')+'" role="button" tabindex="0" data-k="'+o.k+'"'+(ct.selMode&&ct.sel[l.loc]?' style="outline:2px solid var(--blue)"':'')+'><div class="t"><span class="doc" style="display:flex;align-items:center">'+sel+esc(l.label)+'</span>'+chip+'</div>'+
         '<div class="meta" style="margin-top:4px">'+sub+'</div></div>';
     }).join('') + (more?'<button class="btn ghost" id="ct-more" style="margin-top:8px">แสดงเพิ่ม (อีก '+(rows.length-ct.limit)+' ที่เก็บ)</button>':'')
       : (r && f==='todo' && !q ? emp('check','นับครบทุกที่เก็บแล้ว','กด "สรุปผลต่างทั้งรอบ" เพื่อตรวจก่อนปิดรอบ') : '<div class="empty">ไม่พบ LOCATION</div>');
@@ -4745,7 +4769,9 @@ function snWatch(id, getSeq){
     var c=e.target.closest('[data-k]'); if(!c) return;
     if(e.type==='keydown' && e.key!=='Enter' && e.key!==' ') return;
     if(e.type==='keydown') e.preventDefault();
-    var l=ct.locs[Number(c.dataset.k)]; if(l) ctStart(l);
+    var l=ct.locs[Number(c.dataset.k)]; if(!l) return;
+    if(ct.selMode){ if(ct.sel[l.loc]) delete ct.sel[l.loc]; else ct.sel[l.loc]=1; ctSelBar(); ctRenderLocs(); return; }
+    ctStart(l);
   }
   $('ct-locs').addEventListener('click', ctPick);
   $('ct-locs').addEventListener('keydown', ctPick);
@@ -4755,6 +4781,135 @@ function snWatch(id, getSeq){
         '<button class="btn ghost sm" data-pr="'+p.id+'" style="margin:0;width:auto;flex:none">ดูสรุป</button></div>'; }).join('') : '';
   }
   $('ct-past').addEventListener('click', function(e){ var b=e.target.closest('button[data-pr]'); if(b) ctOpenSummary(Number(b.dataset.pr)); });
+
+  /* ---------- ใบนับรวม: เลือกหลายที่เก็บ → พิมพ์รวม / ลงผลรวม ---------- */
+  ct.selMode=false; ct.sel={}; ct.bulk=null;
+  function ctSelKeys(){ return Object.keys(ct.sel); }
+  function ctSelBar(){
+    var n=ctSelKeys().length;
+    $('ct-selbar').style.display = ct.selMode ? 'block' : 'none';
+    $('ct-selinfo').innerHTML = 'เลือกแล้ว <b>'+n+'</b> ที่เก็บ'+(n>80?' <span style="color:var(--bad)">(เกิน 80 ที่เก็บ กรุณาลดลง)</span>':'');
+    $('ct-selmode').textContent = ct.selMode ? 'ยกเลิกการเลือก' : 'เลือกหลายที่เก็บ (ใบนับรวม)';
+  }
+  $('ct-selmode').addEventListener('click', function(){ ct.selMode=!ct.selMode; if(!ct.selMode) ct.sel={}; ctSelBar(); ctRenderLocs(); });
+  $('ct-selclr').addEventListener('click', function(){ ct.sel={}; ctSelBar(); ctRenderLocs(); });
+  $('ct-selall').addEventListener('click', function(){
+    var q=$('ct-search').value.trim().toLowerCase(), r=ct.round, f=ct.filter;
+    ct.locs.forEach(function(l){
+      if(q && l.label.toLowerCase().indexOf(q)<0) return;
+      if(r){ if(f==='todo' && l.done) return; if(f==='done' && !l.done) return; if(f==='diff' && !(l.done && l.diffs>0)) return; }
+      ct.sel[l.loc]=1;
+    });
+    ctSelBar(); ctRenderLocs();
+  });
+  function ctBulkLoad(btn){
+    var keys=ctSelKeys();
+    if(!keys.length){ toast('ยังไม่ได้เลือกที่เก็บ',true); return Promise.reject(); }
+    if(keys.length>80){ toast('เลือกได้ไม่เกิน 80 ที่เก็บต่อครั้ง',true); return Promise.reject(); }
+    var order={}; ct.locs.forEach(function(l,i){ order[l.loc]=i; }); keys.sort(function(a,b){ return (order[a]||0)-(order[b]||0); });
+    busy(btn,true);
+    return run('getCountLists',[{locs:keys, grp:ct.chem?'สารเคมี':''}]).then(function(lists){
+      ct.bulk=lists.map(function(L){ L.items=(L.items||[]).map(function(i){ i.cnt=''; i.note=''; return i; }); return L; });
+      return ct.bulk;
+    }).catch(function(e){ toast(e.message,true); throw e; }).then(function(v){ busy(btn,false); return v; }, function(e){ busy(btn,false); throw e; });
+  }
+  $('ct-selpr').addEventListener('click', function(){
+    ctBulkLoad(this).then(function(L){
+      var psk=pfDetect(), base=psk?16:12.5, mn=base*0.6, H=7.6, cols=[8,34,58,30,14,26,24];
+      var nItems=0, rows=L.map(function(g){
+        nItems+=g.items.length;
+        var head='<tr style="height:7mm"><td colspan="7" style="background:#e9edf3;font-weight:700;padding-left:2mm">LOCATION : '+esc(g.label)+' <span style="font-weight:400">('+g.items.length+' รายการ)</span></td></tr>';
+        if(!g.items.length) return head+'<tr style="height:'+H+'mm"><td colspan="7" style="padding-left:2mm;color:#666">ไม่มีพัสดุตามระบบ — ถ้าพบของ เขียนที่หมายเหตุ</td></tr>';
+        return head+g.items.map(function(it,i){
+          return '<tr style="height:'+H+'mm"><td class="c">'+(i+1)+'</td><td>'+cell(it.part,cols[1],H,base,mn)+'</td><td>'+cell(it.name,cols[2],H,base,mn)+'</td>'+
+            '<td>'+cell(it.serial,cols[3],H,base,mn)+'</td><td class="c">'+fmtNum(it.qty)+'</td><td></td><td></td></tr>';
+        }).join('');
+      }).join('');
+      var title='ใบตรวจนับพัสดุ (รวม)'+(ct.round?' · '+ct.round.name:'');
+      doPrintHtml('<div class="pr ct'+(psk?'':' fb')+'">'+ctHead(title,'<b>'+L.length+'</b> ที่เก็บ · <b>'+nItems+'</b> รายการ','วันที่ '+esc((L[0]&&L[0].date)||''))+
+        ctTable(cols,['ที่','Part number','ชื่อพัสดุ','Serial number','ระบบ','นับได้จริง','หมายเหตุ'],rows)+
+        ctSig([['ผู้ตรวจนับ',''],['ผู้ตรวจสอบ / กรรมการ','']])+'</div>','A4 portrait','8mm');
+    }).catch(function(){});
+  });
+  /* ลงผลนับรวม */
+  function beRow(g,i){
+    var it=ct.bulk[g].items[i], id=g+'-'+i;
+    var ctl = it.serial
+      ? '<div class="seg2"><button class="btn ghost sm f" data-act="found" data-g="'+g+'" data-i="'+i+'">พบ</button><button class="btn ghost sm m" data-act="miss" data-g="'+g+'" data-i="'+i+'">ไม่พบ</button></div>'
+      : '<input type="number" inputmode="decimal" min="0" class="ci-n" data-g="'+g+'" data-i="'+i+'" placeholder="นับได้จริง"><button class="btn ghost sm" data-act="ok" data-g="'+g+'" data-i="'+i+'">ตรง</button>';
+    return '<div class="ci" id="be-'+id+'"><div class="ci-h"><div><b>'+esc(it.part||'-')+'</b><div>'+esc(it.name)+'</div>'+
+      '<div class="meta">'+(it.serial?'S/N '+esc(it.serial)+' · ':'')+(it.type?esc(it.type)+' · ':'')+esc(it.label)+'</div></div><span class="chip">ระบบ '+fmtNum(it.qty)+' '+esc(it.unit)+'</span></div>'+
+      '<div class="ci-in">'+ctl+'</div></div>';
+  }
+  function beRender(){
+    $('ct-e-list').innerHTML = ct.bulk.map(function(L,g){
+      return '<div class="sec" style="margin-top:14px">LOCATION '+esc(L.label)+' · '+L.items.length+' รายการ</div>'+
+        (L.items.length ? L.items.map(function(_,i){ return beRow(g,i); }).join('') : '<div class="meta">ไม่มีพัสดุตามระบบ (ข้าม)</div>');
+    }).join('');
+    beSum();
+  }
+  function beStat(){
+    var tot=0, done=0, diff=0, over=false;
+    ct.bulk.forEach(function(L){ L.items.forEach(function(i){ tot++; if(i.cnt!==''){ done++; if(i.cnt!==i.qty){ diff++; if(i.cnt>i.qty) over=true; } } }); });
+    return {tot:tot, done:done, diff:diff, over:over};
+  }
+  function beSum(){
+    var s=beStat();
+    $('ct-e-info').innerHTML='<b>'+ct.bulk.length+'</b> ที่เก็บ · <b>'+s.tot+'</b> รายการตามระบบ';
+    $('ct-e-sum').innerHTML='กรอกแล้ว <b>'+s.done+'/'+s.tot+'</b> · ผลต่าง <b style="color:'+(s.diff?'var(--bad)':'var(--ok)')+'">'+s.diff+'</b> รายการ';
+    if(!s.diff) $('ct-e-adjust').checked=false;
+    $('ct-e-adjust').parentNode.style.display = s.diff ? 'flex' : 'none';
+    $('ct-e-rw').style.display = ($('ct-e-adjust').checked && (!ct.chem || s.over)) ? 'block' : 'none';
+  }
+  function beUpd(g,i){
+    var it=ct.bulk[g].items[i], el=$('be-'+g+'-'+i); if(!el) return;
+    var has=it.cnt!=='', diff=has?(it.cnt-it.qty):0;
+    el.className='ci'+(has?(diff===0?' ok':' bad'):'');
+    var f=el.querySelector('[data-act=found]'), m=el.querySelector('[data-act=miss]');
+    if(f){ f.classList.toggle('on', has&&it.cnt===1); m.classList.toggle('on', has&&it.cnt===0); }
+    var inp=el.querySelector('.ci-n'); if(inp && document.activeElement!==inp) inp.value = has?it.cnt:'';
+    beSum();
+  }
+  $('ct-selent').addEventListener('click', function(){
+    ctBulkLoad(this).then(function(){ $('ct-e-adjust').checked=false; $('ct-e-reason').value=''; $('ct-e-wit').value=''; beRender(); ctShow('e'); }).catch(function(){});
+  });
+  $('ct-e-back').addEventListener('click', function(){ ctShow('a'); });
+  $('ct-e-list').addEventListener('click', function(e){
+    var b=e.target.closest('button[data-act]'); if(!b) return;
+    var g=Number(b.dataset.g), i=Number(b.dataset.i), it=ct.bulk[g].items[i]; if(!it) return;
+    it.cnt = b.dataset.act==='found' ? 1 : (b.dataset.act==='miss' ? 0 : it.qty); beUpd(g,i);
+  });
+  $('ct-e-list').addEventListener('input', function(e){
+    var t=e.target; if(!t.classList.contains('ci-n')) return;
+    var g=Number(t.dataset.g), i=Number(t.dataset.i), it=ct.bulk[g].items[i]; var v=t.value.trim();
+    it.cnt = v==='' ? '' : (isFinite(Number(v)) ? Number(v) : ''); beUpd(g,i);
+  });
+  $('ct-e-allok').addEventListener('click', function(){
+    ct.bulk.forEach(function(L,g){ L.items.forEach(function(it,i){ if(it.cnt===''){ it.cnt=it.qty; beUpd(g,i); } }); });
+  });
+  $('ct-e-adjust').addEventListener('change', beSum);
+  $('ct-e-save').addEventListener('click', function(){
+    if(!state.by){ askBy(function(){ $('ct-e-save').click(); }); return; }
+    var s=beStat();
+    if(s.done<s.tot){ toast('ยังไม่ได้กรอก '+(s.tot-s.done)+' รายการ (กด “ตรงระบบทุกรายการที่ยังไม่กรอก” ถ้านับตรง)',true); return; }
+    var adjust=$('ct-e-adjust').checked && s.diff>0, reason=$('ct-e-reason').value.trim();
+    if(adjust && (!ct.chem || s.over) && !reason){ toast('กรุณาระบุเหตุผล (ใช้กับของที่นับเกิน)',true); $('ct-e-reason').focus(); return; }
+    var todo=ct.bulk.filter(function(L){ return L.items.length; });
+    if(!todo.length){ toast('ไม่มีรายการให้บันทึก',true); return; }
+    if(!confirm('บันทึกผลตรวจนับ '+todo.length+' ที่เก็บ ('+s.tot+' รายการ)\nผลต่าง '+s.diff+' รายการ · '+(adjust?'ปรับยอดในระบบตามที่นับได้':'ไม่ปรับยอด (บันทึกเป็นหลักฐานเท่านั้น)'))) return;
+    var btn=this; busy(btn,true); var ok=0, docs=[], wit=$('ct-e-wit').value.trim();
+    todo.reduce(function(p,L){
+      return p.then(function(){
+        return run('submitCount',[{ roundId:(ct.round?ct.round.id:null), location:L.loc, by:state.by, witness:wit, adjust:adjust, reason:reason, useMode:ct.chem,
+          items:L.items.map(function(i){ return {seq:i.seq, sys:i.qty, counted:i.cnt, note:''}; }), extras:[] }]).then(function(r){ ok++; docs.push(r.docNo); });
+      });
+    }, Promise.resolve()).then(function(){
+      toast('บันทึกครบ '+ok+' ที่เก็บ'); ct.sel={}; ct.selMode=false; ctSelBar(); ctLoadLocs(); ctShow('a'); if(typeof loadStock==='function') loadStock();
+    }).catch(function(err){
+      toast('บันทึกได้ '+ok+'/'+todo.length+' ที่เก็บ แล้วหยุดที่ผิดพลาด: '+err.message+' — ที่บันทึกแล้วไม่ต้องกรอกซ้ำ ให้เลือกที่เหลือมาลงใหม่',true);
+      ct.sel={}; ct.selMode=false; ctSelBar(); ctLoadLocs(); ctShow('a');
+    }).then(function(){ busy(btn,false); });
+  });
   /* สรุปผลต่างทั้งรอบ */
   function ctOpenSummary(id){
     ctShow('d'); $('ct-d-info').innerHTML='<span class="spin"></span>'; $('ct-d-list').innerHTML='';
