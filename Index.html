@@ -134,7 +134,7 @@
   #k-list>.card{content-visibility:auto;contain-intrinsic-size:auto 150px}
   input,select,textarea{width:100%;font:inherit;font-size:16px;padding:12px 14px;border:1.5px solid var(--line);border-radius:14px;background:#f8fafd;color:var(--ink);appearance:none;-webkit-appearance:none;transition:border-color .25s var(--ease),box-shadow .25s var(--ease),background .25s}
   textarea{min-height:80px;resize:vertical}
-  input:hover,select:hover,textarea:hover{border-color:#c4d3e8}
+  @media (hover:hover) and (pointer:fine){input:hover,select:hover,textarea:hover{border-color:#c4d3e8}}
   input:focus,select:focus,textarea:focus{outline:none;border-color:var(--blue);background:#fff;box-shadow:0 0 0 4px rgba(76,141,206,.2),0 0 18px rgba(76,141,206,.18)}
   select{background-image:linear-gradient(45deg,transparent 50%,#7b8ca8 50%),linear-gradient(135deg,#7b8ca8 50%,transparent 50%);background-position:calc(100% - 20px) 52%,calc(100% - 14px) 52%;background-size:6px 6px;background-repeat:no-repeat;padding-right:36px}
   input[type=checkbox]{width:auto}
@@ -620,7 +620,7 @@ html[data-theme=dark] .ci.bad{background:#3a1c22}
 html[data-theme=dark] label{color:#c5d4ec}
 html[data-theme=dark] ::placeholder{color:#7f93b3}
 html[data-theme=dark] input,html[data-theme=dark] select,html[data-theme=dark] textarea{background:#0c2240;color:var(--ink);border-color:var(--line)}
-html[data-theme=dark] input:hover,html[data-theme=dark] select:hover,html[data-theme=dark] textarea:hover{border-color:#3b5f85}
+@media (hover:hover) and (pointer:fine){html[data-theme=dark] input:hover,html[data-theme=dark] select:hover,html[data-theme=dark] textarea:hover{border-color:#3b5f85}}
 html[data-theme=dark] input:focus,html[data-theme=dark] select:focus,html[data-theme=dark] textarea:focus{background:#0f2a4d;border-color:var(--gold)}
 html[data-theme=dark] .btn.ghost{background:linear-gradient(180deg,#1b3b66,#12305a);color:#dcebff;text-shadow:none;border-color:rgba(212,179,106,.6);box-shadow:0 3px 10px rgba(0,0,0,.3)}
 html[data-theme=dark] .btn.ghost::before{background:linear-gradient(100deg,transparent 30%,rgba(212,179,106,.35) 50%,transparent 70%)}
