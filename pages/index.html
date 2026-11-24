@@ -3290,7 +3290,7 @@ function snWatch(id, getSeq){
     best=Math.max(best, dice(a,nm)*0.95);
     var toks=String(q).toLowerCase().split(/[\s,\/\-]+/).map(nk).filter(function(t){ return t.length>=3; });
     if(toks.length){ var hit=0, hay=(String(g.name)+' '+String(g.part)).toLowerCase(), hk=nk(hay); toks.forEach(function(t){ if(hk.indexOf(t)>=0) hit++; else { var w=hay.split(/[^a-z0-9ก-๙]+/); if(w.some(function(x){ x=nk(x); return x.length>=3 && dice(t,x)>=.7; })) hit+=.8; } });
-      best=Math.max(best, .45+.5*hit/toks.length*(toks.length>1?1:.9)); if(!hit) best=Math.min(best,.5); }
+      if(hit) best=Math.max(best, .45+.5*hit/toks.length*(toks.length>1?1:.9)); }
     return best;
   }
   function renderStock(){
