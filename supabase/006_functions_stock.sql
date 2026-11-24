@@ -560,3 +560,5 @@ grant execute on function rpc_get_stock(), rpc_search_parts(jsonb), rpc_check_se
 -- alter table claims add column if not exists received_seq bigint;
 -- rpc_update_claim(p): เมื่อ status = ได้ซ่อมกลับ/ได้ของใหม่ และ p.receive = true จะ insert receipts (source 'รับจากเคลม', ref_seq = ล็อตเดิม,
 --   serial = S/N ใหม่ถ้าได้ของใหม่, location = p.location) แล้วบันทึก claims.received_seq กันรับซ้ำ ; ผลลัพธ์เพิ่ม 'received', 'lotSeq'
+-- อ้างอิงใบเบิกเดิม: ล็อตที่รับจากเคลมเก็บ ref_seq = ล็อตเดิม; rpc_get_serial_history แสดง "รับกลับจากเคลม (ใบเบิกเดิม <เลข>)"
+-- และหมายเหตุของล็อตมี "· ใบเบิกเดิม <เลข>" (applied live 2026-11-24)
