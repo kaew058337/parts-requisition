@@ -178,7 +178,7 @@ begin
   from receipts r
   where coalesce(nullif(r.source,''),'ใบเบิก') in ('ใบเบิก','รับก่อนเบิก') and r.ref_seq is null and r.received_date >= ms and r.received_date < me;
   delete from _mr where qty <= 0;
-  update _mr set k = case when serial <> '' then 'S' || rn else part || '|' || price || '|' || tail end;
+  update _mr set k = case when serial <> '' then 'S' || rn else part || '|' || price || '|' || tail end where true;
   select count(*) into n from _mr;
   foreach tyn in array array['LRU','LRU(TCI)','SP','SP(TCI)'] loop
     out := out || jsonb_build_object(tyn, coalesce((select jsonb_agg(jsonb_build_object('part', part, 'name', name, 'qty', q, 'unit', unit, 'price', price, 'total', round(q * price, 2), 'remark', tail, 'serial', serial) order by r0)
