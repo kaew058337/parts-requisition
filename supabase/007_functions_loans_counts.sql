@@ -300,8 +300,8 @@ begin
     end if;
     res := case when d = 0 then 'ตรง' when adj then (case when used then 'ตัดจ่ายแล้ว' else 'ปรับยอดแล้ว' end) else 'ไม่ปรับยอด' end;
     note := concat_ws(' | ', nullif(case when used then 'ช่างหยิบใช้เอง (ตัดจ่าย)' when d <> 0 then reason else '' end, ''), nullif(r->>'note',''));
-    insert into counts(count_no, count_date, location, receipt_seq, part_no, name, serial_no, item_type, unit, qty_system, qty_counted, diff, result, note, counter, witness)
-    values (v_no, today, loc, coalesce(newseq, nullif(r->>'lot','')::bigint), r->>'part', r->>'name', r->>'serial', r->>'type', r->>'unit', (r->>'sys')::numeric, (r->>'cnt')::numeric, d, res, note, by_, wit);
+    insert into counts(count_no, count_date, location, receipt_seq, part_no, name, serial_no, item_type, unit, qty_system, qty_counted, diff, result, note, counter, witness, round_id)
+    values (v_no, today, loc, coalesce(newseq, nullif(r->>'lot','')::bigint), r->>'part', r->>'name', r->>'serial', r->>'type', r->>'unit', (r->>'sys')::numeric, (r->>'cnt')::numeric, d, res, note, by_, wit, nullif(p->>'roundId','')::bigint);
   end loop;
   perform fn_log(by_, 'ตรวจนับ', v_no, concat_ws(' | ', coalesce(nullif(loc,''), '(ไม่ระบุที่เก็บ)'), jsonb_array_length(rows) || ' รายการ', 'ผลต่าง ' || n_acts,
     case when n_acts > 0 then case when adj then 'ปรับยอดแล้ว: ' || reason else 'ไม่ปรับยอด' end end));

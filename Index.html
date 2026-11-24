@@ -1593,12 +1593,25 @@ main{padding-bottom:calc(28px + env(safe-area-inset-bottom))}
     <div class="hd"><b id="ct-title">ตรวจนับพัสดุ</b><button class="x" id="ct-x" aria-label="ปิด">×</button></div>
 
     <div id="ct-a">
-      <div class="info">เลือก LOCATION ที่จะตรวจนับ ระบบจะแสดงรายการที่ควรมีในที่เก็บนั้น แล้วให้กรอกจำนวนที่นับได้จริง (ไม่รวมพัสดุที่ยืมออกไป)</div>
-      <label style="display:flex;gap:10px;align-items:center;margin:10px 0;color:var(--ink)"><input type="checkbox" id="ct-chem" style="width:auto;margin:0"> นับเฉพาะสารเคมี (ส่วนที่ขาด = ช่างหยิบใช้ → ตัดจ่ายให้)</label>
+      <div id="ct-rd"></div>
+      <div id="ct-off" style="display:none">
+        <div class="info">ยังไม่มีรอบนับที่เปิดอยู่ ถ้านับเฉพาะที่เก็บเดียว (ไม่ผูกกับรอบ) เลือก LOCATION จากรายการด้านล่างได้เลย</div>
+        <label style="display:flex;gap:10px;align-items:center;margin:10px 0;color:var(--ink)"><input type="checkbox" id="ct-chem" style="width:auto;margin:0"> นับเฉพาะสารเคมี (ส่วนที่ขาด = ช่างหยิบใช้ → ตัดจ่ายในระบบ)</label>
+      </div>
+      <div id="ct-fl" class="seg" style="display:none;grid-template-columns:repeat(4,1fr);margin:10px 0">
+        <button data-f="todo" class="on">ยังไม่นับ</button><button data-f="diff">มีผลต่าง</button><button data-f="done">นับแล้ว</button><button data-f="all">ทั้งหมด</button>
+      </div>
       <input class="search" id="ct-search" type="search" placeholder="ค้นหา LOCATION">
       <div id="ct-locs"><div class="empty"><span class="spin"></span></div></div>
       <div class="sec">ใบตรวจนับล่าสุด</div>
       <div id="ct-hist"></div>
+      <div id="ct-past"></div>
+    </div>
+
+    <div id="ct-d" style="display:none">
+      <div class="ct-bar"><button class="btn ghost sm" id="ct-d-back">← กลับ</button><button class="btn ghost sm" id="ct-d-pr">พิมพ์สรุปรอบ</button></div>
+      <div class="info" id="ct-d-info"></div>
+      <div id="ct-d-list"></div>
     </div>
 
     <div id="ct-b" style="display:none">
@@ -1629,7 +1642,7 @@ main{padding-bottom:calc(28px + env(safe-area-inset-bottom))}
         <div class="meta" id="ct-res"></div>
       </div>
       <button class="btn" id="ct-prrep" style="margin-top:10px">พิมพ์รายงานผลการตรวจนับ</button>
-      <button class="btn ghost" id="ct-done" style="margin-top:10px">ปิด</button>
+      <button class="btn ghost" id="ct-done" style="margin-top:10px">กลับไปที่รายการที่เก็บ</button>
     </div>
   </div>
 </div>
@@ -4607,8 +4620,8 @@ function snWatch(id, getSeq){
   /* ---------- ตรวจนับพัสดุ ---------- */
   var ct = { chem:false, loc:'', label:'', date:'', items:[], extras:[], locs:[], hist:[], last:null };
   function ctShow(v){
-    ['a','b','c'].forEach(function(k){ $('ct-'+k).style.display = (k===v?'block':'none'); });
-    $('ct-title').textContent = v==='a' ? 'ตรวจนับพัสดุ' : (v==='b' ? 'ตรวจนับ · '+ct.label : 'ผลการตรวจนับ');
+    ['a','b','c','d'].forEach(function(k){ $('ct-'+k).style.display = (k===v?'block':'none'); });
+    $('ct-title').textContent = v==='a' ? 'ตรวจนับพัสดุ' : (v==='b' ? 'ตรวจนับ · '+ct.label : (v==='d' ? 'สรุปรอบนับ' : 'ผลการตรวจนับ'));
     $('ct-bg').firstElementChild.scrollTop = 0;
   }
   function ctOpen(){ $('ct-bg').classList.add('on'); ctShow('a'); ctLoadLocs(); }
@@ -4621,29 +4634,86 @@ function snWatch(id, getSeq){
   }
   $('cnt-btn').addEventListener('click', ctOpen);
   $('ct-x').addEventListener('click', ctClose);
-  $('ct-done').addEventListener('click', function(){ $('ct-bg').classList.remove('on'); });
+  $('ct-done').addEventListener('click', function(){ ctShow('a'); ctLoadLocs(); });
 
+  ct.round=null; ct.past=[]; ct.filter='todo'; ct.limit=60;
   function ctLoadLocs(){
     $('ct-locs').innerHTML='<div class="empty"><span class="spin"></span></div>';
-    $('ct-hist').innerHTML='';
-    Promise.all([run('getCountLocations',[ct.chem?'สารเคมี':'']), run('getCountHistory',[8])]).then(function(r){
-      ct.locs = r[0]||[]; ct.hist = r[1]||[];
-      ctRenderLocs(); ctRenderHist();
+    $('ct-hist').innerHTML=''; $('ct-past').innerHTML='';
+    run('getCountRound',[{}]).then(function(rr){
+      ct.round = rr.round && rr.round.open ? rr.round : null; ct.past = rr.past||[];
+      if(ct.round){ ct.chem = ct.round.grp==='สารเคมี'; ct.locs = ct.round.locs.map(function(l){ return l; }); return [ct.locs, null]; }
+      return Promise.all([run('getCountLocations',[ct.chem?'สารเคมี':''])]).then(function(r){ ct.locs=r[0]||[]; return [ct.locs,null]; });
+    }).then(function(){
+      return run('getCountHistory',[8]).catch(function(){ return []; });
+    }).then(function(h){
+      ct.hist=h||[]; ct.limit=60; ctRenderRound(); ctRenderLocs(); ctRenderHist(); ctRenderPast();
     }).catch(function(e){ $('ct-locs').innerHTML='<div class="empty">'+esc(e.message)+'</div>'; });
   }
-  function ctRenderLocs(){
-    var q=$('ct-search').value.trim().toLowerCase();
-    var rows=ct.locs.map(function(l,k){ return {l:l,k:k}; }).filter(function(o){ return !q || o.l.label.toLowerCase().indexOf(q)>=0; });
-    $('ct-locs').innerHTML = rows.length ? rows.map(function(o){
-      var l=o.l;
-      return '<div class="pcard lift" role="button" tabindex="0" data-k="'+o.k+'"><div class="t"><span class="doc">'+esc(l.label)+'</span>'+
-        '<span class="chip">'+l.lots+' รายการ</span></div>'+
-        '<div class="meta" style="margin-top:4px">รวม '+fmtNum(l.qty)+' หน่วย · '+(l.last?'นับล่าสุด '+esc(l.last):'ยังไม่เคยนับ')+'</div></div>';
-    }).join('') : '<div class="empty">ไม่พบ LOCATION</div>';
+  function ctMonthName(){ var m=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม']; var d=new Date(); return 'ตรวจนับประจำเดือน'+m[d.getMonth()]+' '+(d.getFullYear()+543); }
+  function ctRenderRound(){
+    var r=ct.round, box=$('ct-rd');
+    $('ct-off').style.display = r?'none':'block'; $('ct-fl').style.display = r?'grid':'none';
+    if(!r){
+      box.innerHTML='<div class="pcard" style="margin-bottom:12px"><b style="color:var(--navy-royal)">เริ่มรอบตรวจนับใหม่</b>'+
+        '<div class="meta" style="margin:4px 0 8px">รอบนับใช้ติดตามว่าที่เก็บไหนนับแล้ว/ยังไม่นับ และสรุปผลต่างทั้งรอบ</div>'+
+        '<label>ชื่อรอบ</label><input id="ct-rn" value="'+esc(ctMonthName())+'">'+
+        '<label>กลุ่มพัสดุ</label><select id="ct-rg"><option value="">ทุกกลุ่ม</option><option value="สารเคมี">เฉพาะสารเคมี</option></select>'+
+        '<button class="btn" id="ct-rstart" style="margin-top:10px">เริ่มรอบนับ</button></div>';
+      return;
+    }
+    var tot=r.locs.length, done=r.locs.filter(function(l){ return l.done; }).length, df=r.locs.filter(function(l){ return l.done && l.diffs>0; }).length;
+    var lots=r.locs.reduce(function(a,l){ return a+l.lots; },0), pct=tot?Math.round(done*100/tot):0;
+    box.innerHTML='<div class="pcard" style="margin-bottom:12px"><div class="t"><span class="doc">'+esc(r.name)+'</span><span class="chip" style="white-space:nowrap">'+(r.grp?esc(r.grp):'ทุกกลุ่ม')+'</span></div>'+
+      '<div class="meta" style="margin-top:4px">เริ่ม '+esc(r.started)+' โดย '+esc(r.startedBy)+' · '+fmtNum(lots)+' ล็อตใน '+tot+' ที่เก็บ</div>'+
+      '<div style="height:12px;border-radius:99px;background:var(--line);margin:10px 0 6px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,var(--blue),var(--ok));border-radius:99px;transition:width .5s"></div></div>'+
+      '<div style="display:flex;justify-content:space-between;font-size:14px"><span>นับแล้ว <b>'+done+'/'+tot+'</b> ที่เก็บ ('+pct+'%)</span><span style="color:'+(df?'var(--bad)':'var(--ok)')+'">มีผลต่าง <b>'+df+'</b> ที่เก็บ</span></div>'+
+      '<div class="ct-bar" style="margin-bottom:0"><button class="btn ghost sm" id="ct-rsum">สรุปผลต่างทั้งรอบ</button><button class="btn ghost sm" id="ct-rclose">ปิดรอบ</button></div></div>';
   }
-  $('ct-search').addEventListener('input', ctRenderLocs);
+  function ctRenderLocs(){
+    var q=$('ct-search').value.trim().toLowerCase(), r=ct.round, f=ct.filter;
+    var rows=ct.locs.map(function(l,k){ return {l:l,k:k}; }).filter(function(o){
+      if(q && o.l.label.toLowerCase().indexOf(q)<0) return false;
+      if(!r) return true;
+      if(f==='todo') return !o.l.done; if(f==='done') return o.l.done; if(f==='diff') return o.l.done && o.l.diffs>0;
+      return true;
+    });
+    var more=rows.length>ct.limit; var shown=rows.slice(0,ct.limit);
+    $('ct-locs').innerHTML = rows.length ? shown.map(function(o){
+      var l=o.l, chip='';
+      if(r){ chip = !l.done ? '<span class="chip">ยังไม่นับ</span>' : (l.diffs>0 ? '<span class="chip" style="background:#fde7e5;color:var(--bad)">ผลต่าง '+l.diffs+'</span>' : '<span class="chip ok">นับแล้ว ✓</span>'); }
+      else chip='<span class="chip">'+l.lots+' รายการ</span>';
+      var sub = r ? (l.lots+' ล็อต · รวม '+fmtNum(l.qty)+' หน่วย'+(l.done?' · นับโดย '+esc(l.by)+' '+esc(l.date):'')) : ('รวม '+fmtNum(l.qty)+' หน่วย · '+(l.last?'นับล่าสุด '+esc(l.last):'ยังไม่เคยนับ'));
+      return '<div class="pcard lift" role="button" tabindex="0" data-k="'+o.k+'"><div class="t"><span class="doc">'+esc(l.label)+'</span>'+chip+'</div>'+
+        '<div class="meta" style="margin-top:4px">'+sub+'</div></div>';
+    }).join('') + (more?'<button class="btn ghost" id="ct-more" style="margin-top:8px">แสดงเพิ่ม (อีก '+(rows.length-ct.limit)+' ที่เก็บ)</button>':'')
+      : (r && f==='todo' && !q ? emp('check','นับครบทุกที่เก็บแล้ว','กด "สรุปผลต่างทั้งรอบ" เพื่อตรวจก่อนปิดรอบ') : '<div class="empty">ไม่พบ LOCATION</div>');
+  }
+  $('ct-search').addEventListener('input', function(){ ct.limit=60; ctRenderLocs(); });
   $('ct-chem').addEventListener('change', function(){ ct.chem=this.checked; ctLoadLocs(); });
+  $('ct-fl').addEventListener('click', function(e){
+    var b=e.target.closest('button[data-f]'); if(!b) return;
+    ct.filter=b.dataset.f; ct.limit=60; Array.prototype.forEach.call($('ct-fl').children,function(x){ x.classList.toggle('on',x===b); }); ctRenderLocs();
+  });
+  $('ct-rd').addEventListener('click', function(e){
+    var t=e.target.closest('button'); if(!t) return;
+    if(t.id==='ct-rstart'){
+      if(!state.by){ askBy(function(){ t.click(); }); return; }
+      busy(t,true);
+      run('startCountRound',[{name:$('ct-rn').value.trim(), grp:$('ct-rg').value, by:state.by}]).then(function(){ toast('เริ่มรอบนับแล้ว'); ctLoadLocs(); })
+        .catch(function(err){ toast(err.message,true); }).then(function(){ busy(t,false); });
+    } else if(t.id==='ct-rsum'){ ctOpenSummary(ct.round.id);
+    } else if(t.id==='ct-rclose'){
+      var todo=ct.round.locs.filter(function(l){ return !l.done; }).length;
+      if(!confirm('ปิดรอบ "'+ct.round.name+'" ?'+(todo?'\nยังมี '+todo+' ที่เก็บที่ยังไม่ได้นับ':'')+'\nหลังปิดแล้วจะเริ่มรอบใหม่ได้')) return;
+      if(!state.by){ askBy(function(){ t.click(); }); return; }
+      busy(t,true);
+      run('closeCountRound',[{id:ct.round.id, by:state.by}]).then(function(){ toast('ปิดรอบนับแล้ว'); ctLoadLocs(); })
+        .catch(function(err){ toast(err.message,true); }).then(function(){ busy(t,false); });
+    }
+  });
   function ctPick(e){
+    if(e.target.closest('#ct-more')){ ct.limit+=60; ctRenderLocs(); return; }
     var c=e.target.closest('[data-k]'); if(!c) return;
     if(e.type==='keydown' && e.key!=='Enter' && e.key!==' ') return;
     if(e.type==='keydown') e.preventDefault();
@@ -4651,6 +4721,40 @@ function snWatch(id, getSeq){
   }
   $('ct-locs').addEventListener('click', ctPick);
   $('ct-locs').addEventListener('keydown', ctPick);
+  function ctRenderPast(){
+    $('ct-past').innerHTML = ct.past.length ? '<div class="sec">รอบที่ปิดแล้ว</div>'+ct.past.map(function(p){
+      return '<div class="meta" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid var(--line)"><span><b style="color:var(--navy-royal)">'+esc(p.name)+'</b><br>'+esc(p.started)+' – '+esc(p.closed)+'</span>'+
+        '<button class="btn ghost sm" data-pr="'+p.id+'" style="margin:0;width:auto;flex:none">ดูสรุป</button></div>'; }).join('') : '';
+  }
+  $('ct-past').addEventListener('click', function(e){ var b=e.target.closest('button[data-pr]'); if(b) ctOpenSummary(Number(b.dataset.pr)); });
+  /* สรุปผลต่างทั้งรอบ */
+  function ctOpenSummary(id){
+    ctShow('d'); $('ct-d-info').innerHTML='<span class="spin"></span>'; $('ct-d-list').innerHTML='';
+    run('getCountRoundReport',[{id:id}]).then(function(d){
+      ct.sum=d; var r=d.round, tot=r.locs.length, done=r.locs.filter(function(l){ return l.done; }).length;
+      $('ct-d-info').innerHTML='<b>'+esc(r.name)+'</b> '+(r.open?'<span class="chip">กำลังนับ</span>':'<span class="chip ok">ปิดแล้ว '+esc(r.closed||'')+'</span>')+
+        '<br><span class="meta">นับแล้ว '+done+'/'+tot+' ที่เก็บ · รายการผลต่าง '+d.rows.length+' รายการ</span>';
+      $('ct-d-list').innerHTML = d.rows.length ? d.rows.map(function(x){
+        return '<div class="ci '+(x.diff<0?'bad':'')+'"><div class="ci-h"><div><b>'+esc(x.part||'-')+'</b><div>'+esc(x.name)+'</div>'+
+          '<div class="meta">'+esc(x.loc||'(ไม่ระบุที่เก็บ)')+(x.serial?' · S/N '+esc(x.serial):'')+' · '+esc(x.docNo)+' · '+esc(x.by)+' '+esc(x.date)+'</div>'+(x.note?'<div class="meta">'+esc(x.note)+'</div>':'')+'</div>'+
+          '<span class="chip" style="background:'+(x.diff<0?'#fde7e5':'#e6f4ea')+';color:'+(x.diff<0?'var(--bad)':'var(--ok)')+'">'+(x.diff>0?'+':'')+fmtNum(x.diff)+'</span></div>'+
+          '<div class="meta">ระบบ '+fmtNum(x.sys)+' → นับได้ '+fmtNum(x.cnt)+' · '+esc(x.res)+'</div></div>';
+      }).join('') : emp('check','ยังไม่พบผลต่างในรอบนี้');
+    }).catch(function(e){ $('ct-d-info').textContent=e.message; });
+  }
+  $('ct-d-back').addEventListener('click', function(){ ctShow('a'); });
+  $('ct-d-pr').addEventListener('click', function(){
+    var d=ct.sum; if(!d) return;
+    var psk=pfDetect(), base=psk?16:12.5, mn=base*0.6, H=8.5, cols=[9,28,30,40,24,13,13,13,24];
+    var rows=d.rows.map(function(r,i){
+      return '<tr style="height:'+H+'mm"><td class="c">'+(i+1)+'</td><td>'+cell(r.loc,cols[1],H,base,mn)+'</td><td>'+cell(r.part,cols[2],H,base,mn)+'</td><td>'+cell(r.name,cols[3],H,base,mn)+'</td>'+
+        '<td>'+cell(r.serial,cols[4],H,base,mn)+'</td><td class="c">'+fmtNum(r.sys)+'</td><td class="c">'+fmtNum(r.cnt)+'</td><td class="c" style="font-weight:700">'+(r.diff>0?'+':'')+fmtNum(r.diff)+'</td><td>'+cell(r.res,cols[8],H,base*0.9,mn)+'</td></tr>';
+    }).join('');
+    var rd=d.round, tot=rd.locs.length, done=rd.locs.filter(function(l){ return l.done; }).length;
+    doPrintHtml('<div class="pr ct'+(psk?'':' fb')+'">'+ctHead('สรุปผลต่างการตรวจนับ · '+rd.name,'ที่เก็บที่นับแล้ว <b>'+done+'/'+tot+'</b>','เริ่ม '+esc(rd.started)+(rd.closed?' · ปิด '+esc(rd.closed):''))+
+      ctTable(cols,['ที่','LOCATION','Part number','ชื่อพัสดุ','Serial number','ระบบ','นับได้','ผลต่าง','ผลการปรับ'],rows)+
+      ctSig([['ผู้ตรวจนับ',''],['ผู้ตรวจสอบ / กรรมการ',''],['ผู้อนุมัติ','']])+'</div>','A4 portrait','8mm');
+  });
   function ctRenderHist(){
     $('ct-hist').innerHTML = ct.hist.length ? ct.hist.map(function(h,i){
       return '<div class="meta" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid var(--line)">'+
@@ -4782,7 +4886,7 @@ function snWatch(id, getSeq){
     var msg = d ? ('พบผลต่าง '+d+' รายการ\n'+(adjust?(ct.chem?'ระบบจะตัดจ่ายส่วนที่นับขาด เป็น "ช่างหยิบใช้เอง" และปรับยอดตามที่นับได้':'ระบบจะปรับยอดในคลังตามที่นับได้'):'ระบบจะบันทึกผลต่างไว้เป็นหลักฐาน และไม่เปลี่ยนยอดในคลัง')+'\n\nยืนยันการบันทึก?') : 'นับตรงทุกรายการ ยืนยันการบันทึก?';
     if(!confirm(msg)) return;
     var b=this; busy(b,true);
-    run('submitCount',[{ location:ct.loc, by:state.by, witness:$('ct-wit').value.trim(), adjust:adjust, reason:reason, useMode:ct.chem,
+    run('submitCount',[{ roundId:(ct.round?ct.round.id:null), location:ct.loc, by:state.by, witness:$('ct-wit').value.trim(), adjust:adjust, reason:reason, useMode:ct.chem,
       items: ct.items.map(function(i){ return {seq:i.seq, sys:i.qty, counted:i.cnt, note:i.note}; }),
       extras: extras.map(function(x){ return {part:x.part, name:x.name, serial:x.serial, type:x.type, qty:n(x.qty), note:x.note}; }) }])
     .then(function(res){
