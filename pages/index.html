@@ -3281,6 +3281,18 @@ function snWatch(id, getSeq){
     if(r.total>r.results.length) h+='<div class="meta" style="text-align:center;margin:8px 0">แสดง '+r.results.length+' จาก '+r.total+' รายการ — พิมพ์ให้เจาะจงขึ้นเพื่อดูที่เหลือ</div>';
     return h;
   }
+  function bg2(t){ var o={}; for(var i=0;i<t.length-1;i++) o[t.substr(i,2)]=(o[t.substr(i,2)]||0)+1; return o; }
+  function dice(a,b){ if(a.length<2||b.length<2) return 0; var x=bg2(a), y=bg2(b), n=0; for(var k in x) if(y[k]) n+=Math.min(x[k],y[k]); return 2*n/((a.length-1)+(b.length-1)); }
+  function fuzzyScore(q,g){
+    var a=nk(q); if(a.length<3) return 0;
+    var best=0, p=nk(g.part), nm=nk(g.name);
+    if(p){ best=Math.max(best, dice(a,p)); if(p.length>=4 && a.length>=4 && (p.indexOf(a.slice(0,Math.max(4,a.length-2)))>=0 || a.indexOf(p.slice(0,Math.max(4,p.length-2)))>=0)) best=Math.max(best,.62); }
+    best=Math.max(best, dice(a,nm)*0.95);
+    var toks=String(q).toLowerCase().split(/[\s,\/\-]+/).map(nk).filter(function(t){ return t.length>=3; });
+    if(toks.length){ var hit=0, hay=(String(g.name)+' '+String(g.part)).toLowerCase(), hk=nk(hay); toks.forEach(function(t){ if(hk.indexOf(t)>=0) hit++; else { var w=hay.split(/[^a-z0-9ก-๙]+/); if(w.some(function(x){ x=nk(x); return x.length>=3 && dice(t,x)>=.7; })) hit+=.8; } });
+      best=Math.max(best, .45+.5*hit/toks.length*(toks.length>1?1:.9)); if(!hit) best=Math.min(best,.5); }
+    return best;
+  }
   function renderStock(){
     if(!state.stk){ $('k-list').innerHTML=skel(); return; }
     var q=$('k-search').value.trim().toLowerCase();
@@ -3294,13 +3306,23 @@ function snWatch(id, getSeq){
       if(!q) return true;
       return qm(g.part+' '+g.name+' '+g.lots.map(function(l){return l.serial+' '+l.location+' '+l.docNo;}).join(' '),q);
     });
+    var similar=[];
+    if(q && q.length>=3){
+      var have={}; rows.forEach(function(g){ have[g.part+'|'+g.name]=1; });
+      (state.stk||[]).forEach(function(g){
+        if(have[g.part+'|'+g.name]) return;
+        var ls=gq ? g.lots.filter(function(l){ return gq==='-' ? !l.grp : l.grp===gq; }) : g.lots; if(!ls.length) return;
+        var sc=fuzzyScore(q,g); if(sc>=.55){ var o={}; for(var k in g) o[k]=g[k]; o.lots=ls; o.qty=ls.reduce(function(a,l){ return a+l.qty; },0); o._sc=sc; similar.push(o); }
+      });
+      similar.sort(function(a,b){ return b._sc-a._sc; }); similar=similar.slice(0,12);
+    }
     state.lotMap = {};
     (state.stk||[]).forEach(function(g){ g.lots.forEach(function(l){
       state.lotMap[l.seq] = { seq:l.seq, part:g.part, name:g.name, unit:g.unit, serial:l.serial, qty:l.qty, type:l.type, location:l.location, recv:l.recv||'', kit:l.kit||'', source:l.docNo, issRow:l.issRow, issSeq:l.issSeq, machine:l.machine, grp:l.grp||'' };
     }); });
     var total=0, lots=0; rows.forEach(function(g){ total+=g.qty; lots+=g.lots.length; });
     $('k-sum').textContent = rows.length ? rows.length+' Part number · '+lots+' ล็อต · รวม '+fmtNum(total)+' หน่วย' : '';
-    if(!rows.length && q && (state.stk||[]).length){
+    if(!rows.length && !similar.length && q && (state.stk||[]).length){
       var qq=$('k-search').value.trim();
       $('k-list').innerHTML=skel();
       clearTimeout(renderStock.t);
@@ -3312,8 +3334,8 @@ function snWatch(id, getSeq){
       },350);
       return;
     }
-    if(!rows.length){ $('k-list').innerHTML=(state.stk||[]).length?emp('search','ไม่พบรายการที่ค้นหา'):emp('box','ยังไม่มีพัสดุในคลัง','พัสดุจะเข้าคลังเมื่อบันทึกรับ และออกเมื่อจ่าย'); return; }
-    $('k-list').innerHTML = rows.map(function(g){
+    if(!rows.length && !similar.length){ $('k-list').innerHTML=(state.stk||[]).length?emp('search','ไม่พบรายการที่ค้นหา'):emp('box','ยังไม่มีพัสดุในคลัง','พัสดุจะเข้าคลังเมื่อบันทึกรับ และออกเมื่อจ่าย'); return; }
+    function kCard(g){
       var lots = g.lots.map(function(l){
         var bits=[];
         if(l.serial) bits.push('S/N <a class="snl" data-sn="'+esc(l.serial)+'">'+esc(l.serial)+'</a>');
@@ -3328,7 +3350,8 @@ function snWatch(id, getSeq){
       return '<div class="card lift'+tyCls(g.lots[0]&&g.lots[0].type, g.lots.some(function(l){return l.kit;}))+'" style="padding:14px 16px">'+
         '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><b>'+esc(g.part||'-')+'</b><span class="chip ok">'+fmtNum(g.qty)+' '+esc(g.unit)+'</span></div>'+
         '<div style="margin:4px 0 6px">'+esc(g.name)+'</div>'+lots+'</div>';
-    }).join('');
+    }
+    $('k-list').innerHTML = rows.map(kCard).join('') + (similar.length ? '<div class="sec" style="margin-top:14px">'+(rows.length?'พัสดุที่ชื่อ/Part ใกล้เคียง':'ไม่พบตรงตัว · พัสดุที่ชื่อ/Part ใกล้เคียง')+'</div>'+similar.map(kCard).join('') : '');
   }
 
   /* ---------- แตะการ์ดล็อตในคลัง -> เลือก จ่าย / ยืม / แก้ไข ---------- */
