@@ -1588,6 +1588,8 @@ main{padding-bottom:calc(28px + env(safe-area-inset-bottom))}
     <label>สถานะ</label>
     <select id="cu-status"><option>ส่งเคลมแล้ว</option><option>ได้ซ่อมกลับ</option><option>ได้ของใหม่</option><option>ถูกปฏิเสธ</option></select>
     <div id="cu-back"><label>วันที่ได้รับกลับ</label><input type="date" id="cu-date"></div>
+    <div id="cu-rcv" style="display:none"><label class="chk" style="display:flex;gap:8px;align-items:center;margin:10px 0 4px;font-weight:600"><input type="checkbox" id="cu-recv" style="width:auto;margin:0" checked> รับเข้าคลังเลย (ไม่ต้องใช้เลขใบเบิก)</label>
+      <div id="cu-locw"><label>ที่เก็บ (LOCATION)</label><input id="cu-loc" autocomplete="off"></div></div>
     <div id="cu-new"><label>Serial ใหม่</label><input id="cu-newsn" autocapitalize="characters" autocomplete="off"></div>
     <label>หมายเหตุ <span id="cu-need" class="meta"></span></label><textarea id="cu-note" rows="2"></textarea>
     <div class="meta" id="cu-hint" style="margin-top:6px"></div>
@@ -4478,24 +4480,25 @@ function snWatch(id, getSeq){
     var st = $('cu-status').value;
     $('cu-back').style.display = (st==='ได้ซ่อมกลับ'||st==='ได้ของใหม่') ? '' : 'none';
     $('cu-new').style.display = st==='ได้ของใหม่' ? '' : 'none';
+    $('cu-rcv').style.display = (st==='ได้ซ่อมกลับ'||st==='ได้ของใหม่') ? '' : 'none'; $('cu-locw').style.display = $('cu-recv').checked ? '' : 'none';
     $('cu-need').textContent = st==='ถูกปฏิเสธ' ? '(จำเป็น: เหตุผลที่ถูกปฏิเสธ)' : '';
     $('cu-hint').textContent = (st==='ได้ซ่อมกลับ'||st==='ได้ของใหม่') ? 'ประกันจะนับใหม่ 1 ปี จากวันที่ได้รับกลับ' + (st==='ได้ของใหม่' ? ' · ของใหม่ต้องเพิ่มเข้าคลังด้วย (ผ่านการรับตามใบเบิก หรือ + ยอดยกมา)' : ' · ถ้าของกลับเข้าคลังจริง ให้เพิ่มเข้าคลังด้วย (+ ยอดยกมา)') : '';
   }
   function cuOpen(c){
     if(!c) return; sn.cu = c;
     $('cu-info').innerHTML = '<b>#'+c.id+' · S/N '+esc(c.sn)+'</b><br><span class="meta">'+esc(c.name)+' · '+esc(c.part)+'<br>ส่งเคลม '+esc(c.sent)+(c.vendor?' · '+esc(c.vendor):'')+'</span>';
-    $('cu-status').value = c.status; $('cu-date').value = state.today||''; $('cu-newsn').value = c.newSn||''; $('cu-note').value = '';
+    $('cu-status').value = c.status; $('cu-date').value = state.today||''; $('cu-newsn').value = c.newSn||''; $('cu-note').value = ''; $('cu-loc').value=''; $('cu-recv').checked=true;
     cuToggle(); $('cu-bg').classList.add('on');
   }
-  $('cu-status').addEventListener('change', cuToggle);
+  $('cu-status').addEventListener('change', cuToggle); $('cu-recv').addEventListener('change', cuToggle);
   $('cu-x').addEventListener('click', function(){ $('cu-bg').classList.remove('on'); });
   $('cu-bg').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('on'); });
   $('cu-submit').addEventListener('click', function(){
     if(!state.by){ askBy(function(){ $('cu-submit').click(); }); return; }
     var c = sn.cu; if(!c) return;
     var b=this; busy(b,true);
-    run('updateClaim', [{ id:c.id, status:$('cu-status').value, backDate:$('cu-date').value, newSerial:$('cu-newsn').value, note:$('cu-note').value, by:state.by }]).then(function(r){
-      $('cu-bg').classList.remove('on'); toast('อัปเดตแล้ว · '+r.status); snLoadClaims(); loadStock();
+    run('updateClaim', [{ id:c.id, status:$('cu-status').value, backDate:$('cu-date').value, newSerial:$('cu-newsn').value, note:$('cu-note').value, receive:$('cu-recv').checked, location:$('cu-loc').value.trim(), by:state.by }]).then(function(r){
+      $('cu-bg').classList.remove('on'); toast('อัปเดตแล้ว · '+r.status+(r.received?' · รับเข้าคลังแล้ว':'')); snLoadClaims(); loadStock();
     }).catch(function(e){ toast(e.message,true); }).then(function(){ busy(b,false); });
   });
 

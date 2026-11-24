@@ -555,3 +555,8 @@ revoke all on function fn_resolve_grp(text,text,text), fn_move_log(text,bigint,t
 grant execute on function rpc_get_stock(), rpc_search_parts(jsonb), rpc_check_serial(text,bigint), rpc_get_issued_serials(text), rpc_get_opening_lots(text,text), rpc_add_opening_stock(jsonb),
   rpc_get_awaiting_req(), rpc_link_direct_issue(jsonb), rpc_move_location(jsonb), rpc_move_cell(jsonb), rpc_get_move_history(jsonb), rpc_move_to_kit(jsonb), rpc_edit_lot(jsonb),
   rpc_get_serial_history(text), rpc_get_claims(), rpc_submit_claim(jsonb), rpc_update_claim(jsonb), rpc_get_warranty_list(int) to anon;
+
+-- ---------- รับกลับจากเคลมเข้าคลัง (applied live 2026-11-24) ----------
+-- alter table claims add column if not exists received_seq bigint;
+-- rpc_update_claim(p): เมื่อ status = ได้ซ่อมกลับ/ได้ของใหม่ และ p.receive = true จะ insert receipts (source 'รับจากเคลม', ref_seq = ล็อตเดิม,
+--   serial = S/N ใหม่ถ้าได้ของใหม่, location = p.location) แล้วบันทึก claims.received_seq กันรับซ้ำ ; ผลลัพธ์เพิ่ม 'received', 'lotSeq'
