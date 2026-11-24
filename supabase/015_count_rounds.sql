@@ -14,9 +14,9 @@ alter table count_rounds enable row level security;
 -- rpc_close_count_round(p), rpc_get_count_round_report(p)  -- ดูนิยามในฐานข้อมูลจริง (pg_get_functiondef)
 -- grant execute on function rpc_start_count_round(jsonb), rpc_get_count_round(jsonb), rpc_close_count_round(jsonb), rpc_get_count_round_report(jsonb) to anon;
 
--- ใบนับรวม: ดึงรายการพัสดุของหลาย LOCATION ในครั้งเดียว (สูงสุด 80 ที่เก็บ)
+-- ใบนับรวม: ดึงรายการพัสดุของหลาย LOCATION ในครั้งเดียว (สูงสุด 200 ที่เก็บต่อครั้ง)
 create or replace function rpc_get_count_lists(p jsonb) returns jsonb language sql stable security definer set search_path = public as $$
   select coalesce(jsonb_agg(rpc_get_count_list(t.loc, coalesce(p->>'grp','')) order by t.ord), '[]'::jsonb)
-  from jsonb_array_elements_text(case when jsonb_array_length(coalesce(p->'locs','[]'::jsonb)) <= 80 then coalesce(p->'locs','[]'::jsonb) else '[]'::jsonb end) with ordinality as t(loc, ord)
+  from jsonb_array_elements_text(case when jsonb_array_length(coalesce(p->'locs','[]'::jsonb)) <= 200 then coalesce(p->'locs','[]'::jsonb) else '[]'::jsonb end) with ordinality as t(loc, ord)
 $$;
 grant execute on function rpc_get_count_lists(jsonb) to anon;

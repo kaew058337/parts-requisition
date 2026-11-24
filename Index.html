@@ -1603,7 +1603,7 @@ main{padding-bottom:calc(28px + env(safe-area-inset-bottom))}
       <div id="ct-fl" class="seg" style="display:none;grid-template-columns:repeat(4,1fr);margin:10px 0">
         <button data-f="todo" class="on">ยังไม่นับ</button><button data-f="diff">มีผลต่าง</button><button data-f="done">นับแล้ว</button><button data-f="all">ทั้งหมด</button>
       </div>
-      <div style="display:flex;gap:8px;align-items:center;margin:0 0 8px"><button class="btn ghost sm" id="ct-selmode" style="margin:0;width:auto">เลือกหลายที่เก็บ (ใบนับรวม)</button></div>
+      <div style="display:flex;gap:8px;align-items:center;margin:0 0 8px"><button class="btn ghost sm" id="ct-selmode" style="margin:0;width:auto">เลือกหลายที่เก็บ (ใบนับรวม)</button><button class="btn ghost sm" id="ct-prall" style="margin:0;width:auto">พิมพ์ใบนับทั้งคลัง</button></div>
       <div id="ct-selbar" style="display:none;position:sticky;top:0;z-index:5;background:var(--card,#fff);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:0 0 10px">
         <div id="ct-selinfo" style="margin-bottom:8px"></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -4781,7 +4781,7 @@ function snWatch(id, getSeq){
   function ctSelBar(){
     var n=ctSelKeys().length;
     $('ct-selbar').style.display = ct.selMode ? 'block' : 'none';
-    $('ct-selinfo').innerHTML = 'เลือกแล้ว <b>'+n+'</b> ที่เก็บ'+(n>80?' <span style="color:var(--bad)">(เกิน 80 ที่เก็บ กรุณาลดลง)</span>':'');
+    $('ct-selinfo').innerHTML = 'เลือกแล้ว <b>'+n+'</b> ที่เก็บ'+(n>80?' <span class="meta">(พิมพ์ได้ไม่จำกัด · ลงผลนับรวมได้ครั้งละไม่เกิน 80 ที่เก็บ)</span>':'');
     $('ct-selmode').textContent = ct.selMode ? 'ยกเลิกการเลือก' : 'เลือกหลายที่เก็บ (ใบนับรวม)';
   }
   $('ct-selmode').addEventListener('click', function(){ ct.selMode=!ct.selMode; if(!ct.selMode) ct.sel={}; ctSelBar(); ctRenderLocs(); });
@@ -4795,35 +4795,41 @@ function snWatch(id, getSeq){
     });
     ctSelBar(); ctRenderLocs();
   });
-  function ctBulkLoad(btn){
-    var keys=ctSelKeys();
+  function ctBulkLoad(btn, keys, forPrint){
+    keys = keys || ctSelKeys();
     if(!keys.length){ toast('ยังไม่ได้เลือกที่เก็บ',true); return Promise.reject(); }
-    if(keys.length>80){ toast('เลือกได้ไม่เกิน 80 ที่เก็บต่อครั้ง',true); return Promise.reject(); }
-    var order={}; ct.locs.forEach(function(l,i){ order[l.loc]=i; }); keys.sort(function(a,b){ return (order[a]||0)-(order[b]||0); });
-    busy(btn,true);
-    return run('getCountLists',[{locs:keys, grp:ct.chem?'สารเคมี':''}]).then(function(lists){
-      ct.bulk=lists.map(function(L){ L.items=(L.items||[]).map(function(i){ i.cnt=''; i.note=''; return i; }); return L; });
-      return ct.bulk;
-    }).catch(function(e){ toast(e.message,true); throw e; }).then(function(v){ busy(btn,false); return v; }, function(e){ busy(btn,false); throw e; });
+    if(!forPrint && keys.length>80){ toast('ลงผลนับรวมได้ครั้งละไม่เกิน 80 ที่เก็บ (พิมพ์ได้ไม่จำกัด)',true); return Promise.reject(); }
+    var order={}; ct.locs.forEach(function(l,i){ order[l.loc]=i; }); keys=keys.slice().sort(function(a,b){ return (order[a]||0)-(order[b]||0); });
+    var chunks=[]; for(var k=0;k<keys.length;k+=100) chunks.push(keys.slice(k,k+100));
+    busy(btn,true); var all=[];
+    return chunks.reduce(function(p,c){
+      return p.then(function(){ return run('getCountLists',[{locs:c, grp:ct.chem?'สารเคมี':''}]).then(function(r){ all=all.concat(r); }); });
+    }, Promise.resolve()).then(function(){
+      ct.bulk=all.map(function(L){ L.items=(L.items||[]).map(function(i){ i.cnt=''; i.note=''; return i; }); return L; });
+      busy(btn,false); return ct.bulk;
+    }).catch(function(e){ busy(btn,false); toast(e.message,true); throw e; });
   }
-  $('ct-selpr').addEventListener('click', function(){
-    ctBulkLoad(this).then(function(L){
-      var psk=pfDetect(), base=psk?16:12.5, mn=base*0.6, H=7.6, cols=[8,34,58,30,14,26,24];
-      var nItems=0, rows=L.map(function(g){
-        nItems+=g.items.length;
-        var head='<tr style="height:7mm"><td colspan="7" style="background:#e9edf3;font-weight:700;padding-left:2mm">LOCATION : '+esc(g.label)+' <span style="font-weight:400">('+g.items.length+' รายการ)</span></td></tr>';
-        if(!g.items.length) return head+'<tr style="height:'+H+'mm"><td colspan="7" style="padding-left:2mm;color:#666">ไม่มีพัสดุตามระบบ — ถ้าพบของ เขียนที่หมายเหตุ</td></tr>';
-        return head+g.items.map(function(it,i){
-          return '<tr style="height:'+H+'mm"><td class="c">'+(i+1)+'</td><td>'+cell(it.part,cols[1],H,base,mn)+'</td><td>'+cell(it.name,cols[2],H,base,mn)+'</td>'+
-            '<td>'+cell(it.serial,cols[3],H,base,mn)+'</td><td class="c">'+fmtNum(it.qty)+'</td><td></td><td></td></tr>';
-        }).join('');
+  function ctPrintBulk(L){
+    var psk=pfDetect(), base=psk?16:12.5, mn=base*0.6, H=7.6, cols=[8,34,58,30,14,26,24];
+    var nItems=0, rows=L.map(function(g){
+      nItems+=g.items.length;
+      var head='<tr style="height:7mm;break-after:avoid"><td colspan="7" style="background:#e9edf3;font-weight:700;padding-left:2mm">LOCATION : '+esc(g.label)+' <span style="font-weight:400">('+g.items.length+' รายการ)</span></td></tr>';
+      if(!g.items.length) return head+'<tr style="height:'+H+'mm"><td colspan="7" style="padding-left:2mm;color:#666">ไม่มีพัสดุตามระบบ — ถ้าพบของ เขียนที่หมายเหตุ</td></tr>';
+      return head+g.items.map(function(it,i){
+        return '<tr style="height:'+H+'mm;break-inside:avoid"><td class="c">'+(i+1)+'</td><td>'+cell(it.part,cols[1],H,base,mn)+'</td><td>'+cell(it.name,cols[2],H,base,mn)+'</td>'+
+          '<td>'+cell(it.serial,cols[3],H,base,mn)+'</td><td class="c">'+fmtNum(it.qty)+'</td><td></td><td></td></tr>';
       }).join('');
-      var title='ใบตรวจนับพัสดุ (รวม)'+(ct.round?' · '+ct.round.name:'');
-      doPrintHtml('<div class="pr ct'+(psk?'':' fb')+'">'+ctHead(title,'<b>'+L.length+'</b> ที่เก็บ · <b>'+nItems+'</b> รายการ','วันที่ '+esc((L[0]&&L[0].date)||''))+
-        ctTable(cols,['ที่','Part number','ชื่อพัสดุ','Serial number','ระบบ','นับได้จริง','หมายเหตุ'],rows)+
-        ctSig([['ผู้ตรวจนับ',''],['ผู้ตรวจสอบ / กรรมการ','']])+'</div>','A4 portrait','8mm');
-    }).catch(function(){});
+    }).join('');
+    var title='ใบตรวจนับพัสดุ (รวม)'+(ct.round?' · '+ct.round.name:'');
+    doPrintHtml('<div class="pr ct'+(psk?'':' fb')+'">'+ctHead(title,'<b>'+L.length+'</b> ที่เก็บ · <b>'+nItems+'</b> รายการ','วันที่ '+esc((L[0]&&L[0].date)||''))+
+      ctTable(cols,['ที่','Part number','ชื่อพัสดุ','Serial number','ระบบ','นับได้จริง','หมายเหตุ'],rows)+'</div>','A4 portrait','8mm');
+  }
+  $('ct-prall').addEventListener('click', function(){
+    var keys=ct.locs.map(function(l){ return l.loc; });
+    if(!confirm('พิมพ์ใบนับทั้งคลัง '+keys.length+' ที่เก็บ\nอาจใช้กระดาษหลายแผ่น ดำเนินการต่อ?')) return;
+    ctBulkLoad(this, keys, true).then(ctPrintBulk).catch(function(){});
   });
+  $('ct-selpr').addEventListener('click', function(){ ctBulkLoad(this, null, true).then(ctPrintBulk).catch(function(){}); });
   /* ลงผลนับรวม */
   function beRow(g,i){
     var it=ct.bulk[g].items[i], id=g+'-'+i;
