@@ -331,7 +331,7 @@ create or replace function rpc_edit_lot(p jsonb) returns jsonb language plpgsql 
 declare
   lot record; r receipts; seq_ bigint := nullif(p->>'seq','')::bigint; old_sn text; old_loc text; old_part text; old_name text;
   new_loc text; new_sn text; new_part text; new_name text; new_remain numeric; changes text[] := '{}'; ng text; ogp text; n int; seqs bigint[];
-  sn_ch boolean; loc_ch boolean; qty_ch boolean; part_ch boolean; name_ch boolean; hits int;
+  nt text; ot text; sn_ch boolean; loc_ch boolean; qty_ch boolean; part_ch boolean; name_ch boolean; hits int;
 begin
   perform fn_lock();
   select * into lot from v_lots where seq = seq_ and remain > 0;
@@ -359,6 +359,21 @@ begin
       update receipts set item_group = ng where seq = seq_ or (coalesce((p->>'groupAll')::boolean, false) and part_no = old_part);
       get diagnostics n = row_count;
       changes := changes || ('กลุ่ม ' || coalesce(nullif(ogp,''),'ทั่วไป') || ' → ' || coalesce(nullif(ng,''),'ทั่วไป') || case when coalesce((p->>'groupAll')::boolean, false) then ' (ทุกล็อตของ P/N นี้ ' || n || ' แถว)' else '' end);
+    end if;
+  end if;
+  if btrim(coalesce(p->>'type','')) <> '' then   -- ประเภทพัสดุ LRU/SP (คง (TCI) เดิมไว้)
+    nt := btrim(p->>'type');
+    if nt not in ('LRU','SP') then raise exception 'ประเภทพัสดุไม่ถูกต้อง'; end if;
+    ot := r.item_type;
+    update receipts set item_type = nt || case when item_type like '%(TCI)' then '(TCI)' else '' end
+      where (seq = seq_ or (coalesce((p->>'typeAll')::boolean, false) and part_no = old_part))
+        and item_type <> nt || case when item_type like '%(TCI)' then '(TCI)' else '' end;
+    get diagnostics n = row_count;
+    if n > 0 then
+      if r.doc_no <> '' and r.source = 'ใบเบิก' then
+        update requisitions set item_type = nt || case when item_type like '%(TCI)' then '(TCI)' else '' end where doc_no = r.doc_no and part_no = old_part;
+      end if;
+      changes := changes || ('ประเภท ' || ot || ' → ' || nt || case when ot like '%(TCI)' then '(TCI)' else '' end || case when coalesce((p->>'typeAll')::boolean, false) then ' (ทุกล็อตของ P/N นี้ ' || n || ' แถว)' else '' end);
     end if;
   end if;
   if name_ch then   -- ชื่อ : เปลี่ยนทั้งชุดล็อตที่เกี่ยวข้อง (รับ / จ่าย / ยืม)
@@ -426,6 +441,10 @@ begin
   insert into _ev select upper(serial_no), serial_no, case when technician <> '' then 'install' else 'out' end, issue_date, 2,
       case when technician <> '' then 'จ่ายให้ช่าง/ติดตั้ง' else 'จ่ายออก' end, tail_no, technician, '', doc_no, '', null
     from issues where upper(serial_no) = any (chain) and qty > 0;
+  insert into _ev select upper(r.serial_in), r.serial_in, 'install', (r.recorded_at at time zone 'Asia/Bangkok')::date, 2, 'ติดตั้งแทน (S/N in ในใบส่งคืน)', r.machine, r.receiver, r.issue_text, r.letter_no, '', null
+    from returns_out r where upper(r.serial_in) = any (chain)
+      and not exists (select 1 from issues i where upper(i.serial_no) = upper(r.serial_in) and i.qty > 0 and i.technician <> '')
+      and not exists (select 1 from legacy_issues l where upper(l.serial_no) = upper(r.serial_in));
   insert into _ev select upper(serial_out), serial_out, 'remove', (recorded_at at time zone 'Asia/Bangkok')::date, 3, 'ส่งคืน/ถอดออก', machine, '', issue_text, letter_no, '', null
     from returns_out where upper(serial_out) = any (chain);
   insert into _ev select upper(serial_no), serial_no, 'claim', sent_date, 4, 'ส่งเคลม #' || claim_no || case when vendor <> '' then ' → ' || vendor else '' end, '', '', '', letter_no, '', claim_no
