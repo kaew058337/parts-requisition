@@ -1223,6 +1223,8 @@ main{padding-bottom:calc(28px + env(safe-area-inset-bottom))}
     <datalist id="ed-locs"></datalist>
     <datalist id="loc-dl"></datalist>
     <label>จำนวนคงเหลือ</label><input id="ed-qty" type="number" inputmode="decimal" min="0" step="any">
+    <label>ประเภทพัสดุ</label><select id="ed-type"><option value="LRU">LRU</option><option value="SP">SP</option></select>
+    <label class="chk" style="display:flex;gap:8px;align-items:center;margin:6px 0;font-weight:400"><input type="checkbox" id="ed-typeall" style="width:auto;margin:0"> ใช้ประเภทนี้กับทุกล็อตของ P/N นี้</label>
     <label>กลุ่มพัสดุ</label><select id="ed-grp"><option value="-">ทั่วไป</option><option value="สารเคมี">สารเคมี</option></select>
     <label class="chk" style="display:flex;gap:8px;align-items:center;margin:6px 0;font-weight:400"><input type="checkbox" id="ed-grpall" style="width:auto;margin:0"> ใช้กลุ่มนี้กับทุกล็อตของ P/N นี้</label>
     <label>S/N</label><input id="ed-sn" autocomplete="off" autocapitalize="characters">
@@ -3436,7 +3438,7 @@ function snWatch(id, getSeq){
     $('ed-locs').innerHTML=opts;
     $('ed-part').value=l.part||''; $('ed-name').value=l.name||''; $('ed-nameall').checked=false;
     $('ed-loc').value=l.location||'';
-    $('ed-grp').value=l.grp||'-'; $('ed-grpall').checked=false;
+    $('ed-grp').value=l.grp||'-'; $('ed-grpall').checked=false; $('ed-type').value=(String(l.type||'').indexOf('SP')===0?'SP':'LRU'); $('ed-typeall').checked=false;
     $('ed-qty').value=l.qty;
     $('ed-sn').value=l.serial||'';
     $('ed-qty').disabled=!!l.serial;
@@ -3478,7 +3480,7 @@ function snWatch(id, getSeq){
     if(!part){ toast('Part number ว่างไม่ได้',true); return; }
     if(!nm){ toast('ชื่อพัสดุว่างไม่ได้',true); return; }
     var b=this; busy(b,true);
-    run('editLot', [{ seq:l.seq, part:part, name:nm, nameAll:$('ed-nameall').checked, location:$('ed-loc').value.trim(), qty:qty, serial:$('ed-sn').value.trim(), group:$('ed-grp').value, groupAll:$('ed-grpall').checked, by:state.by }]).then(function(res){
+    run('editLot', [{ seq:l.seq, part:part, name:nm, nameAll:$('ed-nameall').checked, location:$('ed-loc').value.trim(), qty:qty, serial:$('ed-sn').value.trim(), type:$('ed-type').value, typeAll:$('ed-typeall').checked, group:$('ed-grp').value, groupAll:$('ed-grpall').checked, by:state.by }]).then(function(res){
       $('ed-bg').classList.remove('on');
       toast(res.same ? 'ไม่มีการเปลี่ยนแปลง' : 'แก้ไขแล้ว: '+res.changes.join(', '));
       loadStock(); if(SM.open) smLoad(true);
