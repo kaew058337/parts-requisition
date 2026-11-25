@@ -390,3 +390,4 @@ grant execute on function rpc_get_pending_receive(), rpc_get_shelf_map(), rpc_ad
 -- rpc_get_kits(p jsonb) : ต่อ KIT 1/2 คืน items (รายการตายตัว need/have/short/ที่เก็บ/S/N), extra (พัสดุนอกรายการ), loans (ยืมออก), lastUse, total, complete
 -- (นิยามเต็มดูในฐานข้อมูลจริง: pg_get_functiondef('rpc_get_kits(jsonb)'::regprocedure))
 -- grant execute on function rpc_get_kits(jsonb) to anon;
+-- rpc_get_kits: แต่ละ item ที่ขาดมี 'reqs' = ใบเบิกทดแทนที่ค้างรับ (v_req_status.machine = 'FLY AWAY KIT n', part ตรง, remain > 0) (applied live 2026-11-25)

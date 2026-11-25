@@ -4392,26 +4392,29 @@ function snWatch(id, getSeq){
   function ktRender(){
     var d=KT.data, k=d[KT.k]; if(!k){ $('kt-body').innerHTML='<div class="empty">ไม่พบข้อมูล</div>'; return; }
     var miss=k.items.filter(function(x){ return x.short>0; }), ok=!miss.length, pct=k.total?Math.round(k.complete*100/k.total):0;
-    var rows=(KT.f==='short'?miss:k.items);
-    var h='<div class="dbx"><div class="seg" id="kt-seg" style="grid-template-columns:1fr 1fr;margin-bottom:12px">'+
+        var h='<div class="dbx"><div class="seg" id="kt-seg" style="grid-template-columns:1fr 1fr;margin-bottom:12px">'+
       ['1','2'].map(function(n){ var kk=d[n]; var bad=kk&&kk.items.some(function(x){ return x.short>0; }); return '<button data-k="'+n+'"'+(KT.k===n?' class="on"':'')+'>KIT '+n+(bad?' <span style="color:var(--bad)">●</span>':' <span style="color:var(--ok)">●</span>')+'</button>'; }).join('')+'</div>'+
       '<div class="pcard" style="margin-bottom:12px"><div style="display:flex;align-items:center;gap:14px">'+dbRing(pct,ok?'#16a34a':'#d97706',74,k.complete+'/'+k.total,'')+
       '<div style="min-width:0"><b style="font-size:17px;color:var(--navy-royal)">'+esc(k.kit)+'</b><div style="margin-top:4px"><span class="chip '+(ok?'ok':'bad')+'">'+(ok?'ครบทุกรายการ':'ขาด '+miss.length+' รายการ')+'</span></div>'+
       '<div class="meta" style="margin-top:6px">ใช้ล่าสุด: '+(k.lastUse?esc(k.lastUse):'ยังไม่เคยใช้')+(k.loans.length?' · ยืมออก '+k.loans.length+' รายการ':'')+'</div></div></div></div>';
     if(k.loans.length) h+='<div class="dbx-sec">ยืมออกจากชุด</div>'+k.loans.map(function(l){ return '<div class="pcard" style="margin-bottom:8px"><b>'+esc(l.part)+'</b> '+esc(l.name)+'<div class="meta">จำนวน '+fmtNum(l.qty)+' · ผู้ยืม '+esc(l.who)+'</div></div>'; }).join('');
-    h+='<div class="seg" id="kt-fl" style="grid-template-columns:1fr 1fr;margin:12px 0 8px"><button data-f="short"'+(KT.f==='short'?' class="on"':'')+'>ที่ขาด ('+miss.length+')</button><button data-f="all"'+(KT.f==='all'?' class="on"':'')+'>ทั้งหมด ('+k.items.length+')</button></div>';
-    h+= rows.length ? rows.map(function(x){
-      var bad=x.short>0;
+    var ordered=miss.concat(k.items.filter(function(x){ return !(x.short>0); }));
+    h+='<div class="dbx-sec" style="margin-top:12px">รายการตายตัวของชุด ('+k.items.length+')'+(miss.length?' · <span style="color:var(--bad)">ขาด '+miss.length+' (แสดงก่อน)</span>':'')+'</div>';
+    h+= ordered.length ? ordered.map(function(x){
+      var bad=x.short>0, rq='';
+      if(bad){
+        rq = (x.reqs&&x.reqs.length) ? '<div class="meta" style="color:var(--ink)">ใบเบิกทดแทน: '+x.reqs.map(function(r){ return '<b>'+esc(r.doc)+'</b> <span class="meta">(เบิก '+esc(r.date)+' · ค้างรับ '+fmtNum(r.remain)+')</span>'; }).join(' · ')+'</div>'
+          : '<div class="meta" style="color:var(--bad)">ยังไม่มีใบเบิกทดแทน</div>';
+      }
       return '<div class="ci '+(bad?'bad':'ok')+'"><div class="ci-h"><div><b>'+esc(x.part||'-')+'</b><div>'+esc(x.name)+'</div>'+
         '<div class="meta">'+(x.locs?'ที่เก็บ '+esc(x.locs):'ไม่ระบุที่เก็บ')+(x.sns?' · S/N '+esc(x.sns):'')+'</div></div>'+
-        '<span class="chip" style="'+(bad?'background:#fde7e5;color:var(--bad)':'')+'">มี '+fmtNum(x.have)+' / ต้องมี '+fmtNum(x.need)+'</span></div>'+(bad?'<div class="meta" style="color:var(--bad)">ขาด '+fmtNum(x.short)+'</div>':'')+'</div>';
-    }).join('') : (KT.f==='short' ? emp('check','ครบทุกรายการ','ไม่มีรายการที่ขาดใน '+esc(k.kit)) : '<div class="empty">ยังไม่ได้ตั้งรายการตายตัวของชุดนี้</div>');
+        '<span class="chip" style="'+(bad?'background:#fde7e5;color:var(--bad)':'')+'">มี '+fmtNum(x.have)+' / ต้องมี '+fmtNum(x.need)+'</span></div>'+(bad?'<div class="meta" style="color:var(--bad);font-weight:600">ขาด '+fmtNum(x.short)+'</div>'+rq:'')+'</div>';
+    }).join('') : '<div class="empty">ยังไม่ได้ตั้งรายการตายตัวของชุดนี้</div>';
     if(k.extra.length) h+='<div class="dbx-sec" style="margin-top:14px">พัสดุอื่นที่เก็บในชุด (นอกรายการตายตัว)</div>'+k.extra.map(function(x){ return '<div class="meta" style="padding:7px 0;border-top:1px solid var(--line)"><b>'+esc(x.part)+'</b> '+esc(x.name)+' · '+fmtNum(x.qty)+(x.locs?' · '+esc(x.locs):'')+'</div>'; }).join('');
     $('kt-body').innerHTML=h+'</div>';
   }
   $('kt-body').addEventListener('click',function(e){
     var b=e.target.closest('#kt-seg button'); if(b){ KT.k=b.dataset.k; ktRender(); return; }
-    b=e.target.closest('#kt-fl button'); if(b){ KT.f=b.dataset.f; ktRender(); }
   });
   $('kt-x').addEventListener('click',function(){ $('kt-bg').classList.remove('on'); });
   $('kt-btn').addEventListener('click',function(){ if(typeof closeDrawer==='function') closeDrawer(); ktOpen(); });
