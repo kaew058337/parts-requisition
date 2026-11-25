@@ -676,10 +676,10 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
 .dbx-todo:first-child{border-top:0}.dbx-todo .dot{width:10px;height:10px;border-radius:50%;background:#7aa2d6;flex:none}.dbx-todo .dot.bad{background:#dc2626}.dbx-todo .dot.warn{background:#e0a020}
 .dbx-todo .tx{flex:1;font-size:14px}.dbx-todo .chev{color:#9aa8bf;font-size:20px}
 .dbx-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
-#tj-bg,#dq-bg{background:var(--bg);-webkit-backdrop-filter:none;backdrop-filter:none}
-#tj-bg .sheet,#dq-bg .sheet{top:0;height:100%;max-height:none;max-width:none;border-radius:0;border-top:0;box-shadow:none;padding:calc(14px + env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom))}
-#tj-bg .sheet .hd,#dq-bg .sheet .hd{position:sticky;top:calc(-14px - env(safe-area-inset-top));z-index:2;background:var(--bg);margin:-4px -4px 8px;padding:8px 4px}
-@media(min-width:900px){#tj-bg .sheet,#dq-bg .sheet{padding-left:max(16px,calc(50% - 560px));padding-right:max(16px,calc(50% - 560px))}}
+#tj-bg,#dq-bg,#kt-bg{background:var(--bg);-webkit-backdrop-filter:none;backdrop-filter:none}
+#tj-bg .sheet,#dq-bg .sheet,#kt-bg .sheet{top:0;height:100%;max-height:none;max-width:none;border-radius:0;border-top:0;box-shadow:none;padding:calc(14px + env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom))}
+#tj-bg .sheet .hd,#dq-bg .sheet .hd,#kt-bg .sheet .hd{position:sticky;top:calc(-14px - env(safe-area-inset-top));z-index:2;background:var(--bg);margin:-4px -4px 8px;padding:8px 4px}
+@media(min-width:900px){#tj-bg .sheet,#dq-bg .sheet,#kt-bg .sheet{padding-left:max(16px,calc(50% - 560px));padding-right:max(16px,calc(50% - 560px))}}
 main .btn.bt{display:inline-flex;align-items:center;gap:6px;background:#fff;color:#0b2a55;border:1px solid #d9e1ee;border-bottom-width:4px;text-shadow:none;box-shadow:0 2px 6px rgba(7,27,53,.08)}
 main .btn.bt svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;flex:none}
 main .btn.bt-i{border-bottom-color:#dc2626}main .btn.bt-i svg{color:#dc2626}
@@ -841,6 +841,7 @@ main{padding-bottom:calc(28px + env(safe-area-inset-bottom))}
   <button class="dr-it dr-in" id="dw-btn" style="--i:1"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>รอเอกสาร TAI</button>
   <button class="dr-it dr-in" id="mr-btn" style="--i:1"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>รายงานสิ้นเปลืองประจำเดือน</button>
   <div class="dr-sec dr-in" style="--i:1">งานพิเศษ</div>
+  <button class="dr-it dr-in" id="kt-btn" style="--i:2"><svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="12" rx="2.5"/><path d="M9 8V6a3 3 0 013-3h0a3 3 0 013 3v2M3 13h18"/></svg>FLY AWAY KIT</button>
   <button class="dr-it dr-in" id="cnt-btn" style="--i:3"><svg viewBox="0 0 24 24"><path d="M9 11l2 2 4-4"/><rect x="4" y="4" width="16" height="16" rx="3"/></svg>ตรวจนับพัสดุ<span class="ex"><svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8M10 6H5a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1v-5"/></svg></span></button>
   <div class="dr-sec dr-in" style="--i:4">ข้อมูล</div>
   <button class="dr-it dr-in" id="his-btn" style="--i:5"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>ประวัติ<span class="ex"><svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8M10 6H5a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1v-5"/></svg></span></button>
@@ -1510,6 +1511,12 @@ main{padding-bottom:calc(28px + env(safe-area-inset-bottom))}
     <div><label id="dqx-ml">เครื่อง</label><input id="dqx-mc" autocomplete="off" placeholder="เช่น 70204"></div>
     <div id="dqx-tw"><label>ช่างผู้รับ</label><input id="dqx-tc" autocomplete="off"></div>
     <button class="btn" id="dqx-ok" style="margin-top:14px;width:100%">บันทึก</button>
+  </div>
+</div>
+<div class="sheet-bg" id="kt-bg">
+  <div class="sheet">
+    <div class="hd"><b>FLY AWAY KIT</b><button class="x" id="kt-x" aria-label="ปิด">×</button></div>
+    <div id="kt-body"><div class="empty"><span class="spin"></span></div></div>
   </div>
 </div>
 <div class="sheet-bg" id="tj-bg">
@@ -4370,6 +4377,37 @@ function snWatch(id, getSeq){
     }).catch(function(e){ toast(e.message||'บันทึกไม่สำเร็จ',true); }).then(function(){ b.disabled=false; });
   });
   $('dq-x').addEventListener('click',function(){ $('dq-bg').classList.remove('on'); });
+  /* ---------- หน้า FLY AWAY KIT ---------- */
+  var KT={data:null,k:'1',f:'short'};
+  function ktOpen(){ $('kt-bg').classList.add('on'); $('kt-bg').firstElementChild.scrollTop=0; $('kt-body').innerHTML='<div class="empty"><span class="spin"></span></div>'; ktLoad(); }
+  window.__ktOpen=ktOpen;
+  function ktLoad(){ run('getKits',[{}]).then(function(d){ KT.data=d; ktRender(); }).catch(function(e){ $('kt-body').innerHTML='<div class="empty">'+esc(e.message)+'</div>'; }); }
+  function ktRender(){
+    var d=KT.data, k=d[KT.k]; if(!k){ $('kt-body').innerHTML='<div class="empty">ไม่พบข้อมูล</div>'; return; }
+    var miss=k.items.filter(function(x){ return x.short>0; }), ok=!miss.length, pct=k.total?Math.round(k.complete*100/k.total):0;
+    var rows=(KT.f==='short'?miss:k.items);
+    var h='<div class="dbx"><div class="seg" id="kt-seg" style="grid-template-columns:1fr 1fr;margin-bottom:12px">'+
+      ['1','2'].map(function(n){ var kk=d[n]; var bad=kk&&kk.items.some(function(x){ return x.short>0; }); return '<button data-k="'+n+'"'+(KT.k===n?' class="on"':'')+'>KIT '+n+(bad?' <span style="color:var(--bad)">●</span>':' <span style="color:var(--ok)">●</span>')+'</button>'; }).join('')+'</div>'+
+      '<div class="pcard" style="margin-bottom:12px"><div style="display:flex;align-items:center;gap:14px">'+dbRing(pct,ok?'#16a34a':'#d97706',74,k.complete+'/'+k.total,'')+
+      '<div style="min-width:0"><b style="font-size:17px;color:var(--navy-royal)">'+esc(k.kit)+'</b><div style="margin-top:4px"><span class="chip '+(ok?'ok':'bad')+'">'+(ok?'ครบทุกรายการ':'ขาด '+miss.length+' รายการ')+'</span></div>'+
+      '<div class="meta" style="margin-top:6px">ใช้ล่าสุด: '+(k.lastUse?esc(k.lastUse):'ยังไม่เคยใช้')+(k.loans.length?' · ยืมออก '+k.loans.length+' รายการ':'')+'</div></div></div></div>';
+    if(k.loans.length) h+='<div class="dbx-sec">ยืมออกจากชุด</div>'+k.loans.map(function(l){ return '<div class="pcard" style="margin-bottom:8px"><b>'+esc(l.part)+'</b> '+esc(l.name)+'<div class="meta">จำนวน '+fmtNum(l.qty)+' · ผู้ยืม '+esc(l.who)+'</div></div>'; }).join('');
+    h+='<div class="seg" id="kt-fl" style="grid-template-columns:1fr 1fr;margin:12px 0 8px"><button data-f="short"'+(KT.f==='short'?' class="on"':'')+'>ที่ขาด ('+miss.length+')</button><button data-f="all"'+(KT.f==='all'?' class="on"':'')+'>ทั้งหมด ('+k.items.length+')</button></div>';
+    h+= rows.length ? rows.map(function(x){
+      var bad=x.short>0;
+      return '<div class="ci '+(bad?'bad':'ok')+'"><div class="ci-h"><div><b>'+esc(x.part||'-')+'</b><div>'+esc(x.name)+'</div>'+
+        '<div class="meta">'+(x.locs?'ที่เก็บ '+esc(x.locs):'ไม่ระบุที่เก็บ')+(x.sns?' · S/N '+esc(x.sns):'')+'</div></div>'+
+        '<span class="chip" style="'+(bad?'background:#fde7e5;color:var(--bad)':'')+'">มี '+fmtNum(x.have)+' / ต้องมี '+fmtNum(x.need)+'</span></div>'+(bad?'<div class="meta" style="color:var(--bad)">ขาด '+fmtNum(x.short)+'</div>':'')+'</div>';
+    }).join('') : (KT.f==='short' ? emp('check','ครบทุกรายการ','ไม่มีรายการที่ขาดใน '+esc(k.kit)) : '<div class="empty">ยังไม่ได้ตั้งรายการตายตัวของชุดนี้</div>');
+    if(k.extra.length) h+='<div class="dbx-sec" style="margin-top:14px">พัสดุอื่นที่เก็บในชุด (นอกรายการตายตัว)</div>'+k.extra.map(function(x){ return '<div class="meta" style="padding:7px 0;border-top:1px solid var(--line)"><b>'+esc(x.part)+'</b> '+esc(x.name)+' · '+fmtNum(x.qty)+(x.locs?' · '+esc(x.locs):'')+'</div>'; }).join('');
+    $('kt-body').innerHTML=h+'</div>';
+  }
+  $('kt-body').addEventListener('click',function(e){
+    var b=e.target.closest('#kt-seg button'); if(b){ KT.k=b.dataset.k; ktRender(); return; }
+    b=e.target.closest('#kt-fl button'); if(b){ KT.f=b.dataset.f; ktRender(); }
+  });
+  $('kt-x').addEventListener('click',function(){ $('kt-bg').classList.remove('on'); });
+  $('kt-btn').addEventListener('click',function(){ if(typeof closeDrawer==='function') closeDrawer(); ktOpen(); });
   /* ---------- หน้า งาน TCI (จัดกลุ่มตามสถานะของ) ---------- */
   var TJ={month:'',data:null};
   function tjOpen(){ $('tj-bg').classList.add('on'); $('tj-bg').firstElementChild.scrollTop=0; $('tj-body').innerHTML='<div class="empty"><span class="spin"></span></div>'; tjLoad(TJ.month); }
@@ -5215,6 +5253,7 @@ function snWatch(id, getSeq){
   }
   act('rl-tj',function(){ if(window.__tjOpen) window.__tjOpen(); },'<svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/><circle cx="19" cy="17" r="1.6"/></svg>','งาน TCI');
   act('rl-db','db-btn',SV.db,'แดชบอร์ด');
+  act('rl-kt',function(){ if(window.__ktOpen) window.__ktOpen(); },'<svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="12" rx="2.5"/><path d="M9 8V6a3 3 0 013-3h0a3 3 0 013 3v2M3 13h18"/></svg>','FLY AWAY KIT');
   act('rl-dw','dw-btn',SV.dw,'รอเอกสาร TAI','<em id="rl-dw-n"></em>');
   act('rl-dq',function(){ if(window.__dqOpen) window.__dqOpen(); },'<svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2h9"/></svg>','ตรวจข้อมูล','<em id="rl-dq-n"></em>');
   var ft=document.createElement('div'); ft.className='rl-ft';

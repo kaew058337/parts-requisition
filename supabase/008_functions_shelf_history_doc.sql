@@ -385,3 +385,8 @@ revoke all on function fn_nat(text), fn_line_date(date), fn_ts(timestamptz), fn_
   fn_doc_row(bigint), fn_kit_status() from public, anon;
 grant execute on function rpc_get_pending_receive(), rpc_get_shelf_map(), rpc_add_shelf_slots(jsonb), rpc_remove_shelf_slot(jsonb), rpc_fill_shelf_gaps(jsonb), rpc_get_bootstrap(),
   rpc_get_history(text,int), rpc_get_awaiting_doc(), rpc_get_doc_info(bigint), rpc_save_doc_info(jsonb), rpc_scan_duplicate_serials(), rpc_get_system_health() to anon;
+
+-- ---------- หน้า FLY AWAY KIT (applied live 2026-11-25) ----------
+-- rpc_get_kits(p jsonb) : ต่อ KIT 1/2 คืน items (รายการตายตัว need/have/short/ที่เก็บ/S/N), extra (พัสดุนอกรายการ), loans (ยืมออก), lastUse, total, complete
+-- (นิยามเต็มดูในฐานข้อมูลจริง: pg_get_functiondef('rpc_get_kits(jsonb)'::regprocedure))
+-- grant execute on function rpc_get_kits(jsonb) to anon;
