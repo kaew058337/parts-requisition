@@ -340,3 +340,9 @@ begin
   return jsonb_build_object('ok', true, 'left', left_, 'autoReq', auto);
 end $$;
 grant execute on function rpc_issue_loan(jsonb) to anon;
+
+-- ---------- คืนของที่ยืมด้วย S/N ใหม่ (applied live 2026-11-26) ----------
+-- alter table loans add column returned_serial text not null default '';
+-- rpc_return_loan(p): รับ p.newSerial ; ถ้าต่างจาก S/N ที่ยืม → receipts.serial_no ของล็อต = newSerial, loans.returned_serial = newSerial (กันซ้ำกับล็อตอื่น, ต้องคืนทีละ 1)
+-- fn_sn_chain(k): เชื่อม S/N เดิม↔ใหม่จากทั้ง claims.new_serial และ loans.returned_serial
+-- rpc_get_serial_history: เพิ่มเหตุการณ์ "ยืมออก · ผู้ยืม …" และ "คืนเข้าคลังด้วย S/N ใหม่ (แทน …)"

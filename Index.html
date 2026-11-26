@@ -1168,6 +1168,7 @@ main{padding-bottom:calc(28px + env(safe-area-inset-bottom))}
     <div class="hd"><b id="la-title">ปิดรายการยืม</b><button class="x" id="la-x" aria-label="ปิด">×</button></div>
     <div class="info" id="la-info"></div>
     <label>จำนวน</label><input id="la-qty" type="number" inputmode="decimal" min="0">
+    <div id="la-snwrap" style="display:none"><label>S/N ที่ส่งคืนจริง (กรอกเฉพาะเมื่อไม่ตรงกับที่ยืม)</label><input id="la-sn" autocomplete="off" placeholder="ปล่อยว่าง = S/N เดิม"><div class="meta" style="margin-top:4px">ระบบจะเปลี่ยน S/N ของล็อตในคลังเป็นเลขใหม่ และเชื่อมประวัติของเลขเดิมกับเลขใหม่ให้</div></div>
     <div id="la-docwrap" style="display:none"><label>เลขเบิก 9 หลักที่ผู้ยืมเบิกคืนให้</label><input id="la-doc" inputmode="numeric" maxlength="9"></div>
     <button class="btn" id="la-submit">ยืนยัน</button>
   </div>
@@ -3746,6 +3747,7 @@ function snWatch(id, getSeq){
       (mode==='return'?'<br>ของจะกลับเข้าคลังเป็น "ในคลัง" ทันที':'<br>ใช้เมื่อผู้ยืม (เช่น TAI) เบิกของมาทดแทนแล้ว ของทดแทนเข้าคลังตามขั้นตอน เบิก-รับ ปกติ')+'</span>';
     $('la-qty').value = x.out; $('la-doc').value='';
     $('la-docwrap').style.display = mode==='replaced' ? 'block' : 'none';
+    $('la-snwrap').style.display = (mode==='return' && x.serial) ? 'block' : 'none'; $('la-sn').value='';
     $('la-submit').textContent = mode==='return' ? 'คืนเข้าคลัง' : 'ปิดรายการยืม';
     $('la-bg').classList.add('on');
   }
@@ -3762,7 +3764,7 @@ function snWatch(id, getSeq){
     var s=state.la; if(!s) return;
     var btn=$('la-submit'); busy(btn,true);
     var call = s.mode==='return'
-      ? run('returnLoan', [{ seq:s.x.seq, qty:$('la-qty').value, by:state.by }])
+      ? run('returnLoan', [{ seq:s.x.seq, qty:$('la-qty').value, newSerial:$('la-sn').value.trim(), by:state.by }])
       : run('closeLoanReplaced', [{ seq:s.x.seq, qty:$('la-qty').value, docNo:$('la-doc').value, by:state.by }]);
     call.then(function(res){
       $('la-bg').classList.remove('on');
