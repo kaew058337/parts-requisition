@@ -4025,7 +4025,9 @@ function snWatch(id, getSeq){
   /* ---------- ประวัติ ---------- */
   function loadHistory(){
     $('h-list').innerHTML=skel();
-    run('getHistory', [state.hist, 150]).then(function(d){ state.histData=d; renderHistory(); })
+    var full = !!$('h-search').value.trim();
+    state.histFull = full;
+    run('getHistory', [state.hist, full ? 5000 : 150]).then(function(d){ state.histData=d; renderHistory(); })
       .catch(function(e){ $('h-list').innerHTML='<div class="empty">'+esc(e.message)+'</div>'; });
   }
   function reqState(v){ return v==='ยกเลิก' ? 'cancel' : (v && v!=='ค้างจ่าย' ? 'paid' : 'open'); }
@@ -4080,7 +4082,17 @@ function snWatch(id, getSeq){
     document.querySelectorAll('#h-seg button').forEach(function(x){ x.classList.toggle('on', x===b); });
     loadHistory();
   });
-  $('h-search').addEventListener('input', renderHistory);
+  var hsT;
+  $('h-search').addEventListener('input', function(){
+    renderHistory();
+    /* ค้นหา: ประวัติแสดงแค่ 150 รายการล่าสุด → เมื่อพิมพ์ค้นหาให้โหลดทั้งหมดมาค้น */
+    clearTimeout(hsT);
+    hsT=setTimeout(function(){
+      var has=!!$('h-search').value.trim();
+      if(has && !state.histFull) loadHistory();
+      else if(!has && state.histFull) loadHistory();
+    }, 350);
+  });
 
   /* ---------- แก้ไข / ยกเลิกใบเบิก ---------- */
   function openEdit(r){
