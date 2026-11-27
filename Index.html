@@ -677,6 +677,41 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
 .dbx-todo .tx{flex:1;font-size:14px}.dbx-todo .chev{color:#9aa8bf;font-size:20px}
 .dbx-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
 #tj-bg,#dq-bg,#kt-bg{background:var(--bg);-webkit-backdrop-filter:none;backdrop-filter:none}
+/* ===== ตารางข้อมูล (จอคอม) ===== */
+@media(min-width:1024px){
+  body[data-view="stk"] main,body[data-view="rcv"] main,body[data-view="iss"] main{max-width:1560px;width:calc(100% - 40px)}
+}
+.dt-wrap{background:var(--card);border:1px solid #d5e0ef;border-radius:12px;overflow:auto;max-height:calc(100vh - 250px);margin-bottom:14px}
+table.dt{width:100%;border-collapse:collapse;font-size:14px}
+.dt thead th{position:sticky;top:0;z-index:2;background:#eaf0f8;color:#33465f;text-align:left;font-size:13px;font-weight:600;padding:10px 8px;white-space:nowrap;user-select:none}
+.dt thead th[data-dts]{cursor:pointer}
+.dt thead th[data-dts]:hover{background:#dde8f6}
+.dt thead th.on{color:var(--navy-royal);font-weight:700}
+.dt td{padding:7px 8px;border-top:1px solid #e3eaf4;vertical-align:middle}
+.dt tbody tr:nth-child(even){background:rgba(120,150,190,.06)}
+.dt .r{text-align:right}.dt .nw{white-space:nowrap}.dt .mut{color:var(--muted)}
+.dt .b{font-weight:600;color:var(--navy-royal)}
+.dt-r{cursor:pointer}
+.dt-r:hover,.dt tbody tr:hover{background:rgba(70,120,190,.12) !important}
+.dt .ty{display:inline-block;border-radius:6px;padding:2px 8px;font-size:12px;font-weight:600;background:#e9efe9;color:#1d5a35}
+.dt .ty.lru{background:#e0ecfb;color:#0f3d73}
+.dt-acts{display:flex;gap:5px;justify-content:flex-end;flex-wrap:nowrap}
+.dt-b{border:1px solid #b9cde8;background:#eef4fc;color:var(--navy-royal);border-radius:8px;padding:5px 9px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:inherit}
+.dt-b:hover{background:#dbe8f8}
+.dt-b.pri{background:var(--navy-royal);border-color:var(--navy-royal);color:#fff}
+.dt-b.pri:hover{filter:brightness(1.15)}
+.dt-r.bt-off{opacity:.45}
+.dt .bt-ck{display:inline-block;width:18px;height:18px;border-radius:5px;border:1.5px solid #9db3d1;vertical-align:middle}
+.dt .bt-ck.on{background:var(--navy-royal);border-color:var(--navy-royal)}
+.dt-cap{margin:6px 2px 8px;font-weight:700;color:var(--navy-royal)}
+html[data-theme=dark] .dt-wrap{border-color:#24456e}
+html[data-theme=dark] .dt thead th{background:#16365d;color:#c5d4ec}
+html[data-theme=dark] .dt thead th[data-dts]:hover{background:#1c4272}
+html[data-theme=dark] .dt td{border-color:#24456e}
+html[data-theme=dark] .dt .ty{background:#1b3a2c;color:#b7e4c7}
+html[data-theme=dark] .dt .ty.lru{background:#17365f;color:#cfe2fb}
+html[data-theme=dark] .dt-b{background:#16365d;border-color:#2f5a8c;color:#dbe8fb}
+html[data-theme=dark] .dt-b.pri{background:#2f6fb5;border-color:#2f6fb5;color:#fff}
 #pc-bg{background:var(--bg);-webkit-backdrop-filter:none;backdrop-filter:none}
 #pc-bg .sheet{top:0;max-height:none;border-radius:0;max-width:none;width:100%;padding:14px 22px 22px}
 #pc-bg .sheet .hd{position:sticky;top:-14px;z-index:3;background:var(--bg);margin:0 -6px 10px;padding:8px 6px}
@@ -1970,7 +2005,7 @@ function snWatch(id, getSeq){
   function show(v){
     if(state.view) scrollMem[state.view] = window.pageYOffset;
     if(v!=='his') state.lastMain = v;
-    state.view = v;
+    state.view = v; document.body.dataset.view = v;
     $('back-btn').classList.toggle('on', v==='his');
     $('his-btn').classList.toggle('on', v==='his');
     ['req','rcv','iss','stk','ret','his'].forEach(function(k){ $('v-'+k).classList.toggle('on', k===v); });
@@ -2985,6 +3020,67 @@ function snWatch(id, getSeq){
   $('d-close').addEventListener('click', function(){ $('d-bg').classList.remove('on'); });
 
   /* ---------- รับ ---------- */
+  /* ---------- ตารางข้อมูล (จอคอม) : คลัง / รับ / จ่าย ---------- */
+  var WIDE = window.matchMedia ? window.matchMedia('(min-width:1024px)') : {matches:false};
+  var DT = {s:{}, fn:{}};
+  function dtDate(t){ var m=/(\d+)\/(\d+)\/(\d+)/.exec(String(t||'')); return m ? Number(m[3])*10000+Number(m[2])*100+Number(m[1]) : 0; }
+  function dtSort(id,rows){
+    var st=DT.s[id]; if(!st) return rows;
+    return rows.slice().sort(function(a,b){
+      var x=a.v[st.k], y=b.v[st.k]; if(x==null) x=''; if(y==null) y='';
+      var c=(typeof x==='number'&&typeof y==='number') ? x-y : String(x).localeCompare(String(y),'th',{numeric:true});
+      return st.d*c;
+    });
+  }
+  function dtTable(id,cols,rows){
+    var st=DT.s[id];
+    var th=cols.map(function(c){
+      var on=st&&st.k===c.k;
+      return '<th'+(c.sort?' data-dts="'+id+'|'+c.k+'" tabindex="0"':'')+(on?' class="on"':'')+(c.al==='r'?' style="text-align:right"':'')+'>'+c.t+(on?(st.d>0?' ▲':' ▼'):'')+'</th>';
+    }).join('');
+    var tb=rows.map(function(r){ return '<tr '+(r.attr||'')+'>'+r.td.map(function(c,i){ return '<td'+(cols[i].cls?' class="'+cols[i].cls+'"':'')+'>'+c+'</td>'; }).join('')+'</tr>'; }).join('');
+    return '<div class="dt-wrap"><table class="dt"><thead><tr>'+th+'</tr></thead><tbody>'+tb+'</tbody></table></div>';
+  }
+  function dtTy(t){ t=String(t||''); return t ? '<span class="ty'+(t.indexOf('LRU')===0?' lru':'')+'">'+esc(t)+'</span>' : ''; }
+  document.addEventListener('click', function(e){
+    var h=e.target.closest && e.target.closest('th[data-dts]'); if(!h) return;
+    var p=h.dataset.dts.split('|'), st=DT.s[p[0]];
+    DT.s[p[0]] = (st&&st.k===p[1]) ? (st.d>0 ? {k:p[1],d:-1} : null) : {k:p[1],d:1};
+    if(DT.fn[p[0]]) DT.fn[p[0]]();
+  });
+  document.addEventListener('keydown', function(e){ if(e.key==='Enter' && e.target.matches && e.target.matches('th[data-dts]')) e.target.click(); });
+  if(WIDE.addEventListener) WIDE.addEventListener('change', function(){ try{ if(state.stk) renderStock(); if(state.rcv && state.rcv.length) renderRcv(); if(state.iss) renderIssue(); }catch(e){} });
+  function rcvTable(rows){
+    var cols=[]; if(BT.on) cols.push({k:'ck',t:'',cls:'nw'});
+    cols=cols.concat([{k:'doc',t:'เลขเบิก',sort:1,cls:'nw'},{k:'part',t:'Part number',sort:1},{k:'name',t:'ชื่อพัสดุ',sort:1},{k:'mc',t:'เครื่อง',sort:1,cls:'nw'},{k:'type',t:'ประเภท',sort:1},
+      {k:'rem',t:'ค้างรับ / เบิก',sort:1,al:'r',cls:'r nw'},{k:'date',t:'วันเบิก',sort:1,cls:'nw'},{k:'urg',t:'ความเร่งด่วน',sort:1,cls:'nw'},{k:'tai',t:'TAI'},{k:'act',t:'',cls:'nw'}]);
+    var rs=rows.map(function(r){ return {r:r, v:{doc:r.docNo,part:r.part,name:r.name,mc:r.machine||'',type:r.type||'',rem:r.remain,date:dtDate(r.date),urg:urg(r.urgency),tai:(r.tai&&r.tai.label)||''}}; });
+    rs=dtSort('rcv',rs);
+    return dtTable('rcv',cols,rs.map(function(o){
+      var r=o.r, lru=lruOf(r), off=BT.on&&lru, t=r.tai, tc=t?(t.level==='bad'?'#b91c1c':(t.level==='warn'?'#b45309':'#0f5f3f')):'';
+      var td=[]; if(BT.on) td.push(lru?'':'<span class="bt-ck'+(BT.sel[btKey(r)]?' on':'')+'"></span>');
+      td=td.concat(['<span class="b">'+esc(r.docNo)+'</span>', esc(r.part), esc(r.name), esc(r.machine||''), dtTy(r.type),
+        '<b>'+fmtNum(r.remain)+'</b> / '+fmtNum(r.qty)+' <span class="mut">'+esc(r.unit)+'</span>', esc(r.date), '<span class="chip '+esc(r.urgency)+'">'+esc(urg(r.urgency))+'</span>',
+        t ? '<span style="color:'+tc+';font-weight:600">'+esc(t.label)+'</span>'+(t.supplier?'<div class="mut" style="font-size:12px">'+esc(t.supplier)+'</div>':'') : '',
+        BT.on ? '' : '<div class="dt-acts"><button type="button" class="dt-b pri">รับ</button></div>']);
+      return {attr:'class="dt-r'+(off?' bt-off':'')+'" data-i="'+state.rcv.indexOf(r)+'"', td:td};
+    }));
+  }
+  function issTable(rows){
+    var cols=[]; if(BX.on) cols.push({k:'ck',t:'',cls:'nw'});
+    cols=cols.concat([{k:'doc',t:'เลขเบิก',sort:1,cls:'nw'},{k:'part',t:'Part number',sort:1},{k:'name',t:'ชื่อพัสดุ',sort:1},{k:'sn',t:'S/N',sort:1,cls:'nw'},{k:'type',t:'ประเภท',sort:1},
+      {k:'qty',t:'จำนวน',sort:1,al:'r',cls:'r nw'},{k:'mc',t:'เครื่อง',sort:1,cls:'nw'},{k:'loc',t:'ที่เก็บ',sort:1,cls:'nw'},{k:'urg',t:'ความเร่งด่วน',sort:1,cls:'nw'},{k:'act',t:'',cls:'nw'}]);
+    var rs=rows.map(function(r){ return {r:r, v:{doc:r.docNo,part:r.part,name:r.name,sn:r.serial||'',type:r.type||'',qty:r.qty,mc:r.machine||'',loc:r.location||'',urg:urg(r.urgency)}}; });
+    rs=dtSort('iss',rs);
+    return dtTable('iss',cols,rs.map(function(o){
+      var r=o.r, td=[]; if(BX.on) td.push('<span class="bt-ck'+(BX.sel[bxKey(r)]?' on':'')+'"></span>');
+      td=td.concat(['<span class="b">'+esc(r.docNo)+'</span>', esc(r.part), esc(r.name), esc(r.serial||''), dtTy(r.type), fmtNum(r.qty)+' <span class="mut">'+esc(r.unit)+'</span>',
+        esc(r.machine||''), esc(r.location||''), '<span class="chip '+esc(r.urgency)+'">'+esc(urg(r.urgency))+'</span>',
+        BX.on ? '' : '<div class="dt-acts"><button type="button" class="dt-b pri">จ่าย</button></div>']);
+      return {attr:'class="dt-r" data-i="'+state.iss.indexOf(r)+'"', td:td};
+    }));
+  }
+  DT.fn.rcv=function(){ renderRcv(); }; DT.fn.iss=function(){ renderIssue(); }; DT.fn.stk=function(){ renderStock(); };
   function loadRcv(){
     if(!state.rcv||!state.rcv.length){ state.rcv=[]; $('c-list').innerHTML=skel(); }
     run('getPendingReceive').then(function(rows){ state.rcv=rows; renderRcv(); })
@@ -2997,6 +3093,7 @@ function snWatch(id, getSeq){
       return !q || qm(r.docNo+' '+r.part+' '+r.name+' '+r.machine,q);
     });
     if(!rows.length){ $('c-list').innerHTML=state.rcv.length?emp('search','ไม่พบรายการที่ค้นหา','ลองพิมพ์เลขเบิก, Part number หรือเครื่องให้สั้นลง'):emp('check','ไม่มีใบเบิกรอรับ','ใบเบิกที่ออกแล้วจะมารออยู่ที่นี่จนกว่าจะรับพัสดุครบ'); return; }
+    if(WIDE.matches){ $('c-list').innerHTML = rcvTable(rows); return; }
     $('c-list').innerHTML = rows.map(function(r){
       var lru=lruOf(r), off=BT.on&&lru;
       return '<div class="pcard'+tyCls(r.type)+(off?' bt-off':'')+'" data-i="'+state.rcv.indexOf(r)+'">'+
@@ -3009,7 +3106,7 @@ function snWatch(id, getSeq){
   }
   $('c-search').addEventListener('input', renderRcv);
   $('c-list').addEventListener('click', function(e){
-    var c = e.target.closest('.pcard'); if(!c) return;
+    var c = e.target.closest('.pcard,.dt-r'); if(!c) return;
     var r = state.rcv[Number(c.dataset.i)];
     if(BT.on){
       if(lruOf(r)){ toast('พัสดุ LRU ต้องรับทีละตัว ปิดโหมดเลือกหลายรายการเพื่อรับแยก'); return; }
@@ -3214,6 +3311,7 @@ function snWatch(id, getSeq){
       return !q || qm(r.docNo+' '+r.part+' '+r.name+' '+r.serial+' '+r.machine,q);
     });
     if(!rows.length){ $('i-list').innerHTML=state.iss.length?emp('search','ไม่พบรายการที่ค้นหา','ลองพิมพ์เลขเบิก, Part number, S/N หรือเครื่องให้สั้นลง'):emp('inbox','ไม่มีพัสดุที่รับแล้วรอจ่าย','ต้องรับตามเลขเบิกก่อนจึงจะจ่ายได้'); return; }
+    if(WIDE.matches){ $('i-list').innerHTML = issTable(rows); return; }
     $('i-list').innerHTML = rows.map(function(r){
       return '<div class="pcard'+tyCls(r.type)+'" data-i="'+state.iss.indexOf(r)+'">'+
         '<div class="t"><span class="doc">'+(BX.on?'<span class="bt-ck'+(BX.sel[bxKey(r)]?' on':'')+'"></span>':'')+esc(r.docNo)+'</span><span class="chip '+esc(r.urgency)+'">'+esc(urg(r.urgency))+'</span></div>'+
@@ -3225,7 +3323,7 @@ function snWatch(id, getSeq){
   }
   $('i-search').addEventListener('input', renderIssue);
   $('i-list').addEventListener('click', function(e){
-    var c = e.target.closest('.pcard'); if(!c) return;
+    var c = e.target.closest('.pcard,.dt-r'); if(!c) return;
     var r = state.iss[Number(c.dataset.i)];
     if(BX.on){ var k=bxKey(r); if(BX.sel[k]) delete BX.sel[k]; else BX.sel[k]=1; bxBar(); renderIssue(); return; }
     state.fromStock=false; openIssue(r);
@@ -3428,6 +3526,31 @@ function snWatch(id, getSeq){
       return '<div class="card lift'+tyCls(g.lots[0]&&g.lots[0].type, g.lots.some(function(l){return l.kit;}))+'" style="padding:14px 16px">'+
         '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><b>'+esc(g.part||'-')+'</b><span class="chip ok">'+fmtNum(g.qty)+' '+esc(g.unit)+'</span></div>'+
         '<div style="margin:4px 0 6px">'+esc(g.name)+'</div>'+lots+'</div>';
+    }
+    if(WIDE.matches){
+      var kcols=[{k:'ck',t:'',cls:'nw'},{k:'part',t:'Part number',sort:1},{k:'name',t:'ชื่อพัสดุ',sort:1},{k:'sn',t:'S/N',sort:1,cls:'nw'},{k:'type',t:'ประเภท',sort:1},
+        {k:'qty',t:'คงเหลือ',sort:1,al:'r',cls:'r nw'},{k:'loc',t:'ที่เก็บ',sort:1,cls:'nw'},{k:'src',t:'แหล่งที่มา / เลขเบิก',sort:1},{k:'recv',t:'วันที่รับ',sort:1,cls:'nw'},{k:'note',t:'ชุด / กลุ่ม / หมดอายุ'},{k:'act',t:'',cls:'nw'}];
+      var kTable=function(gs){
+        var rs=[]; gs.forEach(function(g){ g.lots.forEach(function(l){ rs.push({g:g,l:l,v:{part:g.part||'',name:g.name,sn:l.serial||'',type:l.type||'',qty:l.qty,loc:l.location||'',src:l.docNo||'',recv:dtDate(l.received)}}); }); });
+        rs=dtSort('stk',rs);
+        return dtTable('stk',kcols,rs.map(function(o){
+          var g=o.g,l=o.l, fromDoc=!(l.docNo==='ยอดยกมา'||l.docNo==='คืนเข้าคลัง'||l.docNo==='รับก่อนเบิก'||l.docNo==='ย้ายจากชุด');
+          var note=[]; if(l.kit) note.push('<b>'+esc(l.kit)+'</b>'); if(l.grp) note.push('<b>'+esc(l.grp)+'</b>'); if(l.expire) note.push('หมดอายุ '+esc(l.expire));
+          var act=(l.free?'<button type="button" class="dt-b pri" data-is="'+l.seq+'">จ่าย</button>':(l.issRow?'<button type="button" class="dt-b pri" data-ix="'+l.seq+'">จ่าย</button>':''))+
+            '<button type="button" class="dt-b" data-bl="'+l.seq+'">ยืม</button><button type="button" class="dt-b" data-ed="'+l.seq+'">แก้ไข</button>'+
+            '<button type="button" class="dt-b" data-tg="'+l.seq+'" title="พิมพ์ป้ายกำกับพัสดุ" aria-label="พิมพ์ป้ายกำกับพัสดุ"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/></svg></button>';
+          return {attr:'', td:[
+            '<input type="checkbox" data-tgc="'+l.seq+'" aria-label="เลือกพิมพ์ป้าย"'+(TG.sel[l.seq]?' checked':'')+'>',
+            '<span class="b">'+esc(g.part||'-')+'</span>',
+            esc(g.name)+(l.linkNote?'<div style="color:var(--bad);font-size:12px">⚠ '+esc(l.linkNote)+'</div>':''),
+            l.serial?'<a class="snl" data-sn="'+esc(l.serial)+'">'+esc(l.serial)+'</a>':'',
+            dtTy(l.type), '<b>'+fmtNum(l.qty)+'</b> <span class="mut">'+esc(g.unit)+'</span>', esc(l.location||''),
+            fromDoc ? 'เลขเบิก '+esc(l.docNo) : esc(l.docNo)+(l.note?' <span class="mut">('+esc(l.note)+')</span>':''),
+            esc(l.received||''), note.join(' · '), '<div class="dt-acts">'+act+'</div>']};
+        }));
+      };
+      $('k-list').innerHTML = kTable(rows) + (similar.length ? '<div class="dt-cap" style="margin-top:14px">'+(rows.length?'พัสดุที่ชื่อ/Part ใกล้เคียง':'ไม่พบตรงตัว · พัสดุที่ชื่อ/Part ใกล้เคียง')+'</div>'+kTable(similar) : '');
+      return;
     }
     $('k-list').innerHTML = rows.map(kCard).join('') + (similar.length ? '<div class="sec" style="margin-top:14px">'+(rows.length?'พัสดุที่ชื่อ/Part ใกล้เคียง':'ไม่พบตรงตัว · พัสดุที่ชื่อ/Part ใกล้เคียง')+'</div>'+similar.map(kCard).join('') : '');
   }
