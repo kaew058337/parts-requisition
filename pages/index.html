@@ -684,6 +684,39 @@ html[data-theme] main .card.ty-kit,html[data-theme] main .pcard.ty-kit{border-le
 .dbx-todo .tx{flex:1;font-size:14px}.dbx-todo .chev{color:#9aa8bf;font-size:20px}
 .dbx-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
 #tj-bg,#dq-bg,#kt-bg{background:var(--bg);-webkit-backdrop-filter:none;backdrop-filter:none}
+#pc-bg{background:var(--bg);-webkit-backdrop-filter:none;backdrop-filter:none}
+#pc-bg .sheet{top:0;max-height:none;border-radius:0;max-width:none;width:100%;padding:14px 22px 22px}
+#pc-bg .sheet .hd{position:sticky;top:-14px;z-index:3;background:var(--bg);margin:0 -6px 10px;padding:8px 6px}
+.pc-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.pc-tools .btn{margin:0;width:auto;padding:8px 14px}
+.pc-auto{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);margin:0;font-weight:400}
+.pc-auto input{width:auto;margin:0}
+.pc-kpi{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.pc-k{background:var(--card);border:1px solid #d5e0ef;border-radius:14px;padding:14px 16px;min-width:0}
+.pc-k .l{font-size:13px;color:var(--muted)}
+.pc-k .v{font-size:34px;font-weight:700;line-height:1.1;color:var(--navy-royal);margin-top:4px}
+.pc-k .s{font-size:12.5px;color:var(--muted);margin-top:4px}
+.pc-k.bad .v{color:var(--bad)}.pc-k.warn .v{color:#b45309}.pc-k.ok .v{color:#15803d}
+.pc-bar{display:flex;gap:10px;align-items:center;margin-bottom:14px}
+.pc-bar .search{flex:1;margin:0;font-size:16px}
+.pc-bar .btn{margin:0;width:auto;white-space:nowrap}
+.pc-cols{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+.pc-cols h3{margin:0 0 8px;font-size:16px;color:var(--navy-royal)}
+.pc-cols h3 small{font-weight:400;color:var(--muted);font-size:13px}
+.pc-cols section>div{max-height:calc(100vh - 290px);overflow:auto;padding-right:4px}
+.pc-c{background:var(--card);border:1px solid #d5e0ef;border-radius:12px;padding:11px 13px;margin-bottom:9px}
+.pc-c.click{cursor:pointer}
+.pc-c.click:hover{border-color:#7aa2d6}
+.pc-c .t{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.pc-c .meta{margin-top:2px}
+.pc-lot{display:flex;justify-content:space-between;align-items:center;gap:8px;border-top:1px solid var(--line);padding:6px 0;margin-top:6px}
+.pc-b{border:1px solid #b9cde8;background:#eef4fc;color:var(--navy-royal);border-radius:9px;padding:5px 11px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:inherit}
+.pc-b:hover{background:#dbe8f8}
+.pc-b.pri{background:var(--navy-royal);color:#fff;border-color:var(--navy-royal)}
+.pc-acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+html[data-theme=dark] .pc-k,html[data-theme=dark] .pc-c{border-color:#24456e}
+html[data-theme=dark] .pc-b{background:#16365d;border-color:#2f5a8c;color:#dbe8fb}
+@media(max-width:1100px){.pc-kpi{grid-template-columns:repeat(3,1fr)}.pc-cols{grid-template-columns:1fr}.pc-cols section>div{max-height:none}.pc-bar{flex-wrap:wrap}}
 #tj-bg .sheet,#dq-bg .sheet,#kt-bg .sheet{top:0;height:100%;max-height:none;max-width:none;border-radius:0;border-top:0;box-shadow:none;padding:calc(14px + env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom))}
 #tj-bg .sheet .hd,#dq-bg .sheet .hd,#kt-bg .sheet .hd{position:sticky;top:calc(-14px - env(safe-area-inset-top));z-index:2;background:var(--bg);margin:-4px -4px 8px;padding:8px 4px}
 @media(min-width:900px){#tj-bg .sheet,#dq-bg .sheet,#kt-bg .sheet{padding-left:max(16px,calc(50% - 560px));padding-right:max(16px,calc(50% - 560px))}}
@@ -848,6 +881,7 @@ main{padding-bottom:calc(28px + env(safe-area-inset-bottom))}
   <button class="dr-it dr-in" id="dw-btn" style="--i:1"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>รอเอกสาร TAI</button>
   <button class="dr-it dr-in" id="mr-btn" style="--i:1"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>รายงานสิ้นเปลืองประจำเดือน</button>
   <div class="dr-sec dr-in" style="--i:1">งานพิเศษ</div>
+  <button class="dr-it dr-in" id="pc-btn" style="--i:2"><svg viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>ภาพรวมคลัง (จอคอม)</button>
   <button class="dr-it dr-in" id="kt-btn" style="--i:2"><svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="12" rx="2.5"/><path d="M9 8V6a3 3 0 013-3h0a3 3 0 013 3v2M3 13h18"/></svg>FLY AWAY KIT</button>
   <button class="dr-it dr-in" id="cnt-btn" style="--i:3"><svg viewBox="0 0 24 24"><path d="M9 11l2 2 4-4"/><rect x="4" y="4" width="16" height="16" rx="3"/></svg>ตรวจนับพัสดุ<span class="ex"><svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8M10 6H5a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1v-5"/></svg></span></button>
   <div class="dr-sec dr-in" style="--i:4">ข้อมูล</div>
@@ -1020,6 +1054,27 @@ main{padding-bottom:calc(28px + env(safe-area-inset-bottom))}
   <button data-v="ret"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 010 10h-3"/></svg>ส่งคืน</button>
   <button data-v="his"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>ประวัติ</button>
 </nav>
+
+<!-- ===== sheet: ภาพรวมคลัง (จอคอม) ===== -->
+<div class="sheet-bg" id="pc-bg">
+  <div class="sheet">
+    <div class="hd"><b>ภาพรวมคลัง · จอคอม</b>
+      <span class="pc-tools"><span class="meta" id="pc-upd"></span>
+        <label class="pc-auto"><input type="checkbox" id="pc-auto"> เปิดหน้านี้เองบนคอม</label>
+        <button class="btn ghost sm" id="pc-ref" type="button">รีเฟรช</button>
+        <button class="btn ghost sm" id="pc-fs" type="button">เต็มจอ</button>
+        <button class="x" id="pc-x" aria-label="ปิด">×</button></span></div>
+    <div id="pc-kpi" class="pc-kpi"></div>
+    <div class="pc-bar"><input class="search" id="pc-q" type="search" placeholder="ค้นหาพัสดุ: Part / ชื่อ / Serial / LOCATION / เลขเบิก / เครื่อง" autocomplete="off">
+      <button class="btn" id="pc-new" type="button">+ เบิกพัสดุ</button>
+      <button class="btn ghost" id="pc-pre" type="button">รับเข้าคลัง (ไม่มีใบเบิก)</button></div>
+    <div class="pc-cols">
+      <section><h3>พัสดุในคลัง <small id="pc-n1"></small></h3><div id="pc-stk"></div></section>
+      <section><h3>ค้างรับ <small id="pc-n2"></small></h3><div id="pc-rcv"></div></section>
+      <section><h3>รอจ่าย <small id="pc-n3"></small></h3><div id="pc-iss"></div></section>
+    </div>
+  </div>
+</div>
 
 <!-- ===== sheet: รับ ===== -->
 <div class="sheet-bg" id="s-bg">
@@ -4476,6 +4531,135 @@ function snWatch(id, getSeq){
   });
   new MutationObserver(function(){ if(!$('x-bg').classList.contains('on') && $('tj-bg').classList.contains('on')) setTimeout(function(){ if($('tj-bg').classList.contains('on')) tjLoad(TJ.month); },700); }).observe($('x-bg'),{attributes:true,attributeFilter:['class']});
   $('tj-x').addEventListener('click', function(){ $('tj-bg').classList.remove('on'); });
+
+  /* ---------- ภาพรวมคลัง (จอคอม) ---------- */
+  var PC={rcv:[],iss:[],stk:[],loans:[],kits:null,round:null,t:0,timer:0,vs:[],vr:[],vi:[],loading:false};
+  function pcOn(){ return $('pc-bg').classList.contains('on'); }
+  function pcOpen(){
+    $('pc-bg').classList.add('on');
+    try{ $('pc-auto').checked = localStorage.getItem('pc-auto')==='1'; }catch(e){}
+    pcRender(); pcLoad();
+    clearInterval(PC.timer);
+    PC.timer=setInterval(function(){
+      if(!pcOn()||document.hidden) return;
+      if(['x-bg','s-bg','fi-bg','o-bg'].some(function(id){ return $(id).classList.contains('on'); })) return;
+      pcLoad();
+    },180000);
+  }
+  window.__pcOpen=pcOpen;
+  function pcClose(){ $('pc-bg').classList.remove('on'); clearInterval(PC.timer); }
+  function pcSafe(name,args,cur){ return run(name,args||[]).catch(function(){ return cur; }); }
+  function pcLoad(){
+    if(PC.loading) return; PC.loading=true;
+    $('pc-ref').disabled=true;
+    Promise.all([
+      pcSafe('getPendingReceive',[],PC.rcv), pcSafe('getPendingIssue',[],PC.iss), pcSafe('getStock',[],PC.stk),
+      pcSafe('getLoans',[],PC.loans), pcSafe('getKits',[{}],PC.kits), pcSafe('getCountRound',[{}],PC.round)
+    ]).then(function(r){
+      PC.rcv=r[0]||[]; PC.iss=r[1]||[]; PC.stk=r[2]||[]; PC.loans=r[3]||[]; PC.kits=r[4]; PC.round=r[5];
+      state.stk=PC.stk;
+      PC.t=Date.now();
+      var d=new Date(); $('pc-upd').textContent='อัปเดต '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
+      pcRender();
+    }).then(function(){ PC.loading=false; $('pc-ref').disabled=false; });
+  }
+  function pcKpi(){
+    var openLoans=(PC.loans||[]).filter(function(x){ return x.open; }), late=openLoans.filter(function(x){ return x.late>0; }).length;
+    function kit(n){ var k=PC.kits&&PC.kits[n]; if(!k) return {v:'-',s:'ไม่มีข้อมูล',c:''}; var m=k.items.filter(function(x){ return x.short>0; }).length;
+      return {v:m, s:m?'รายการที่ขาด · ครบ '+k.complete+'/'+k.total:'ครบทุกรายการ ('+k.total+')', c:m?'bad':'ok'}; }
+    var k1=kit('1'), k2=kit('2'), rd=PC.round&&PC.round.round&&PC.round.round.open?PC.round.round:null, cnt;
+    if(rd){ var tot=rd.locs.length, dn=rd.locs.filter(function(l){ return l.done; }).length; cnt={v:(tot?Math.round(dn*100/tot):0)+'%', s:esc(rd.name)+' · '+dn+'/'+tot+' ที่เก็บ', c:''}; }
+    else cnt={v:'-', s:'ยังไม่มีรอบนับ', c:''};
+    function card(l,o){ return '<div class="pc-k '+(o.c||'')+'"><div class="l">'+l+'</div><div class="v">'+o.v+'</div><div class="s">'+o.s+'</div></div>'; }
+    return card('ค้างรับ',{v:fmtNum(PC.rcv.length),s:'ใบเบิกที่ยังรับไม่ครบ',c:PC.rcv.length?'warn':'ok'})+
+      card('รอจ่าย',{v:fmtNum(PC.iss.length),s:'ของในคลังที่รอจ่ายตามใบเบิก',c:PC.iss.length?'warn':'ok'})+
+      card('ยืมอยู่',{v:fmtNum(openLoans.length),s:late?'เกินกำหนดคืน '+late+' รายการ':'ไม่มีเกินกำหนด',c:late?'bad':''})+
+      card('FLY AWAY KIT ที่ขาด (KIT1 · KIT2)',{v:k1.v+' · '+k2.v,s:'จำนวนรายการที่ขาดของแต่ละชุด',c:(k1.c==='bad'||k2.c==='bad')?'bad':'ok'})+
+      card('รอบตรวจนับ',cnt);
+  }
+  function pcRender(){
+    $('pc-kpi').innerHTML=pcKpi();
+    var q=$('pc-q').value.trim().toLowerCase();
+    /* พัสดุในคลัง */
+    var groups=(PC.stk||[]).filter(function(g){
+      if(!g.lots||!g.lots.length) return false;
+      return !q || qm(g.part+' '+g.name+' '+g.lots.map(function(l){ return l.serial+' '+l.location+' '+l.docNo; }).join(' '),q);
+    });
+    var rc=PC.rcv.filter(function(r){ return !q || qm(r.docNo+' '+r.part+' '+r.name+' '+r.machine,q); });
+    var is=PC.iss.filter(function(r){ return !q || qm(r.docNo+' '+r.part+' '+r.name+' '+r.serial+' '+r.machine,q); });
+    PC.vs=groups.slice(0,40); PC.vr=rc.slice(0,80); PC.vi=is.slice(0,80);
+    $('pc-n1').textContent=groups.length+' Part'+(groups.length>PC.vs.length?' (แสดง '+PC.vs.length+' · พิมพ์ให้เจาะจงขึ้น)':'');
+    $('pc-n2').textContent=rc.length+' ใบ'; $('pc-n3').textContent=is.length+' รายการ';
+    PC.lotMap={};
+    $('pc-stk').innerHTML = PC.vs.length ? PC.vs.map(function(g,gi){
+      var pend=PC.rcv.filter(function(r){ return g.part ? r.part===g.part : r.name===g.name; });
+      var lots=g.lots.slice(0,6).map(function(l){
+        PC.lotMap[l.seq]={ seq:l.seq, part:g.part, name:g.name, unit:g.unit, serial:l.serial, qty:l.qty, type:l.type, location:l.location, recv:l.recv||'', kit:l.kit||'', source:l.docNo, issRow:l.issRow, issSeq:l.issSeq, machine:l.machine, grp:l.grp||'' };
+        var bits=[]; if(l.serial) bits.push('S/N '+esc(l.serial)); bits.push('จำนวน '+fmtNum(l.qty)); if(l.type) bits.push(esc(l.type)); if(l.location) bits.push(esc(l.location)); if(l.kit) bits.push('<b>'+esc(l.kit)+'</b>');
+        return '<div class="pc-lot"><span class="meta" style="margin:0">'+bits.join(' · ')+'</span><button class="pc-b" data-pl="'+l.seq+'" type="button">จ่าย</button></div>';
+      }).join('')+(g.lots.length>6?'<div class="meta">…และอีก '+(g.lots.length-6)+' ล็อต (ดูในหน้าคลัง)</div>':'');
+      return '<div class="pc-c"><div class="t"><b>'+esc(g.part||'-')+'</b><span class="chip ok">'+fmtNum(g.qty)+' '+esc(g.unit)+'</span></div><div>'+esc(g.name)+'</div>'+lots+
+        '<div class="pc-acts"><button class="pc-b pri" data-pq="'+gi+'" type="button">เบิกเพิ่ม</button>'+
+        pend.slice(0,3).map(function(r){ return '<button class="pc-b" data-pr="'+PC.rcv.indexOf(r)+'" type="button">รับ '+esc(r.docNo)+' ('+fmtNum(r.remain)+')</button>'; }).join('')+'</div></div>';
+    }).join('') : emp('box', q?'ไม่พบพัสดุในคลังที่ค้นหา':'ยังไม่มีพัสดุในคลัง', q?'ดูช่องค้างรับ/รอจ่ายทางขวา หรือลองคำค้นอื่น':'');
+    $('pc-rcv').innerHTML = PC.vr.length ? PC.vr.map(function(r){
+      return '<div class="pc-c click" data-pr="'+PC.rcv.indexOf(r)+'"><div class="t"><b>'+esc(r.docNo)+'</b><span class="chip '+esc(r.urgency)+'">'+esc(urg(r.urgency))+'</span></div><div>'+esc(r.name)+'</div>'+
+        '<div class="meta">'+esc(r.part)+' · ค้างรับ '+fmtNum(r.remain)+' / '+fmtNum(r.qty)+' '+esc(r.unit)+(r.machine?' · เครื่อง '+esc(r.machine):'')+'</div>'+taiLine(r.tai)+
+        '<div class="pc-acts"><button class="pc-b pri" type="button">รับพัสดุ</button></div></div>';
+    }).join('') : emp('check', q?'ไม่พบรายการที่ค้นหา':'ไม่มีใบเบิกค้างรับ','');
+    $('pc-iss').innerHTML = PC.vi.length ? PC.vi.map(function(r){
+      return '<div class="pc-c click" data-pi="'+PC.iss.indexOf(r)+'"><div class="t"><b>'+esc(r.docNo)+'</b><span class="chip '+esc(r.urgency)+'">'+esc(urg(r.urgency))+'</span></div><div>'+esc(r.name)+'</div>'+
+        '<div class="meta">'+esc(r.part)+(r.serial?' · S/N '+esc(r.serial):'')+' · จำนวน '+fmtNum(r.qty)+' '+esc(r.unit)+'</div>'+
+        '<div class="meta">'+(r.machine?'เครื่อง '+esc(r.machine):'')+(r.location?' · '+esc(r.location):'')+'</div>'+
+        '<div class="pc-acts"><button class="pc-b pri" type="button">จ่ายพัสดุ</button></div></div>';
+    }).join('') : emp('check', q?'ไม่พบรายการที่ค้นหา':'ไม่มีรายการรอจ่าย','');
+  }
+  function pcReq(g){
+    pcClose(); show('req');
+    var d=null;
+    Array.prototype.forEach.call(document.querySelectorAll('#r-items .item'), function(x){ if(!d && !x.querySelector('.f-part').value) d=x; });
+    if(!d) d=addItem();
+    if(g){
+      d.querySelector('.f-part').value=g.part||'';
+      d.querySelector('.f-name').value=g.name||'';
+      d.querySelector('.f-unit').value=g.unit||'EA';
+      var t=String((g.lots&&g.lots[0]&&g.lots[0].type)||'').replace(/\(TCI\)/,'');
+      if(t==='LRU'||t==='SP'){ d.querySelector('.f-type').value=t; instToggle(d); }
+      d.querySelector('.f-part').dispatchEvent(new Event('input',{bubbles:true}));
+      d.querySelector('.f-qty').focus(); d.querySelector('.f-qty').select();
+    }
+    window.scrollTo(0,0);
+    toast(g?'ใส่ '+(g.part||g.name)+' ในใบเบิกแล้ว กรอกจำนวนและผู้เบิกต่อได้เลย':'เปิดฟอร์มเบิกใหม่');
+  }
+  $('pc-btn').addEventListener('click', pcOpen);
+  $('pc-x').addEventListener('click', pcClose);
+  $('pc-ref').addEventListener('click', pcLoad);
+  $('pc-fs').addEventListener('click', function(){
+    try{ if(document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); }catch(e){ toast('เบราว์เซอร์นี้ไม่รองรับเต็มจอ (ลองกด F11)'); }
+  });
+  $('pc-auto').addEventListener('change', function(){ try{ localStorage.setItem('pc-auto', this.checked?'1':'0'); }catch(e){} });
+  $('pc-new').addEventListener('click', function(){ pcReq(null); });
+  $('pc-pre').addEventListener('click', function(){ $('k-open').click(); });
+  var pcT; $('pc-q').addEventListener('input', function(){ clearTimeout(pcT); pcT=setTimeout(pcRender,150); });
+  $('pc-bg').addEventListener('click', function(e){
+    var b=e.target.closest('button[data-pl]');
+    if(b){ var l=PC.lotMap[Number(b.dataset.pl)]; if(l){ openFromLot(l); } return; }
+    b=e.target.closest('button[data-pq]');
+    if(b){ pcReq(PC.vs[Number(b.dataset.pq)]); return; }
+    var c=e.target.closest('[data-pr]');
+    if(c){ var r=PC.rcv[Number(c.dataset.pr)]; if(r) openRcv(r); return; }
+    c=e.target.closest('[data-pi]');
+    if(c){ var i=PC.iss[Number(c.dataset.pi)]; if(i){ state.fromStock=false; openIssue(i); } }
+  });
+  /* ปิดฟอร์มรับ/จ่ายแล้วให้รีเฟรชตัวเลขเอง */
+  ['x-bg','s-bg','fi-bg','o-bg'].forEach(function(id){
+    new MutationObserver(function(){ if(!$(id).classList.contains('on') && pcOn()) setTimeout(function(){ if(pcOn()) pcLoad(); },700); }).observe($(id),{attributes:true,attributeFilter:['class']});
+  });
+  /* เปิดอัตโนมัติ: ?pc=1 หรือ เปิดแอปที่ติดตั้งบนคอมและติ๊กไว้ */
+  try{
+    var pcStand = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
+    if(location.search.indexOf('pc=1')>=0 || (pcStand && window.innerWidth>=1024 && localStorage.getItem('pc-auto')==='1')) setTimeout(pcOpen,900);
+  }catch(e){}
   $('db-btn').addEventListener('click', dbOpen);
   $('db-x').addEventListener('click', function(){ $('db-bg').classList.remove('on'); });
   function snOpen(serial){
@@ -5277,6 +5461,7 @@ function snWatch(id, getSeq){
   }
   act('rl-tj',function(){ if(window.__tjOpen) window.__tjOpen(); },'<svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/><circle cx="19" cy="17" r="1.6"/></svg>','งาน TCI');
   act('rl-db','db-btn',SV.db,'แดชบอร์ด');
+  act('rl-pc',function(){ if(window.__pcOpen) window.__pcOpen(); },'<svg viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>','ภาพรวมคลัง (จอคอม)');
   act('rl-kt',function(){ if(window.__ktOpen) window.__ktOpen(); },'<svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="12" rx="2.5"/><path d="M9 8V6a3 3 0 013-3h0a3 3 0 013 3v2M3 13h18"/></svg>','FLY AWAY KIT');
   act('rl-dw','dw-btn',SV.dw,'รอเอกสาร TAI','<em id="rl-dw-n"></em>');
   act('rl-dq',function(){ if(window.__dqOpen) window.__dqOpen(); },'<svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2h9"/></svg>','ตรวจข้อมูล','<em id="rl-dq-n"></em>');
