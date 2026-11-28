@@ -1895,7 +1895,7 @@ function snWatch(id, getSeq){
     getDocInfo:['p_seq'], getHistory:['p_kind','p_limit'], getIssuedSerials:['p_part'], getLoansForPart:['p_part','p_name'],
     getNextReturnNo:['date_iso'], getOpeningLots:['p_part','p_name'], getSerialHistory:['p_serial'], getWarrantyList:['days']
   };
-  var SUPA_NOARG = { getDq:1, getAwaitingDoc:1, getAwaitingReq:1, getBootstrap:1, getClaims:1, getLoans:1, getPendingIssue:1, getPendingReceive:1,
+  var SUPA_NOARG = { getPcSummary:1, getDq:1, getAwaitingDoc:1, getAwaitingReq:1, getBootstrap:1, getClaims:1, getLoans:1, getPendingIssue:1, getPendingReceive:1,
     getReconcile:1, getTciInbox:1, getReturnable:1, getShelfMap:1, getStock:1, getSystemHealth:1, scanDuplicateSerials:1 };
   function supaName(fn){ return 'rpc_' + fn.replace(/[A-Z]/g, function(c){ return '_' + c.toLowerCase(); }); }
   function supaTransport(fn, args){
@@ -4667,8 +4667,8 @@ function snWatch(id, getSeq){
     PC.timer=setInterval(function(){
       if(!pcOn()||document.hidden) return;
       if(['x-bg','s-bg','fi-bg','o-bg'].some(function(id){ return $(id).classList.contains('on'); })) return;
-      pcLoad();
-    },180000);
+      pcLight();
+    },300000);
   }
   window.__pcOpen=pcOpen;
   function pcClose(){ $('pc-bg').classList.remove('on'); clearInterval(PC.timer); }
@@ -4681,25 +4681,46 @@ function snWatch(id, getSeq){
       pcSafe('getLoans',[],PC.loans), pcSafe('getKits',[{}],PC.kits), pcSafe('getCountRound',[{}],PC.round)
     ]).then(function(r){
       PC.rcv=r[0]||[]; PC.iss=r[1]||[]; PC.stk=r[2]||[]; PC.loans=r[3]||[]; PC.kits=r[4]; PC.round=r[5];
-      state.stk=PC.stk;
+      state.stk=PC.stk; PC.sum=pcSum();
       PC.t=Date.now();
       var d=new Date(); $('pc-upd').textContent='อัปเดต '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
       pcRender();
     }).then(function(){ PC.loading=false; $('pc-ref').disabled=false; });
   }
+  function pcSum(){
+    /* สรุปตัวเลขจากข้อมูลเต็ม (ใช้ตอนโหลดเต็ม) */
+    var op=(PC.loans||[]).filter(function(x){ return x.open; });
+    function sh(n){ var k=PC.kits&&PC.kits[n]; return k?k.items.filter(function(x){ return x.short>0; }).length:null; }
+    function tt(n){ var k=PC.kits&&PC.kits[n]; return k?k.items.length:0; }
+    var rd=PC.round&&PC.round.round, o={ rcv:PC.rcv.length, iss:PC.iss.length, loansOpen:op.length, loansLate:op.filter(function(x){ return x.late>0; }).length,
+      k1:sh('1'), k2:sh('2'), kt1:tt('1'), kt2:tt('2'), round:null };
+    if(rd) o.round={ name:rd.name, total:rd.locs.length, done:rd.locs.filter(function(l){ return l.done; }).length };
+    return o;
+  }
   function pcKpi(){
-    var openLoans=(PC.loans||[]).filter(function(x){ return x.open; }), late=openLoans.filter(function(x){ return x.late>0; }).length;
-    function kit(n){ var k=PC.kits&&PC.kits[n]; if(!k) return {v:'-',s:'ไม่มีข้อมูล',c:''}; var m=k.items.filter(function(x){ return x.short>0; }).length;
-      return {v:m, s:m?'รายการที่ขาด · ครบ '+k.complete+'/'+k.total:'ครบทุกรายการ ('+k.total+')', c:m?'bad':'ok'}; }
-    var k1=kit('1'), k2=kit('2'), rd=PC.round&&PC.round.round&&PC.round.round.open?PC.round.round:null, cnt;
-    if(rd){ var tot=rd.locs.length, dn=rd.locs.filter(function(l){ return l.done; }).length; cnt={v:(tot?Math.round(dn*100/tot):0)+'%', s:esc(rd.name)+' · '+dn+'/'+tot+' ที่เก็บ', c:''}; }
+    var m=PC.sum||pcSum();
+    function kit(v,t){ if(v==null) return {v:'-',c:''}; return {v:v,c:v?'bad':'ok'}; }
+    var k1=kit(m.k1,m.kt1), k2=kit(m.k2,m.kt2), rd=m.round, cnt;
+    if(rd){ cnt={v:(rd.total?Math.round(rd.done*100/rd.total):0)+'%', s:esc(rd.name)+' · '+rd.done+'/'+rd.total+' ที่เก็บ', c:''}; }
     else cnt={v:'-', s:'ยังไม่มีรอบนับ', c:''};
     function card(l,o){ return '<div class="pc-k '+(o.c||'')+'"><div class="l">'+l+'</div><div class="v">'+o.v+'</div><div class="s">'+o.s+'</div></div>'; }
-    return card('ค้างรับ',{v:fmtNum(PC.rcv.length),s:'ใบเบิกที่ยังรับไม่ครบ',c:PC.rcv.length?'warn':'ok'})+
-      card('รอจ่าย',{v:fmtNum(PC.iss.length),s:'ของในคลังที่รอจ่ายตามใบเบิก',c:PC.iss.length?'warn':'ok'})+
-      card('ยืมอยู่',{v:fmtNum(openLoans.length),s:late?'เกินกำหนดคืน '+late+' รายการ':'ไม่มีเกินกำหนด',c:late?'bad':''})+
+    return card('ค้างรับ',{v:fmtNum(m.rcv),s:'ใบเบิกที่ยังรับไม่ครบ',c:m.rcv?'warn':'ok'})+
+      card('รอจ่าย',{v:fmtNum(m.iss),s:'ของในคลังที่รอจ่ายตามใบเบิก',c:m.iss?'warn':'ok'})+
+      card('ยืมอยู่',{v:fmtNum(m.loansOpen),s:m.loansLate?'เกินกำหนดคืน '+m.loansLate+' รายการ':'ไม่มีเกินกำหนด',c:m.loansLate?'bad':''})+
       card('FLY AWAY KIT ที่ขาด (KIT1 · KIT2)',{v:k1.v+' · '+k2.v,s:'จำนวนรายการที่ขาดของแต่ละชุด',c:(k1.c==='bad'||k2.c==='bad')?'bad':'ok'})+
       card('รอบตรวจนับ',cnt);
+  }
+  /* รีเฟรชเบา: ดึงเฉพาะตัวเลขสรุป (ไม่กี่ร้อยไบต์) แล้วโหลดเต็มเมื่อจำนวนค้างรับ/รอจ่ายเปลี่ยน */
+  window.__pcLight=function(){ pcLight(); };
+  function pcLight(){
+    if(PC.loading) return;
+    pcSafe('getPcSummary',[],null).then(function(m){
+      if(!m||!pcOn()) return;
+      var changed = m.rcv!==PC.rcv.length || m.iss!==PC.iss.length;
+      PC.sum=m; $('pc-kpi').innerHTML=pcKpi();
+      var d=new Date(); $('pc-upd').textContent='อัปเดต '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
+      if(changed) pcLoad();
+    });
   }
   function pcRender(){
     $('pc-kpi').innerHTML=pcKpi();
