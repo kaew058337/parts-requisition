@@ -727,6 +727,16 @@ html[data-theme=dark] .dt-b.pri{background:#2f6fb5;border-color:#2f6fb5;color:#f
 .cb-s{display:block;font-size:12.5px;color:var(--muted);margin-top:1px}
 html[data-theme=dark] .cb-list{border-color:#2f5a8c}
 html[data-theme=dark] .cb-m{color:#dbe8fb}
+.pp-t{width:44px;height:44px;object-fit:cover;border-radius:8px;cursor:pointer;display:block;border:1px solid #cfdcee;background:#eef3fa}
+.pp-add{width:44px;height:44px;border-radius:8px;border:1.5px dashed #9db3d1;background:#f6f9fd;color:#6b7f9a;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer}
+.pp-m{width:64px;height:64px;flex:none}
+.pp-add.pp-m{flex-direction:column;font-size:10.5px;gap:1px}
+.pp-row{display:flex;gap:12px;align-items:center;margin:10px 0}
+.pp-cv-wrap{display:flex;justify-content:center;margin:8px 0}
+#pp-cv{width:300px;height:300px;border-radius:14px;background:#111;touch-action:none;cursor:grab;max-width:100%}
+#pz-img{width:100%;max-width:420px;aspect-ratio:1/1;object-fit:cover;border-radius:14px;display:block;margin:6px auto;background:#eef3fa}
+html[data-theme=dark] .pp-add{background:#102a4a;border-color:#2f5a8c;color:#9db8dc}
+html[data-theme=dark] .pp-t{border-color:#24456e}
 #pc-bg{background:var(--bg);-webkit-backdrop-filter:none;backdrop-filter:none}
 #pc-bg .sheet{top:0;max-height:none;border-radius:0;max-width:none;width:100%;padding:14px 22px 22px}
 #pc-bg .sheet .hd{position:sticky;top:-14px;z-index:3;background:var(--bg);margin:0 -6px 10px;padding:8px 6px}
@@ -1124,6 +1134,7 @@ main{padding-bottom:calc(28px + env(safe-area-inset-bottom))}
   <div class="sheet">
     <div class="hd"><b id="s-title">รับพัสดุ</b><button class="x" id="s-x" aria-label="ปิด">×</button></div>
     <div class="info" id="s-info"></div>
+    <div id="p-photo" class="pp-row"></div>
 
     <div class="sec">การรับ</div>
     <div class="row2">
@@ -1788,6 +1799,32 @@ main{padding-bottom:calc(28px + env(safe-area-inset-bottom))}
 
 <div id="toast"></div>
 
+<!-- ===== รูปพัสดุ: ครอบรูป / ดูรูป ===== -->
+<input type="file" id="pp-file" accept="image/*" style="display:none">
+<div class="sheet-bg" id="pp-bg">
+  <div class="sheet">
+    <div class="hd"><b id="pp-title">เพิ่มรูปพัสดุ</b><button class="x" id="pp-x" aria-label="ปิด">×</button></div>
+    <div class="meta" id="pp-sub"></div>
+    <div class="pp-cv-wrap"><canvas id="pp-cv" width="300" height="300" aria-label="ครอบรูป ลากเพื่อเลื่อนตำแหน่ง"></canvas></div>
+    <label for="pp-z">ซูม</label>
+    <input id="pp-z" type="range" min="1" max="3" step="0.01" value="1">
+    <div class="meta" style="margin:6px 0 10px">ลากรูปเพื่อเลื่อน · รูปจะถูกย่อให้เหลือประมาณ 70 KB และใช้กับทุกล็อตของ Part number นี้</div>
+    <button class="btn" id="pp-save" type="button">บันทึกรูป</button>
+    <button class="btn ghost" id="pp-cancel" type="button" style="margin-top:8px">ยกเลิก</button>
+  </div>
+</div>
+<div class="sheet-bg" id="pz-bg">
+  <div class="sheet">
+    <div class="hd"><b id="pz-title">รูปพัสดุ</b><button class="x" id="pz-x" aria-label="ปิด">×</button></div>
+    <img id="pz-img" alt="รูปพัสดุ">
+    <div class="meta" id="pz-sub" style="text-align:center"></div>
+    <div style="display:flex;gap:10px;margin-top:12px">
+      <button class="btn ghost" id="pz-change" type="button" style="flex:1">เปลี่ยนรูป</button>
+      <button class="btn ghost" id="pz-del" type="button" style="flex:1;color:var(--bad)">ลบรูป</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function(){
   var $ = function(id){ return document.getElementById(id); };
@@ -1902,7 +1939,7 @@ function snWatch(id, getSeq){
     getDocInfo:['p_seq'], getHistory:['p_kind','p_limit'], getIssuedSerials:['p_part'], getLoansForPart:['p_part','p_name'],
     getNextReturnNo:['date_iso'], getOpeningLots:['p_part','p_name'], getSerialHistory:['p_serial'], getWarrantyList:['days']
   };
-  var SUPA_NOARG = { getPcSummary:1, getDq:1, getAwaitingDoc:1, getAwaitingReq:1, getBootstrap:1, getClaims:1, getLoans:1, getPendingIssue:1, getPendingReceive:1,
+  var SUPA_NOARG = { getPartPhotos:1, getPcSummary:1, getDq:1, getAwaitingDoc:1, getAwaitingReq:1, getBootstrap:1, getClaims:1, getLoans:1, getPendingIssue:1, getPendingReceive:1,
     getReconcile:1, getTciInbox:1, getReturnable:1, getShelfMap:1, getStock:1, getSystemHealth:1, scanDuplicateSerials:1 };
   function supaName(fn){ return 'rpc_' + fn.replace(/[A-Z]/g, function(c){ return '_' + c.toLowerCase(); }); }
   function supaTransport(fn, args){
@@ -3096,6 +3133,93 @@ function snWatch(id, getSeq){
     }));
   }
   DT.fn.rcv=function(){ renderRcv(); }; DT.fn.iss=function(){ renderIssue(); }; DT.fn.stk=function(){ renderStock(); };
+
+  /* ---------- รูปพัสดุ (ผูกกับ Part number) ---------- */
+  var PP={part:'',name:'',img:null,z:1,ox:0,oy:0,drag:null,busy:false};
+  state.photos={};
+  var CAM_SVG='<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
+  function ppKey(part){ var h=5381,t=String(part); for(var i=0;i<t.length;i++){ h=((h<<5)+h+t.charCodeAt(i))>>>0; } return t.replace(/[^A-Za-z0-9]+/g,'_').slice(0,60)+'-'+h.toString(36); }
+  function ppUrl(part,big){ var o=state.photos[part]; if(!o||!CFG.SUPA_URL) return ''; return CFG.SUPA_URL+'/storage/v1/object/public/part-photos/'+o.p+(big?'.jpg':'_t.jpg')+'?v='+o.t; }
+  function ppLoad(){ return run('getPartPhotos').then(function(m){ state.photos=m||{}; return m; }).catch(function(){ return null; }); }
+  function ppThumb(part,cls){
+    if(!part) return '';
+    if(state.photos[part]) return '<img class="pp-t'+(cls?' '+cls:'')+'" src="'+esc(ppUrl(part,false))+'" alt="รูปพัสดุ '+esc(part)+'" loading="lazy" data-pz="'+esc(part)+'">';
+    return '<button type="button" class="pp-add'+(cls?' '+cls:'')+'" data-pa="'+esc(part)+'" aria-label="เพิ่มรูปพัสดุ '+esc(part)+'">'+CAM_SVG+(cls?'เพิ่มรูป':'')+'</button>';
+  }
+  function ppNameOf(part){ var g=(state.stk||[]).filter(function(x){ return x.part===part; })[0]; return g?g.name:''; }
+  function ppRefresh(){
+    try{
+      if(state.stk) renderStock();
+      if(state.curR && $('s-bg').classList.contains('on')) ppRcvBlock(state.curR);
+    }catch(e){}
+  }
+  function ppRcvBlock(r){
+    var b=$('p-photo'); if(!r||!r.part){ b.innerHTML=''; return; }
+    if(state.photos[r.part]) b.innerHTML=ppThumb(r.part,'pp-m')+'<div class="meta">รูปพัสดุ · แตะเพื่อขยาย / เปลี่ยน</div>';
+    else b.innerHTML='<button type="button" class="pp-add pp-m" data-pa="'+esc(r.part)+'" data-pn="'+esc(r.name||'')+'" aria-label="เพิ่มรูปพัสดุ">'+CAM_SVG+'เพิ่มรูป</button><div class="meta">ยังไม่มีรูปของ Part นี้ · ถ่ายเพิ่มได้ (ไม่บังคับ)</div>';
+  }
+  function ppPick(part,name){ PP.part=part; PP.name=name||ppNameOf(part); $('pp-file').value=''; $('pp-file').click(); }
+  $('pp-file').addEventListener('change', function(){
+    var f=this.files&&this.files[0]; if(!f) return;
+    var im=new Image(), u=URL.createObjectURL(f);
+    im.onload=function(){ URL.revokeObjectURL(u); PP.img=im; PP.z=1; PP.ox=0; PP.oy=0; $('pp-z').value=1;
+      $('pp-sub').textContent=PP.part+(PP.name?' · '+PP.name:''); $('pp-title').textContent=state.photos[PP.part]?'เปลี่ยนรูปพัสดุ':'เพิ่มรูปพัสดุ';
+      $('pz-bg').classList.remove('on'); $('pp-bg').classList.add('on'); ppDraw(); };
+    im.onerror=function(){ URL.revokeObjectURL(u); toast('เปิดไฟล์รูปไม่ได้',true); };
+    im.src=u;
+  });
+  function ppGeom(N){ /* คืนค่า scale,dx,dy สำหรับวาดลงผืน N×N (ฐานคือผืน 300) */
+    var im=PP.img, base=300/Math.min(im.width,im.height), sc=base*PP.z, k=N/300;
+    var w=im.width*sc, h=im.height*sc, mx=Math.max(0,(w-300)/2), my=Math.max(0,(h-300)/2);
+    PP.ox=Math.max(-mx,Math.min(mx,PP.ox)); PP.oy=Math.max(-my,Math.min(my,PP.oy));
+    return { w:w*k, h:h*k, x:(300-w)/2*k+PP.ox*k, y:(300-h)/2*k+PP.oy*k };
+  }
+  function ppRender(N){ var c=document.createElement('canvas'); c.width=c.height=N; var x=c.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,N,N); var g=ppGeom(N); x.imageSmoothingQuality='high'; x.drawImage(PP.img,g.x,g.y,g.w,g.h); return c; }
+  function ppDraw(){ if(!PP.img) return; var cv=$('pp-cv'), x=cv.getContext('2d'), g=ppGeom(300); x.fillStyle='#111'; x.fillRect(0,0,300,300); x.drawImage(PP.img,g.x,g.y,g.w,g.h); }
+  $('pp-z').addEventListener('input', function(){ PP.z=Number(this.value)||1; ppDraw(); });
+  (function(){
+    var cv=$('pp-cv');
+    cv.addEventListener('pointerdown', function(e){ PP.drag={x:e.clientX,y:e.clientY,ox:PP.ox,oy:PP.oy}; try{ cv.setPointerCapture(e.pointerId); }catch(x){} });
+    cv.addEventListener('pointermove', function(e){ if(!PP.drag) return; var k=300/cv.getBoundingClientRect().width; PP.ox=PP.drag.ox+(e.clientX-PP.drag.x)*k; PP.oy=PP.drag.oy+(e.clientY-PP.drag.y)*k; ppDraw(); });
+    ['pointerup','pointercancel'].forEach(function(n){ cv.addEventListener(n, function(){ PP.drag=null; }); });
+  })();
+  function ppClose(){ $('pp-bg').classList.remove('on'); PP.img=null; }
+  $('pp-x').addEventListener('click', ppClose); $('pp-cancel').addEventListener('click', ppClose);
+  function ppBlob(c,q){ return new Promise(function(res,rej){ c.toBlob(function(b){ b?res(b):rej(new Error('สร้างไฟล์รูปไม่ได้')); },'image/jpeg',q); }); }
+  function ppUpload(path,blob){
+    return fetch(CFG.SUPA_URL+'/storage/v1/object/part-photos/'+path, { method:'POST', headers:{ apikey:CFG.SUPA_KEY, Authorization:'Bearer '+CFG.SUPA_KEY, 'Content-Type':'image/jpeg', 'x-upsert':'true', 'cache-control':'max-age=31536000' }, body:blob })
+      .then(function(r){ if(!r.ok) return r.text().then(function(t){ throw new Error('อัปโหลดรูปไม่สำเร็จ ('+r.status+') '+t.slice(0,120)); }); });
+  }
+  $('pp-save').addEventListener('click', function(){
+    if(!PP.img||PP.busy) return; PP.busy=true; var btn=this; btn.disabled=true; btn.textContent='กำลังบันทึก…';
+    var key=ppKey(PP.part), part=PP.part;
+    Promise.all([ppBlob(ppRender(800),0.8), ppBlob(ppRender(160),0.75)]).then(function(b){
+      return ppUpload(key+'.jpg',b[0]).then(function(){ return ppUpload(key+'_t.jpg',b[1]); });
+    }).then(function(){ return run('setPartPhoto',[{part:part,path:key,by:state.by||''}]); })
+    .then(function(){ state.photos[part]={p:key,t:Date.now()}; ppClose(); toast('บันทึกรูปแล้ว'); ppRefresh(); })
+    .catch(function(e){ toast(e.message||'บันทึกรูปไม่สำเร็จ',true); })
+    .then(function(){ PP.busy=false; btn.disabled=false; btn.textContent='บันทึกรูป'; });
+  });
+  function ppView(part){
+    PP.part=part; PP.name=ppNameOf(part);
+    $('pz-title').textContent=part; $('pz-img').src=ppUrl(part,true); $('pz-img').alt='รูปพัสดุ '+part;
+    $('pz-sub').textContent=PP.name; $('pz-bg').classList.add('on');
+  }
+  $('pz-x').addEventListener('click', function(){ $('pz-bg').classList.remove('on'); });
+  $('pz-change').addEventListener('click', function(){ ppPick(PP.part,PP.name); });
+  $('pz-del').addEventListener('click', function(){
+    var part=PP.part; if(!confirm('ลบรูปของ '+part+' ?')) return;
+    var key=state.photos[part]&&state.photos[part].p; if(!key) return;
+    fetch(CFG.SUPA_URL+'/storage/v1/object/part-photos', { method:'DELETE', headers:{ apikey:CFG.SUPA_KEY, Authorization:'Bearer '+CFG.SUPA_KEY, 'Content-Type':'application/json' }, body:JSON.stringify({prefixes:[key+'.jpg',key+'_t.jpg']}) })
+      .then(function(){ return run('deletePartPhoto',[{part:part,by:state.by||''}]); })
+      .then(function(){ delete state.photos[part]; $('pz-bg').classList.remove('on'); toast('ลบรูปแล้ว'); ppRefresh(); })
+      .catch(function(e){ toast(e.message||'ลบรูปไม่สำเร็จ',true); });
+  });
+  document.addEventListener('click', function(e){
+    var a=e.target.closest&&e.target.closest('[data-pa]'); if(a){ e.preventDefault(); e.stopPropagation(); ppPick(a.dataset.pa, a.dataset.pn||''); return; }
+    var z=e.target.closest&&e.target.closest('[data-pz]'); if(z){ e.preventDefault(); e.stopPropagation(); ppView(z.dataset.pz); }
+  }, true);
+  ppLoad();
   function loadRcv(){
     if(!state.rcv||!state.rcv.length){ state.rcv=[]; $('c-list').innerHTML=skel(); }
     run('getPendingReceive').then(function(rows){ state.rcv=rows; renderRcv(); })
@@ -3229,7 +3353,7 @@ function snWatch(id, getSeq){
     state.curR = r; state.rcvDirty = false;
     $('p-paydate').value=''; $('p-tail').value=''; $('p-tech').value=''; $('p-date').value=state.today||''; setNow(false);
     $('s-title').textContent = 'รับพัสดุ · '+r.docNo;
-    rcvInfo(r);
+    rcvInfo(r); ppRcvBlock(r);
     PF.forEach(function(id){ $(id).value=''; });
     snRule('p', r.type);
     resetRcvQty(r);
@@ -3451,6 +3575,7 @@ function snWatch(id, getSeq){
   function loadStock(sync){
     /* แสดงข้อมูลเดิมทันที (ถ้ามี) แล้วโหลดใหม่เบื้องหลัง; ไม่เรียก getReconcile ทุกครั้ง (ช้า เพราะล็อกและเขียนชีทใหม่) */
     renderStock();
+    ppLoad().then(function(){ if(state.stk) renderStock(); });
     run('getStock').then(function(rows){ state.stk=rows; renderStock(); loadAwaiting(); if(sync===true) loadRecon(); })
       .catch(function(e){ $('k-list').innerHTML='<div class="empty">'+esc(e.message)+'</div>'; });
   }
@@ -3539,11 +3664,12 @@ function snWatch(id, getSeq){
         return '<div class="meta lot" style="padding:7px 64px 7px 0;border-top:1px solid var(--line)">'+bits.join(' · ')+'<br>'+(l.docNo==='ยอดยกมา'||l.docNo==='คืนเข้าคลัง'||l.docNo==='รับก่อนเบิก'||l.docNo==='ย้ายจากชุด'?esc(l.docNo)+(l.note?' ('+esc(l.note)+')':''):'เลขเบิก '+esc(l.docNo))+' · รับ '+esc(l.received)+'<div class="lot-acts" hidden>'+(l.free?'<button class="btn sm bt bt-i" data-is="'+l.seq+'"><svg viewBox="0 0 24 24"><path d="M12 15V3"/><path d="M7 7l5-5 5 5"/><path d="M4 20h16"/></svg>จ่าย</button>':(l.issRow?'<button class="btn sm bt bt-i" data-ix="'+l.seq+'"><svg viewBox="0 0 24 24"><path d="M12 15V3"/><path d="M7 7l5-5 5 5"/><path d="M4 20h16"/></svg>จ่าย</button>':''))+'<button class="btn sm bt bt-l" data-bl="'+l.seq+'"><svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>ยืม</button><button class="btn sm bt bt-e" data-ed="'+l.seq+'"><svg viewBox="0 0 24 24"><path d="M4 20h4l11-11-4-4L4 16z"/></svg>แก้ไข</button></div><label class="lot-sel"><input type="checkbox" data-tgc="'+l.seq+'"'+(TG.sel[l.seq]?' checked':'')+'>เลือก</label><svg class="lot-ch" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>'+(l.linkNote?'<div style="color:var(--bad);margin-top:4px">⚠ '+esc(l.linkNote)+'</div>':'')+'</div>';
       }).join('');
       return '<div class="card lift'+tyCls(g.lots[0]&&g.lots[0].type, g.lots.some(function(l){return l.kit;}))+'" style="padding:14px 16px">'+
-        '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><b>'+esc(g.part||'-')+'</b><span class="chip ok">'+fmtNum(g.qty)+' '+esc(g.unit)+'</span></div>'+
-        '<div style="margin:4px 0 6px">'+esc(g.name)+'</div>'+lots+'</div>';
+        '<div style="display:flex;gap:12px;align-items:flex-start">'+(g.part?'<div style="flex:none">'+ppThumb(g.part,'pp-m')+'</div>':'')+
+        '<div style="flex:1;min-width:0"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><b>'+esc(g.part||'-')+'</b><span class="chip ok">'+fmtNum(g.qty)+' '+esc(g.unit)+'</span></div>'+
+        '<div style="margin:4px 0 6px">'+esc(g.name)+'</div></div></div>'+lots+'</div>';
     }
     if(WIDE.matches){
-      var kcols=[{k:'ck',t:'',cls:'nw'},{k:'part',t:'Part number',sort:1},{k:'name',t:'ชื่อพัสดุ',sort:1},{k:'sn',t:'S/N',sort:1,cls:'nw'},{k:'type',t:'ประเภท',sort:1},
+      var kcols=[{k:'ck',t:'',cls:'nw'},{k:'ph',t:'รูป'},{k:'part',t:'Part number',sort:1},{k:'name',t:'ชื่อพัสดุ',sort:1},{k:'sn',t:'S/N',sort:1,cls:'nw'},{k:'type',t:'ประเภท',sort:1},
         {k:'qty',t:'คงเหลือ',sort:1,al:'r',cls:'r nw'},{k:'loc',t:'ที่เก็บ',sort:1,cls:'nw'},{k:'src',t:'แหล่งที่มา / เลขเบิก',sort:1},{k:'recv',t:'วันที่รับ',sort:1,cls:'nw'},{k:'note',t:'ชุด / กลุ่ม / หมดอายุ'},{k:'act',t:'',cls:'nw'}];
       var kTable=function(gs){
         var rs=[]; gs.forEach(function(g){ g.lots.forEach(function(l){ rs.push({g:g,l:l,v:{part:g.part||'',name:g.name,sn:l.serial||'',type:l.type||'',qty:l.qty,loc:l.location||'',src:l.docNo||'',recv:dtDate(l.received)}}); }); });
@@ -3556,6 +3682,7 @@ function snWatch(id, getSeq){
             '<button type="button" class="dt-b" data-tg="'+l.seq+'" title="พิมพ์ป้ายกำกับพัสดุ" aria-label="พิมพ์ป้ายกำกับพัสดุ"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/></svg></button>';
           return {attr:'', td:[
             '<input type="checkbox" data-tgc="'+l.seq+'" aria-label="เลือกพิมพ์ป้าย"'+(TG.sel[l.seq]?' checked':'')+'>',
+            ppThumb(g.part),
             '<span class="b">'+esc(g.part||'-')+'</span>',
             esc(g.name)+(l.linkNote?'<div style="color:var(--bad);font-size:12px">⚠ '+esc(l.linkNote)+'</div>':''),
             l.serial?'<a class="snl" data-sn="'+esc(l.serial)+'">'+esc(l.serial)+'</a>':'',
