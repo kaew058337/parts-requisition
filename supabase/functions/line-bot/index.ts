@@ -162,7 +162,7 @@ async function handleFile(ev: any) {
     const names: string[] = XLSX.read(buf, { type: "array", bookSheets: true }).SheetNames;
     const only = names.filter((n) => norm(n) === "พัสดุค้างจ่าย");
     const wb = XLSX.read(buf, only.length ? { ...lean, sheets: only } : lean);
-    const grids: { name: string; g: Grid }[] = wb.SheetNames.map((n: string) => {
+    const grids: { name: string; g: Grid }[] = wb.SheetNames.filter((n: string) => wb.Sheets[n]).map((n: string) => {
       const ws = wb.Sheets[n];
       return { name: n, g: { vals: XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: "" }) as unknown[][], merges: (ws["!merges"] ?? []) as Grid["merges"] } };
     });
