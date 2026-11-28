@@ -1283,7 +1283,10 @@ main{padding-bottom:calc(28px + env(safe-area-inset-bottom))}
   <div class="sheet">
     <div class="hd"><b id="la-title">ปิดรายการยืม</b><button class="x" id="la-x" aria-label="ปิด">×</button></div>
     <div class="info" id="la-info"></div>
-    <label>จำนวน</label><input id="la-qty" type="number" inputmode="decimal" min="0">
+    <label id="la-qlbl">จำนวน</label><input id="la-qty" type="number" inputmode="decimal" min="0">
+    <div id="la-extwrap" style="display:none"><label>วันครบกำหนดใหม่</label><input id="la-due" type="date">
+      <div style="display:flex;gap:8px;margin:8px 0;flex-wrap:wrap"><button type="button" class="btn ghost sm" data-ad="7">+7 วัน</button><button type="button" class="btn ghost sm" data-ad="14">+14 วัน</button><button type="button" class="btn ghost sm" data-ad="30">+30 วัน</button></div>
+      <label>เหตุผล (ไม่บังคับ)</label><input id="la-why" autocomplete="off" placeholder="เช่น ยังใช้งานไม่เสร็จ"></div>
     <div id="la-snwrap" style="display:none"><label>S/N ที่ส่งคืนจริง (กรอกเฉพาะเมื่อไม่ตรงกับที่ยืม)</label><input id="la-sn" autocomplete="off" placeholder="ปล่อยว่าง = S/N เดิม"><div class="meta" style="margin-top:4px">ระบบจะเปลี่ยน S/N ของล็อตในคลังเป็นเลขใหม่ และเชื่อมประวัติของเลขเดิมกับเลขใหม่ให้</div></div>
     <div id="la-docwrap" style="display:none"><label>เลขเบิก 9 หลักที่ผู้ยืมเบิกคืนให้</label><input id="la-doc" inputmode="numeric" maxlength="9"></div>
     <button class="btn" id="la-submit">ยืนยัน</button>
@@ -3984,7 +3987,8 @@ function snWatch(id, getSeq){
       var btns = x.open ? '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">'+
         '<button class="btn ghost sm" data-lr="'+x.seq+'">คืนของ</button>'+
         '<button class="btn ghost sm" data-lu="'+x.seq+'">ใช้งานจริง</button>'+
-        '<button class="btn ghost sm" data-lp="'+x.seq+'">เบิกคืนแล้ว</button></div>' : '';
+        '<button class="btn ghost sm" data-lp="'+x.seq+'">เบิกคืนแล้ว</button>'+
+        '<button class="btn ghost sm" data-le="'+x.seq+'">ขยายเวลา</button></div>' : '';
       return '<div class="card" style="padding:12px 14px'+(x.open?'':';opacity:.75')+'">'+
         '<div style="display:flex;justify-content:space-between;gap:8px"><b>ยืม #'+x.seq+'</b>'+chip+'</div>'+
         '<div style="margin:4px 0 2px">'+esc(x.name)+'</div>'+
@@ -4062,20 +4066,30 @@ function snWatch(id, getSeq){
   function findLoan2(seq){ var r=null; (state.loans2||[]).forEach(function(x){ if(x.seq===seq) r=x; }); return r; }
   function openLoanAction(mode, x){
     state.la = { mode:mode, x:x };
-    $('la-title').textContent = (mode==='return' ? 'คืนของเข้าคลัง' : 'ผู้ยืมเบิกคืนแล้ว')+' · ยืม #'+x.seq;
+    var ext = mode==='extend';
+    $('la-title').textContent = (ext ? 'ขยายเวลายืม' : mode==='return' ? 'คืนของเข้าคลัง' : 'ผู้ยืมเบิกคืนแล้ว')+' · ยืม #'+x.seq;
+    $('la-qty').style.display = $('la-qlbl').style.display = ext ? 'none' : '';
+    $('la-extwrap').style.display = ext ? 'block' : 'none';
+    if(ext){ $('la-due').value=x.dueIso||''; $('la-due').min=x.dueIso||''; $('la-why').value=''; }
     $('la-info').innerHTML='<b>'+esc(x.name)+'</b><br><span class="meta">'+esc(x.part)+(x.serial?' · S/N '+esc(x.serial):'')+' · ผู้ยืม '+esc(x.borrower)+' · ค้างยืม '+fmtNum(x.out)+' '+esc(x.unit)+
-      (mode==='return'?'<br>ของจะกลับเข้าคลังเป็น "ในคลัง" ทันที':'<br>ใช้เมื่อผู้ยืม (เช่น TAI) เบิกของมาทดแทนแล้ว ของทดแทนเข้าคลังตามขั้นตอน เบิก-รับ ปกติ')+'</span>';
+      (ext?'<br>กำหนดคืนเดิม '+esc(x.due)+(x.late>0?' (เกิน '+x.late+' วัน)':''):mode==='return'?'<br>ของจะกลับเข้าคลังเป็น "ในคลัง" ทันที':'<br>ใช้เมื่อผู้ยืม (เช่น TAI) เบิกของมาทดแทนแล้ว ของทดแทนเข้าคลังตามขั้นตอน เบิก-รับ ปกติ')+'</span>';
     $('la-qty').value = x.out; $('la-doc').value='';
     $('la-docwrap').style.display = mode==='replaced' ? 'block' : 'none';
     $('la-snwrap').style.display = (mode==='return' && x.serial) ? 'block' : 'none'; $('la-sn').value='';
-    $('la-submit').textContent = mode==='return' ? 'คืนเข้าคลัง' : 'ปิดรายการยืม';
+    $('la-submit').textContent = ext ? 'บันทึกวันใหม่' : mode==='return' ? 'คืนเข้าคลัง' : 'ปิดรายการยืม';
     $('la-bg').classList.add('on');
   }
   $('kl-list').addEventListener('click', function(e){
     var b;
     if((b=e.target.closest('button[data-lr]'))){ openLoanAction('return', findLoan2(Number(b.dataset.lr))); return; }
     if((b=e.target.closest('button[data-lp]'))){ openLoanAction('replaced', findLoan2(Number(b.dataset.lp))); return; }
+    if((b=e.target.closest('button[data-le]'))){ openLoanAction('extend', findLoan2(Number(b.dataset.le))); return; }
     if((b=e.target.closest('button[data-lu]'))){ startReqFromLoan(findLoan2(Number(b.dataset.lu))); return; }
+  });
+  $('la-extwrap').addEventListener('click', function(e){
+    var b=e.target.closest('button[data-ad]'); if(!b||!state.la) return;
+    var base=new Date(Math.max(Date.now(), state.la.x.dueMs||0)); base.setDate(base.getDate()+Number(b.dataset.ad));
+    $('la-due').value=base.getFullYear()+'-'+String(base.getMonth()+1).padStart(2,'0')+'-'+String(base.getDate()).padStart(2,'0');
   });
   $('la-x').addEventListener('click', function(){ $('la-bg').classList.remove('on'); });
   $('la-bg').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('on'); });
@@ -4083,11 +4097,14 @@ function snWatch(id, getSeq){
     if(!state.by){ askBy(function(){ $('la-submit').click(); }); return; }
     var s=state.la; if(!s) return;
     var btn=$('la-submit'); busy(btn,true);
-    var call = s.mode==='return'
+    var call = s.mode==='extend'
+      ? run('extendLoan', [{ seq:s.x.seq, due:$('la-due').value, reason:$('la-why').value.trim(), by:state.by }])
+      : s.mode==='return'
       ? run('returnLoan', [{ seq:s.x.seq, qty:$('la-qty').value, newSerial:$('la-sn').value.trim(), by:state.by }])
       : run('closeLoanReplaced', [{ seq:s.x.seq, qty:$('la-qty').value, docNo:$('la-doc').value, by:state.by }]);
     call.then(function(res){
       $('la-bg').classList.remove('on');
+      if(s.mode==='extend'){ toast('ขยายเวลาแล้ว · ครบกำหนดใหม่ '+res.due); loadLoans(); boot(); return; }
       toast(res.left>0 ? 'บันทึกแล้ว · ค้างยืมอีก '+fmtNum(res.left) : 'ปิดรายการยืมแล้ว');
       loadLoans(); boot();
     }).catch(function(e){ toast(e.message,true); }).then(function(){ busy(btn,false); });
