@@ -719,6 +719,14 @@ html[data-theme=dark] .dt .ty{background:#1b3a2c;color:#b7e4c7}
 html[data-theme=dark] .dt .ty.lru{background:#17365f;color:#cfe2fb}
 html[data-theme=dark] .dt-b{background:#16365d;border-color:#2f5a8c;color:#dbe8fb}
 html[data-theme=dark] .dt-b.pri{background:#2f6fb5;border-color:#2f6fb5;color:#fff}
+.cb-list{position:fixed;z-index:80;background:var(--card);border:1px solid #b9cde8;border-radius:12px;box-shadow:0 12px 32px rgba(8,25,55,.28);max-height:340px;overflow:auto;padding:4px}
+.cb-it{display:block;width:100%;text-align:left;padding:8px 12px;border:0;background:none;border-radius:8px;cursor:pointer;font:inherit;color:inherit}
+.cb-it[aria-selected=true]{background:rgba(70,120,190,.18)}
+@media (hover:hover) and (pointer:fine){.cb-it:hover{background:rgba(70,120,190,.12)}}
+.cb-m{display:block;font-weight:600;color:var(--navy-royal)}
+.cb-s{display:block;font-size:12.5px;color:var(--muted);margin-top:1px}
+html[data-theme=dark] .cb-list{border-color:#2f5a8c}
+html[data-theme=dark] .cb-m{color:#dbe8fb}
 #pc-bg{background:var(--bg);-webkit-backdrop-filter:none;backdrop-filter:none}
 #pc-bg .sheet{top:0;max-height:none;border-radius:0;max-width:none;width:100%;padding:14px 22px 22px}
 #pc-bg .sheet .hd{position:sticky;top:-14px;z-index:3;background:var(--bg);margin:0 -6px 10px;padding:8px 6px}
@@ -4783,6 +4791,62 @@ function snWatch(id, getSeq){
     var pcStand = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
     if(location.search.indexOf('pc=1')>=0 || (pcStand && window.innerWidth>=1024 && localStorage.getItem('pc-auto')==='1')) setTimeout(pcOpen,900);
   }catch(e){}
+
+  /* ---------- ช่องค้นหาแบบ combobox: พิมพ์แล้วมีเมนูรายการที่ตรงให้เลือก ---------- */
+  function cbAttach(input, getItems){
+    var list=document.createElement('div'); list.className='cb-list'; list.setAttribute('role','listbox'); list.id=input.id+'-cb'; list.hidden=true;
+    document.body.appendChild(list);
+    input.setAttribute('role','combobox'); input.setAttribute('aria-autocomplete','list'); input.setAttribute('aria-expanded','false'); input.setAttribute('aria-controls',list.id); input.setAttribute('autocomplete','off');
+    var items=[], cur=-1, skip=false;
+    function place(){ var r=input.getBoundingClientRect(); list.style.left=r.left+'px'; list.style.top=(r.bottom+4)+'px'; list.style.width=Math.max(r.width,260)+'px'; list.style.maxHeight=Math.max(160,Math.min(340,window.innerHeight-r.bottom-16))+'px'; }
+    function close(){ list.hidden=true; input.setAttribute('aria-expanded','false'); input.removeAttribute('aria-activedescendant'); cur=-1; }
+    function mark(n){ cur=n; Array.prototype.forEach.call(list.children,function(el,i){ el.setAttribute('aria-selected',i===n?'true':'false'); if(i===n){ input.setAttribute('aria-activedescendant',el.id); el.scrollIntoView({block:'nearest'}); } }); }
+    function pick(i){ var it=items[i]; if(!it) return; skip=true; input.value=it.value; input.dispatchEvent(new Event('input',{bubbles:true})); skip=false; close(); }
+    function open(){
+      var q=input.value.trim().toLowerCase();
+      if(!q){ close(); return; }
+      items=getItems(q)||[];
+      if(!items.length){ close(); return; }
+      list.innerHTML=items.map(function(it,i){ return '<button type="button" class="cb-it" role="option" id="'+list.id+'-'+i+'" aria-selected="false" data-i="'+i+'"><span class="cb-m">'+esc(it.main)+'</span>'+(it.sub?'<span class="cb-s">'+esc(it.sub)+'</span>':'')+'</button>'; }).join('');
+      place(); list.hidden=false; input.setAttribute('aria-expanded','true'); cur=-1;
+    }
+    input.addEventListener('input', function(){ if(!skip) open(); });
+    input.addEventListener('focus', function(){ if(input.value.trim()) open(); });
+    input.addEventListener('blur', function(){ setTimeout(close,120); });
+    input.addEventListener('keydown', function(e){
+      if(list.hidden){ if(e.key==='ArrowDown'&&input.value.trim()){ open(); e.preventDefault(); } return; }
+      if(e.key==='ArrowDown'){ mark((cur+1)%items.length); e.preventDefault(); }
+      else if(e.key==='ArrowUp'){ mark(cur<=0?items.length-1:cur-1); e.preventDefault(); }
+      else if(e.key==='Enter'){ if(cur>=0){ pick(cur); e.preventDefault(); } else close(); }
+      else if(e.key==='Escape'){ close(); }
+    });
+    list.addEventListener('mousedown', function(e){ e.preventDefault(); });
+    list.addEventListener('click', function(e){ var b=e.target.closest('.cb-it'); if(b) pick(Number(b.dataset.i)); });
+    window.addEventListener('resize', function(){ if(!list.hidden) place(); });
+    window.addEventListener('scroll', function(){ if(!list.hidden) place(); }, true);
+  }
+  function cbUniq(a){ var seen={}, out=[]; a.forEach(function(x){ var k=x.value+'|'+x.main; if(!seen[k]){ seen[k]=1; out.push(x); } }); return out.slice(0,8); }
+  cbAttach($('k-search'), function(q){
+    var a=[];
+    (state.stk||[]).forEach(function(g){
+      if(a.length>40) return;
+      var hit=qm(g.part+' '+g.name,q);
+      if(hit) a.push({main:g.part||g.name, sub:(g.part?g.name+' · ':'')+fmtNum(g.qty)+' '+(g.unit||''), value:g.part||g.name});
+      (g.lots||[]).forEach(function(l){
+        if(l.serial && qm(l.serial,q)) a.push({main:'S/N '+l.serial, sub:(g.part||'-')+' · '+g.name+(l.location?' · '+l.location:''), value:l.serial});
+        else if(l.location && !hit && qm(l.location,q)) a.push({main:l.location, sub:(g.part||'-')+' · '+g.name, value:l.location});
+      });
+    });
+    return cbUniq(a);
+  });
+  cbAttach($('c-search'), function(q){
+    return cbUniq((state.rcv||[]).filter(function(r){ return qm(r.docNo+' '+r.part+' '+r.name+' '+r.machine,q); })
+      .map(function(r){ return {main:r.docNo, sub:r.part+' · '+r.name+(r.machine?' · เครื่อง '+r.machine:''), value:r.docNo}; }));
+  });
+  cbAttach($('i-search'), function(q){
+    return cbUniq((state.iss||[]).filter(function(r){ return qm(r.docNo+' '+r.part+' '+r.serial+' '+r.name,q); })
+      .map(function(r){ return {main:r.docNo, sub:r.part+' · '+r.name+(r.serial?' · S/N '+r.serial:''), value:r.docNo}; }));
+  });
   $('db-btn').addEventListener('click', dbOpen);
   $('db-x').addEventListener('click', function(){ $('db-bg').classList.remove('on'); });
   function snOpen(serial){
