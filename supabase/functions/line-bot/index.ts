@@ -149,13 +149,19 @@ async function handleFile(ev: any) {
   const seen = (await getSet("line_seen")).split(",");
   if (seen.includes(m.id)) return;
   await setSet("line_seen", seen.concat([m.id]).slice(-30).join(","));
+  await setSet("line_last_file", `${name} · ${new Date().toISOString()} · เริ่มอ่าน`);   // ไว้ตรวจเมื่อฟังก์ชันล้มกลางคัน
   let msg: string;
   try {
     const dl = await fetch(`https://api-data.line.me/v2/bot/message/${m.id}/content`, { headers: { Authorization: "Bearer " + TOKEN } });
     if (!dl.ok) throw new Error("ดาวน์โหลดไฟล์จากไลน์ไม่ได้ (" + dl.status + ")");
     const buf = new Uint8Array(await dl.arrayBuffer());
     if (buf.length > 9 * 1024 * 1024) throw new Error("ไฟล์ใหญ่เกิน 9 MB");
-    const wb = XLSX.read(buf, { type: "array" });
+    await setSet("line_last_file", `${name} · ${buf.length} ไบต์ · ${new Date().toISOString()} · ดาวน์โหลดแล้ว`);
+    // ประหยัดหน่วยความจำ: ดูชื่อแท็บก่อน ถ้ามีแท็บ TAI อ่านแท็บเดียว ; ปิดสไตล์/สูตร/รูปแบบ ; ใช้โหมด dense
+    const lean = { type: "array", dense: true, cellStyles: false, cellNF: false, cellHTML: false, cellFormula: false, cellText: false } as any;
+    const names: string[] = XLSX.read(buf, { type: "array", bookSheets: true }).SheetNames;
+    const only = names.filter((n) => norm(n) === "พัสดุค้างจ่าย");
+    const wb = XLSX.read(buf, only.length ? { ...lean, sheets: only } : lean);
     const grids: { name: string; g: Grid }[] = wb.SheetNames.map((n: string) => {
       const ws = wb.Sheets[n];
       return { name: n, g: { vals: XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: "" }) as unknown[][], merges: (ws["!merges"] ?? []) as Grid["merges"] } };
